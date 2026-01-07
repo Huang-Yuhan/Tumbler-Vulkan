@@ -1,19 +1,37 @@
 #include <iostream>
+#include <set>
 #include <stdexcept>
 #include <core/VulkanDevice.h>
 
 namespace Tumbler {
     VulkanDevice::VulkanDevice(VkInstance instance, VkSurfaceKHR surface)
             : surface(surface) {
+        //首先获取物理设备
         pickPhysicalDevice(instance);
+        //然后创建逻辑设备
         createLogicalDevice();
         createCommandPool();
     }
 
-    VulkanDevice::~VulkanDevice() {
+    VulkanDevice::~VulkanDevice() noexcept {
         //先销毁commandpool,然后销毁设备
         vkDestroyCommandPool(logicalDevice, commandPool, nullptr);
         vkDestroyDevice(logicalDevice, nullptr);
+    }
+
+    uint32_t VulkanDevice::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
+    {
+        VkPhysicalDeviceMemoryProperties memProperties;
+        vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+
+        for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+            if ((typeFilter & (1 << i)) &&
+                (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+                return i;
+                }
+        }
+
+        throw std::runtime_error("failed to find suitable memory type!");
     }
 
     void VulkanDevice::pickPhysicalDevice(VkInstance instance) {
@@ -69,6 +87,7 @@ namespace Tumbler {
         return queue_family_indices.isComplete() && extensionsSupported && swapChainAdequate && supportedFeatures.samplerAnisotropy;
     }
 
+
     QueueFamilyIndices VulkanDevice::findQueueFamilies(VkPhysicalDevice device) const {
         QueueFamilyIndices queue_family_indices;
 
@@ -99,5 +118,74 @@ namespace Tumbler {
         }
 
         return queue_family_indices;
+    }
+
+    bool VulkanDevice::checkDeviceExtensionSupport(VkPhysicalDevice device)
+    {
+        uint32_t extensionCount;
+        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+
+        std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+
+        std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
+
+        for (const auto& extension : availableExtensions) {
+            requiredExtensions.erase(extension.extensionName);
+        }
+
+        return requiredExtensions.empty();
+    }
+
+    void VulkanDevice::createLogicalDevice()
+    {
+        std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+        std::set<uint32_t> uniqueQueueFamilies={
+            indices.graphicsFamily.value(),
+            indices.presentFamily.value()
+        };
+
+        float queuePriority=1.0f;
+        for (uint32_t queueFamily : uniqueQueueFamilies)
+        {
+            VkDeviceQueueCreateInfo queueCreateInfo{
+                .sType=VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+                .queueFamilyIndex=queueFamily,
+                .queueCount=1,
+                .pQueuePriorities=&queuePriority
+            };
+            queueCreateInfos.push_back(queueCreateInfo);
+        }
+        VkPhysicalDeviceFeatures deviceFeatures{
+            .samplerAnisotropy=VK_TRUE
+        };
+
+        VkDeviceCreateInfo deviceCreateInfo{
+            .sType=VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+            .queueCreateInfoCount=static_cast<uint32_t>(queueCreateInfos.size()),
+            .pQueueCreateInfos=queueCreateInfos.data(),
+            .enabledExtensionCount=static_cast<uint32_t>(deviceExtensions.size()),
+            .ppEnabledExtensionNames=deviceExtensions.data(),
+            .pEnabledFeatures=&deviceFeatures,
+        };
+        if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &logicalDevice) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create logical device!");
+        }
+        vkGetDeviceQueue(logicalDevice, indices.graphicsFamily.value(), 0, &graphicsQueue);
+        vkGetDeviceQueue(logicalDevice, indices.presentFamily.value(), 0, &presentQueue);
+    }
+
+    void VulkanDevice::createCommandPool()
+    {
+        VkCommandPoolCreateInfo poolInfo{
+            .sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+            .flags=VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+            .queueFamilyIndex=indices.graphicsFamily.value()
+        };
+        if (vkCreateCommandPool(logicalDevice, &poolInfo, nullptr, &commandPool) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create command pool!");
+        }
     }
 }
