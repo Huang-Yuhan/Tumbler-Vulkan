@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.31)
-project(Tumbler-Vulkan LANGUAGES CXX)
+project(Tumbler-Engine LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -8,44 +8,35 @@ if(MSVC)
     add_compile_options(/utf-8)
 endif()
 
-# 1. 依赖查找
+# 1. 查找依赖
 find_package(Vulkan REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 
-# 2. 添加 Shader 子目录 (我们之前做好的)
-add_subdirectory(shaders)
+# 2. 编译 Shader (跟之前一样)
+add_subdirectory(assets/shaders)
 
 # =========================================================
-# 3. 收集源文件
+# 3. 构建核心引擎库 (关键步骤)
 # =========================================================
-# 方式 A (推荐用于开发阶段)：递归查找 src 下所有 cpp
-file(GLOB_RECURSE SOURCE_FILES "src/*.cpp")
+# 收集核心源码
+file(GLOB_RECURSE CORE_SOURCES "src/core/*.cpp")
 
-# 方式 B (最严格，适合发布)：手动列出，防止意外编译
-# set(SOURCE_FILES
-#     src/main.cpp
-#     src/Application.cpp
-# )
+# 创建一个静态库 "TumblerCore"
+# STATIC 表示编译为 .lib 或 .a 文件
+add_library(TumblerCore STATIC ${CORE_SOURCES})
 
-# =========================================================
-# 4. 创建可执行文件
-# =========================================================
-add_executable(Tumbler-Vulkan ${SOURCE_FILES})
-
-# =========================================================
-# 5. 配置 Include 路径 (关键步骤)
-# =========================================================
-# 告诉 CMake，头文件在 include 目录下
-# PRIVATE 意味着这些路径只在这个目标内部使用
-target_include_directories(Tumbler-Vulkan PRIVATE
+# 配置库的头文件路径
+# PUBLIC 关键字很重要：这意味着链接了这个库的程序（如 rectangle），
+# 也会自动获得这些 Include 路径，不需要再写一遍。
+target_include_directories(TumblerCore PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src"
 )
 
-# =========================================================
-# 6. 链接库
-# =========================================================
-target_link_libraries(Tumbler-Vulkan PRIVATE
+# 配置库的链接依赖
+# PUBLIC 表示链接了 TumblerCore 的程序，也会自动链接 Vulkan/GLFW/GLM
+target_link_libraries(TumblerCore PUBLIC
         Vulkan::Vulkan
         glfw
         glm::glm
@@ -53,9 +44,13 @@ target_link_libraries(Tumbler-Vulkan PRIVATE
 
 # 平台适配
 if (WIN32)
-    target_link_libraries(Tumbler-Vulkan PRIVATE winmm)
+    target_link_libraries(TumblerCore PUBLIC winmm)
 elseif (APPLE)
-    target_link_libraries(Tumbler-Vulkan PRIVATE "-framework Cocoa" "-framework IOKit" "-framework CoreVideo")
+    target_link_libraries(TumblerCore PUBLIC "-framework Cocoa" "-framework IOKit" "-framework CoreVideo")
 endif()
 
-add_dependencies(Tumbler-Vulkan Shaders)
+# =========================================================
+# 4. 添加例子子目录
+# =========================================================
+# CMake 会进入这个文件夹寻找另一个 CMakeLists.txt
+add_subdirectory(src/examples)

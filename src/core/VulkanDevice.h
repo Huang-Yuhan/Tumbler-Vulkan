@@ -31,6 +31,12 @@ namespace Tumbler {
         }
     };
 
+    struct SwapChainSupportDetails {
+        VkSurfaceCapabilitiesKHR capabilities;
+        std::vector<VkSurfaceFormatKHR> formats;
+        std::vector<VkPresentModeKHR> presentModes;
+    };
+
 /**
  * @brief 封装 Vulkan 的物理设备与逻辑设备管理。
  * * @details
@@ -91,6 +97,11 @@ public:
     [[nodiscard]]
     QueueFamilyIndices getQueueFamilies() const { return indices; }
 
+    [[nodiscard]]
+    VkSurfaceKHR getSurface()const { return surface; }
+
+    SwapChainSupportDetails getSwapChainSupport() { return querySwapChainSupport(physicalDevice); }
+
     // =========================================================================
     // 核心工具函数
     // =========================================================================
@@ -115,6 +126,8 @@ private:
 
     /// @brief 创建默认的命令池 (Command Pool)
     void createCommandPool();
+
+    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
 
     // =========================================================================
     // 内部检查函数
@@ -142,6 +155,7 @@ private:
     VkCommandPool commandPool;                        /**< 主绘图命令池 */
 
     QueueFamilyIndices indices;                       /**< 缓存的队列族索引 */
+
 
     /// @brief 设备必须支持的扩展列表 (主要是 Swap chain)
     static constexpr std::array<const char*, 1> deviceExtensions = {
