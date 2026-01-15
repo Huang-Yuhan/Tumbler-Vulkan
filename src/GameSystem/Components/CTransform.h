@@ -95,3 +95,6 @@ public:
         return glm::vec3(GetLocalToWorldMatrix() * glm::vec4(localPoint, 1.0f));
     }
 };
+
+//CTransform必须可以转换为Component*
+static_assert(std::is_base_of_v<Component, CTransform>, "CTransform must be a subclass of Component");

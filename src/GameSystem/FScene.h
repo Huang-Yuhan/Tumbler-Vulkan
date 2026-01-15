@@ -1,8 +1,9 @@
 #pragma once
 #include <memory>
+#include <string>
 #include <vector>
 
-#include "FActor.h"
+class FActor;
 
 class FScene
 {
@@ -12,8 +13,17 @@ private:
     std::vector<FActor*> PendingKillActors;
 
 public:
-    FScene() = default;
-    ~FScene() = default;
+    FScene();
+    ~FScene();
+    // 移动构造函数 (Move Constructor)
+    FScene(FScene&& other) noexcept;
+
+    // 移动赋值运算符 (Move Assignment)
+    FScene& operator=(FScene&& other) noexcept;
+
+    // 禁用拷贝 (unique_ptr 不能拷贝，所以 FScene 也不能拷贝)
+    FScene(const FScene&) = delete;
+    FScene& operator=(const FScene&) = delete;
     // ==========================================
     // 生命周期管理
     // ==========================================
@@ -31,6 +41,6 @@ public:
     // 数据访问 (供 Renderer 使用)
     // ==========================================
 
-    const std::vector<std::unique_ptr<FActor>>& GetAllActors() const { return Actors; }
+    const std::vector<std::unique_ptr<FActor>>& GetAllActors()const;
 
 };

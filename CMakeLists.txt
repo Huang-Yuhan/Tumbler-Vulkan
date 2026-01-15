@@ -20,7 +20,19 @@ add_subdirectory(assets/shaders)
 # 3. 构建核心引擎库 (关键步骤)
 # =========================================================
 # 收集核心源码
-file(GLOB_RECURSE CORE_SOURCES "src/core/*.cpp")
+file(GLOB_RECURSE CORE_SOURCES "${CMAKE_SOURCE_DIR}/src/*.cpp")
+
+# =========================================================
+# 2. 收集 src/examples 下的 .cpp 文件 (这是我们要排除的黑名单)
+# =========================================================
+file(GLOB_RECURSE EXCLUDE_SOURCES "${CMAKE_SOURCE_DIR}/src/examples/*.cpp")
+
+# =========================================================
+# 3. 从核心源码列表中移除 examples 的文件
+# =========================================================
+if (EXCLUDE_SOURCES)
+    list(REMOVE_ITEM CORE_SOURCES ${EXCLUDE_SOURCES})
+endif()
 
 # 创建一个静态库 "TumblerCore"
 # STATIC 表示编译为 .lib 或 .a 文件

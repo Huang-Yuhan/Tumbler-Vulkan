@@ -1,23 +1,22 @@
 #pragma once
 
-#include <GameSystem/FActor.h>
+// 1. 前置声明 (正确，解耦了 FActor.h)
+class FActor;
 
 class Component
 {
-
 protected:
-    // [Ownership] 非拥有型指针 (Non-owning pointer)。
-    // 1. 避免循环引用：Component 由 Actor 通过 unique_ptr 强持有，若此处使用 shared_ptr 会导致内存泄漏。
-    // 2. 生命周期安全：Component 的生命周期完全依赖于 Actor，Actor 析构时会自动销毁 Component，
-    //    因此在 Component 存活期间，Owner 指针永远有效，无需使用 weak_ptr。
+    // [Ownership] 非拥有型指针
     FActor* Owner = nullptr;
+
 public:
-    virtual ~Component()=default;
-    void SetOwner(FActor* InOwner) { Owner = InOwner; }
+    Component();
+    virtual ~Component(); // 析构函数必须是 virtual
 
-    virtual FActor* GetOwner() { return Owner; }
-    virtual void Update(float DeltaTime){};
+    // 2. 只有声明，去掉花括号 {}
+    void SetOwner(FActor* InOwner);
+    virtual FActor* GetOwner();
 
+    // Update 也可以放进 cpp，保持整洁
+    virtual void Update(float DeltaTime);
 };
-
-

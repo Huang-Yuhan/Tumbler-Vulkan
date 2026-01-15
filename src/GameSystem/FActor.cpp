@@ -13,5 +13,8 @@ FActor* FActor::CreateActor(const std::string& name) {
     // 这里的 new FActor() 可以调用私有构造函数，因为 CreateActor 是成员函数
     const auto NewActor = new FActor();
     NewActor->Name = name;
+
+    NewActor->Transform.SetOwner(NewActor);
+
     return NewActor;
 }

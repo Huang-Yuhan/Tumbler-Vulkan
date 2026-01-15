@@ -74,3 +74,11 @@ public:
         return results;
     }
 };
+
+
+template<>
+inline CTransform * FActor::GetComponent<CTransform>()
+{
+    // 直接返回成员变量的地址
+    return &(this->Transform);
+}
