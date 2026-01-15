@@ -1,5 +1,5 @@
 #pragma once
-#include "GameSystem/FScene.h"
+#include "Core/GameSystem/FScene.h"
 
 
 class AppLogic
@@ -10,10 +10,13 @@ private:
 
 
     void InitializeScene();
+    void InitializePlanes() const;
 
 public:
     AppLogic();
     ~AppLogic();
+
+    [[nodiscard]] const FScene* GetScene() const;
 };
 
 

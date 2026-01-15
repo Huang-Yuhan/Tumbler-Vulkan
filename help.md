@@ -1,188 +1,231 @@
+这是一个为你量身定制的开发路线图文档。你可以把它保存为 `Tumbler_Dev_Plan.md`，或者直接导入到你的 Notion/Obsidian 里，每完成一项就打个钩。
 
-将庞大的 monolithic（单体）Vulkan 代码拆分成模块化、可复用的类是进阶图形编程的必经之路。Vulkan 的繁琐配置非常适合通过 **面向对象 (OOP)** 或 **RAII (资源获取即初始化)** 模式进行封装。
-
-以下是对现有代码的**拆分分析**以及**封装建议**。
-
----
-
-### 一、 核心模块分析：应该拆分成什么？
-
-我们可以按照**生命周期**和**功能职责**将代码划分为 5 个核心模块：
-
-| 模块名称 | 包含的 Vulkan 对象 | 职责 | 生命周期 |
-| --- | --- | --- | --- |
-| **1. Window (窗口)** | `GLFWwindow`, `VkSurfaceKHR` | 处理窗口创建、事件（按键/鼠标）、大小改变回调。 | 全局最长 |
-| **2. Device (设备上下文)** | `VkInstance`, `VkPhysicalDevice`, `VkDevice`, `VkQueue`, `DebugMessenger` | **最核心的类**。负责与显卡握手、分配队列、以及内存分配辅助函数。几乎所有其他类都要引用它。 | 全局，仅次于窗口 |
-| **3. SwapChain (交换链)** | `VkSwapchainKHR`, `VkImage`, `VkImageView`, `VkFramebuffer` | 管理屏幕画面、分辨率、双重缓冲。**难点：** 窗口大小时需要销毁重建。 | 随窗口大小变化 |
-| **4. Pipeline (管线)** | `VkPipeline`, `VkPipelineLayout`, `VkRenderPass` | 定义“怎么画”：Shader 加载、光栅化状态、深度测试配置等。 | 随材质/Shader变化 |
-| **5. Model (模型/资源)** | `VkBuffer`, `VkDeviceMemory` (Vertex/Index) | 定义“画什么”：管理顶点数据和索引数据的显存分配与上传。 | 随场景物体变化 |
-| **6. Renderer (渲染器)** | `VkCommandPool`, `VkCommandBuffer`, `SyncObjects` (Semaphores/Fences) | 调度中心。负责录制指令、提交队列、控制帧率同步。 | 每一帧都在工作 |
+这份计划严格遵循了我们确定的 **“引擎底层 (Platform/Graphics) 与 游戏逻辑 (GameSystem) 分离”** 的架构思想。
 
 ---
 
-### 二、 封装建议与接口设计
+# 🚀 Tumbler Engine 开发路线图
 
-我为你设计了一个经典的简易游戏引擎架构。
+**目标**：构建一个基于 Vulkan 的现代 C++ 渲染引擎框架，实现逻辑与渲染分离。
+**核心工具**：C++20, Vulkan, GLFW, VMA, GLM, CMake.
 
-#### 1. `VulkanDevice` 类 (核心基石)
+---
 
-这是第一个要提取的类。它将取代你代码中杂乱的 `initVulkan` 前半部分。
+## 📅 阶段一：基建施工 (Platform & Context)
 
-* **封装内容**：Instance, Debug, PhysicalDevice, Device, Queue, CommandPool (用于临时指令)。
-* **核心接口**：
-```cpp
-class VulkanDevice {
-public:
-    VulkanDevice(Window& window); // 构造时初始化 Vulkan
-    ~VulkanDevice(); // 析构时 vkDestroyDevice...
+**目标**：程序能编译通过，运行后弹出一个空白窗口，后台成功初始化 Vulkan 和 VMA，退出时无报错。
 
-    // 提供 Getter 给其他类使用
-    VkDevice device() { return device_; }
-    VkQueue graphicsQueue() { return graphicsQueue_; }
+### 1.1 文件结构与 CMake
 
-    // 核心工具：封装之前那个通用的 buffer 创建和内存查找函数
-    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, 
-                      VkMemoryPropertyFlags properties, VkBuffer& buffer, 
-                      VkDeviceMemory& bufferMemory);
-
-    // 核心工具：执行一次性指令（用于拷贝数据）
-    VkCommandBuffer beginSingleTimeCommands();
-    void endSingleTimeCommands(VkCommandBuffer commandBuffer);
-
-    // ...
-};
-
-```
+* [ ] **整理目录**：确保 `src` 下存在 `Platform`、`Graphics`、`Utils` 文件夹。
+* [ ] **更新 CMakeLists.txt**：
+* [ ] 确保 `file(GLOB ...)` 或手动添加包含了上述新目录。
+* [ ] 确保链接了 `glfw` 和 `vulkan` 库。
+* [ ] **关键**：通过 vcpkg 或手动引入 `VulkanMemoryAllocator` (VMA)。
 
 
 
-#### 2. `VulkanSwapChain` 类 (最麻烦的部分)
+### 1.2 窗口系统 (AppWindow)
 
-把所有跟屏幕显示相关的逻辑丢进去。
-
-* **封装内容**：SwapChain, Images, ImageViews, Framebuffers, Extent, Format.
-* **核心接口**：
-```cpp
-class VulkanSwapChain {
-public:
-    // 构造时需要 Device 和 Window 尺寸
-    VulkanSwapChain(VulkanDevice& device, VkExtent2D windowExtent);
-
-    // 获取下一张图，如果失败（窗口变化）返回错误码
-    VkResult acquireNextImage(uint32_t* imageIndex, VkSemaphore semaphore);
-
-    // 提交画面
-    VkResult submitCommandBuffers(const VkCommandBuffer* buffers, uint32_t* imageIndex);
-
-    // 关键：比较当前的 extent 和窗口实际大小，不一样则需要重建
-    bool compareSwapFormats(const VulkanSwapChain& swapChain) const;
-};
-
-```
+* [ ] **创建 `src/Platform/AppWindow.h` / `.cpp**`
+* [ ] 封装 `GLFWwindow*`。
+* [ ] 实现 `Init()`: 调用 `glfwInit`, `glfwCreateWindow`。
+* [ ] 实现 `PollEvents()`: 调用 `glfwPollEvents`。
+* [ ] 实现 `ShouldClose()`。
+* [ ] 实现 `CreateSurface(VkInstance)`: 封装 `glfwCreateWindowSurface`。
 
 
+* [ ] **验证点 1**：在 `main.cpp` 中实例化 `AppWindow`，确保窗口弹出且能关闭。
 
-#### 3. `VulkanPipeline` 类 (材质系统雏形)
+### 1.3 Vulkan 上下文 (VulkanContext)
 
-将来你可以有多个 Pipeline（一个画实心，一个画线框，一个画透明）。
+* [ ] **创建 `src/Utils/VulkanImplementation.cpp**`
+* [ ] 定义 `#define VMA_IMPLEMENTATION` 并包含 `vk_mem_alloc.h`。
 
-* **封装内容**：Pipeline, PipelineLayout, RenderPass (RenderPass 有时也可以独立).
-* **核心接口**：
-```cpp
-struct PipelineConfigInfo {
-    // ... 保存视口、光栅化、多重采样等配置结构体
-    // 提供一个 helper 函数设置默认值
-    static PipelineConfigInfo defaultPipelineConfigInfo(uint32_t width, uint32_t height);
-};
 
-class VulkanPipeline {
-public:
-    VulkanPipeline(VulkanDevice& device, 
-                   const std::string& vertFile, 
-                   const std::string& fragFile, 
-                   const PipelineConfigInfo& configInfo);
+* [ ] **创建 `src/Graphics/VulkanContext.h` / `.cpp**`
+* [ ] **Instance**: 创建 Vulkan Instance (开启 Validation Layers)。
+* [ ] **Surface**: 调用 `window->CreateSurface`。
+* [ ] **PhysicalDevice**: 选择一张支持 Graphics Queue 的显卡。
+* [ ] **LogicalDevice**: 创建 `VkDevice` 和 `VkQueue`。
+* [ ] **VMA**: 初始化 `VmaAllocator`。
 
-    void bind(VkCommandBuffer commandBuffer); // 执行 vkCmdBindPipeline
-};
 
-```
+* [ ] **验证点 2**：程序启动后控制台打印 "Vulkan Initialized"，退出时 Validation Layers 无报错。
+
+---
+
+## 📅 阶段二：建立画布 (Swapchain & Loop)
+
+**目标**：渲染器接管屏幕，能建立渲染循环，虽然屏幕是黑的（或闪烁颜色），但证明 GPU 正在每一帧工作。
+
+### 2.1 交换链 (VulkanSwapchain)
+
+* [ ] **创建 `src/Graphics/VulkanSwapchain.h` / `.cpp**`
+* [ ] **Init**: 创建 `VkSwapchainKHR` (选择 SurfaceFormat, PresentMode, Extent)。
+* [ ] **ImageViews**: 获取 `VkImage` 并为每个创建 `VkImageView`。
+* [ ] **Acquire**: 封装 `vkAcquireNextImageKHR`。
+* [ ] **Present**: 封装 `vkQueuePresentKHR`。
 
 
 
-#### 4. `VulkanModel` 类 (数据载体)
+### 2.2 渲染器框架 (VulkanRenderer - Part 1)
 
-这将极大简化 `main.cpp`。你不再需要手动管理 buffer 和 memory。
+* [ ] **更新 `src/Graphics/VulkanRenderer.h**`
+* [ ] 持有 `VulkanContext` 和 `VulkanSwapchain` 成员。
+* [ ] 实现 `Initialize(AppWindow*)`: 按顺序初始化 Context -> Swapchain。
 
-* **封装内容**：VertexBuffer, IndexBuffer, VertexCount.
-* **核心接口**：
-```cpp
-class VulkanModel {
-public:
-    struct Vertex { ... }; // 之前的 Vertex 结构体定义移到这里
 
-    VulkanModel(VulkanDevice& device, const std::vector<Vertex>& vertices, const std::vector<uint16_t>& indices);
-    ~VulkanModel();
+* [ ] **实现同步对象**
+* [ ] 创建 `VkFence` (RenderFence, 初始状态 Signal)。
+* [ ] 创建 `VkSemaphore` (ImageAvailable, RenderFinished)。
 
-    void bind(VkCommandBuffer commandBuffer); // 执行 vkCmdBindVertexBuffers + IndexBuffer
-    void draw(VkCommandBuffer commandBuffer); // 执行 vkCmdDrawIndexed
-};
 
-```
+* [ ] **实现命令缓冲**
+* [ ] 创建 `VkCommandPool`。
+* [ ] 分配 `VkCommandBuffer` (MainCommandBuffer)。
+
+
+
+### 2.3 渲染循环 (Render Loop)
+
+* [ ] **实现 `Render(FScene* scene)**` (暂时忽略 scene 参数)
+* [ ] `vkWaitForFences`: 等待上一帧。
+* [ ] `vkResetFences`: 重置信号。
+* [ ] `Swapchain.AcquireNextImage`: 获取图片索引。
+* [ ] `vkResetCommandBuffer`: 重置命令缓冲。
+* [ ] `vkBeginCommandBuffer` -> `vkEndCommandBuffer`: 录制一个空命令。
+* [ ] `vkQueueSubmit`: 提交命令 (等待 ImageAvailable，触发 RenderFinished)。
+* [ ] `Swapchain.PresentImage`: 显示画面。
+
+
+* [ ] **验证点 3**：运行程序，帧率正常（不卡顿），验证层无报错。
+
+---
+
+## 📅 阶段三：数据搬运 (Mesh & Memory)
+
+**目标**：打通 CPU 到 GPU 的数据通道，实现网格上传机制。
+
+### 3.1 资源定义
+
+* [ ] **创建 `src/Graphics/VulkanTypes.h**`
+* [ ] 定义 `struct AllocatedBuffer` (VkBuffer + VmaAllocation)。
+
+
+* [ ] **创建 `src/Graphics/FVulkanMesh.h**`
+* [ ] 定义 `struct FVulkanMesh` (持有 VertexBuffer, IndexBuffer)。
+* [ ] 实现 `Destroy(VmaAllocator)` 方法。
+
+
+
+### 3.2 净化 FMesh
+
+* [ ] **修改 `src/geometry/FMesh.h**`
+* [ ] **移除** `<vulkan/vulkan.h>`。
+* [ ] 确保 `FMesh` 只是纯数据 (`vector<uint8_t>`, `vector<uint32_t>`)。
+* [ ] 确保 `CreatePlane` 使用了 `#pragma pack` 和正确的内存布局。
+
+
+
+### 3.3 上传机制 (UploadMesh)
+
+* [ ] **在 `VulkanRenderer` 中实现辅助函数**
+* [ ] `CreateBuffer(...)`: 封装 `vmaCreateBuffer`。
+* [ ] `ImmediateSubmit(...)`: 用于执行单次拷贝命令。
+
+
+* [ ] **实现 `UploadMesh(FMesh* cpuMesh)**`
+* [ ] 检查 `MeshCache` 是否存在。
+* [ ] 创建 Staging Buffer (Host Visible)。
+* [ ] `memcpy` 数据到 Staging。
+* [ ] 创建 GPU Buffer (Device Local)。
+* [ ] `vkCmdCopyBuffer`: 拷贝 Staging -> GPU。
+* [ ] 销毁 Staging，存入 Cache。
 
 
 
 ---
 
-### 三、 封装后的 `main.cpp` 预览
+## 📅 阶段四：管线与绘制 (Pipeline & Draw)
 
-一旦你完成了上述封装，你的主程序将变得非常清爽，就像搭积木一样：
+**目标**：屏幕上出现一个彩色的几何体。这是最关键的视觉里程碑。
 
-```cpp
-void run() {
-    // 1. 初始化窗口和设备
-    Window window(800, 600, "Vulkan Encapsulated");
-    VulkanDevice device(window);
-    
-    // 2. 创建模型 (数据上传自动化)
-    std::vector<VulkanModel::Vertex> vertices = { ... };
-    std::vector<uint16_t> indices = { ... };
-    VulkanModel rectangleModel(device, vertices, indices);
+### 4.1 渲染管线基础设施
 
-    // 3. 创建渲染器和交换链
-    Renderer renderer(window, device);
-    
-    // 4. 主循环
-    while (!window.shouldClose()) {
-        glfwPollEvents();
+* [ ] **RenderPass**: 在 Renderer 中创建 `VkRenderPass` (包含 Color Attachment, ClearOp=Clear)。
+* [ ] **Framebuffers**: 为 Swapchain 的每个 ImageView 创建一个 `VkFramebuffer`。
 
-        // 获取指令缓冲开始录制
-        if (auto commandBuffer = renderer.beginFrame()) {
-            
-            // 开始渲染流程 (RenderPass)
-            renderer.beginSwapChainRenderPass(commandBuffer);
-            
-            // 绑定管线、绑定模型、绘制
-            simpleRenderSystem.renderGameObjects(commandBuffer, rectangleModel); // 假设你有个渲染系统
+### 4.2 着色器与管线
 
-            // 结束渲染流程
-            renderer.endSwapChainRenderPass(commandBuffer);
-            
-            // 提交并显示
-            renderer.endFrame();
-        }
-    }
-}
+* [ ] **编写 Shader**:
+* [ ] `shaders/triangle.vert`: 接收 Position/Normal/UV。
+* [ ] `shaders/triangle.frag`: 输出颜色。
+* [ ] 编译为 `.spv` 文件。
 
-```
 
-### 四、 你的下一步行动计划
+* [ ] **创建 `VkPipeline**`:
+* [ ] 定义 `VkPipelineLayout` (包含 Push Constants 范围，用于传 Model 矩阵)。
+* [ ] 编写 `VulkanUtils::GenerateAttributeDescriptions(FVertexLayout)`。
+* [ ] 配置 InputAssembly, Rasterizer, Multisampling 等。
 
-不要试图一次性全部拆完，否则一定会报一堆错。请按以下顺序一步步来：
 
-1. **第一步 (基础)**：创建 `lve_device.hpp/cpp` (LVE 是 Little Vulkan Engine 的缩写，一个很好的参考架构)。将 `PickPhysicalDevice`, `CreateLogicalDevice`, `CreateCommandPool` 以及 `findMemoryType` 移入其中。
-2. **第二步 (窗口)**：创建 `lve_window.hpp/cpp`，封装 GLFW 初始化。
-3. **第三步 (重构 Main)**：修改 `main.cpp`，让它使用上面两个新类，跑通程序（确保还是能画出三角形）。
-4. **第四步 (管线)**：创建 `lve_pipeline.hpp/cpp`，封装 Shader 读取和 Pipeline 创建。
-5. **第五步 (交换链)**：这是最难的一步，创建 `lve_swap_chain.hpp`，把 Framebuffer 和 ImageViews 移进去。
 
-**你需要我先演示哪一个类的具体代码实现？建议先从 `VulkanDevice` 开始，因为它是地基。**
+### 4.3 完成绘制命令
+
+* [ ] **完善 `RecordCommands**`:
+* [ ] `vkCmdBeginRenderPass` (设置 ClearColor 为蓝色或其他色)。
+* [ ] `vkCmdBindPipeline`.
+* [ ] `vkCmdPushConstants` (上传 Model 矩阵)。
+* [ ] `vkCmdBindVertexBuffers` & `IndexBuffer` (使用 `FVulkanMesh`).
+* [ ] `vkCmdDrawIndexed`.
+* [ ] `vkCmdEndRenderPass`.
+
+
+* [ ] **验证点 4**：屏幕上出现一个平面！
+
+---
+
+## 📅 阶段五：逻辑层接入 (Logic Integration)
+
+**目标**：通过 ECS 组件控制渲染，实现真正的引擎化。
+
+### 5.1 组件实现
+
+* [ ] **更新 `src/GameSystem/Components/CMeshRenderer.h**`
+* [ ] 持有 `std::shared_ptr<FMesh>`。
+* [ ] 持有 `std::shared_ptr<FMaterial>` (可选，先预留)。
+
+
+
+### 5.2 逻辑层代码
+
+* [ ] **在 `AppLogic::Init` 中**:
+* [ ] `FMesh::CreatePlane(...)` 生成网格数据。
+* [ ] `Scene->CreateActor("Floor")`。
+* [ ] `Actor->AddComponent<CMeshRenderer>()->SetMesh(...)`。
+* [ ] 设置 `Actor->Transform` 位置。
+
+
+
+### 5.3 联调 (The Final Link)
+
+* [ ] **更新 `VulkanRenderer::Render**`:
+* [ ] 遍历 `scene->GetAllActors()`。
+* [ ] 获取 `CMeshRenderer`。
+* [ ] 调用 `UploadMesh(renderer->GetMesh())`。
+* [ ] 获取 `Actor->Transform.GetLocalToWorldMatrix()`。
+* [ ] 执行绘制。
+
+
+
+---
+
+# 🛠️ 常用开发小贴士
+
+1. **Vulkan Validation Layers 是你的朋友**：只要屏幕黑了或者程序崩了，第一时间看控制台的红色报错。
+2. **小步快跑**：不要一次性写完一个阶段的代码再运行。比如写完 `VulkanContext` 就运行一下，确保 `vkCreateInstance` 返回 `VK_SUCCESS`。
+3. **命名空间**：记得所有代码都包在 `namespace Tumbler { ... }` 里。
+4. **编码问题**：如果 CLion 控制台乱码，记得设置环境变量 `VSLANG=1033`。
+
+祝开发顺利！我们先从 **阶段 1.2 AppWindow** 开始。

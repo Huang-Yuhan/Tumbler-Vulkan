@@ -4,14 +4,18 @@ project(Tumbler-Engine LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# 在 CMakeLists.txt 顶部
 if(MSVC)
-    add_compile_options(/utf-8)
+    add_compile_options("/utf-8")
 endif()
 
 # 1. 查找依赖
 find_package(Vulkan REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
+find_package(VulkanMemoryAllocator CONFIG REQUIRED)
+find_package(spdlog CONFIG REQUIRED)
+
 
 # 2. 编译 Shader (跟之前一样)
 add_subdirectory(assets/shaders)
@@ -20,19 +24,9 @@ add_subdirectory(assets/shaders)
 # 3. 构建核心引擎库 (关键步骤)
 # =========================================================
 # 收集核心源码
-file(GLOB_RECURSE CORE_SOURCES "${CMAKE_SOURCE_DIR}/src/*.cpp")
+file(GLOB_RECURSE CORE_SOURCES "${CMAKE_SOURCE_DIR}/src/core/*.cpp")
 
-# =========================================================
-# 2. 收集 src/examples 下的 .cpp 文件 (这是我们要排除的黑名单)
-# =========================================================
-file(GLOB_RECURSE EXCLUDE_SOURCES "${CMAKE_SOURCE_DIR}/src/examples/*.cpp")
 
-# =========================================================
-# 3. 从核心源码列表中移除 examples 的文件
-# =========================================================
-if (EXCLUDE_SOURCES)
-    list(REMOVE_ITEM CORE_SOURCES ${EXCLUDE_SOURCES})
-endif()
 
 # 创建一个静态库 "TumblerCore"
 # STATIC 表示编译为 .lib 或 .a 文件
@@ -52,6 +46,8 @@ target_link_libraries(TumblerCore PUBLIC
         Vulkan::Vulkan
         glfw
         glm::glm
+        GPUOpen::VulkanMemoryAllocator
+        spdlog::spdlog
 )
 
 # 平台适配

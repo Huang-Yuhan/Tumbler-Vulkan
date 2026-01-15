@@ -2,7 +2,7 @@
 #include "Component.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp> // 必须包含这个才能用 translate/scale
-#include <Utils/FQuaternion.hpp>
+#include <Core/Utils/FQuaternion.hpp>
 
 class CTransform final : public Component
 {

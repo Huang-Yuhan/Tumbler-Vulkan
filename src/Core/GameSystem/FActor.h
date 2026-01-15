@@ -5,9 +5,9 @@
 #include <memory>
 
 // 因为 Transform 是成员变量(值类型)，必须包含头文件，不能前置声明
-#include "GameSystem/Components/CTransform.h"
+#include "Core/GameSystem/Components/CTransform.h"
 // 因为 Template 函数里调用了 Comp->SetOwner，编译器需要看到 Component 的完整定义
-#include "GameSystem/Components/Component.h"
+#include "Core/GameSystem/Components/Component.h"
 
 class FActor {
 private:

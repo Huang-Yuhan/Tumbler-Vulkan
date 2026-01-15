@@ -61,3 +61,13 @@ const std::vector<std::unique_ptr<FActor>> & FScene::GetAllActors() const
 {
     return Actors;
 }
+
+FActor * FScene::FindActorByName(const std::string &name) const
+{
+    for (const auto& actor : Actors) {
+        if (actor->Name == name) {
+            return actor.get();
+        }
+    }
+    return nullptr;
+}

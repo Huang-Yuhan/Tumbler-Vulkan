@@ -1,2 +1,1 @@
-add_subdirectory(rectangle)
 add_subdirectory(Tumbler)

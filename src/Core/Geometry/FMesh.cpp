@@ -2,26 +2,10 @@
 #include <glm/glm.hpp> // 在 cpp 里包含真正的 glm
 
 
-// 这是一个内部辅助函数，不需要暴露给 .h
-// 放在这里，static 表示只在当前 cpp 文件可见
-static VkFormat GetVertexFormat(const EVertexAttribute attribute)
-{
-    switch (attribute)
-    {
-    case EVertexAttribute::Position:  return VK_FORMAT_R32G32B32_SFLOAT;
-    case EVertexAttribute::Normal:    return VK_FORMAT_R32G32B32_SFLOAT;
-    case EVertexAttribute::Tangent:   return VK_FORMAT_R32G32B32A32_SFLOAT;
-    case EVertexAttribute::Color:     return VK_FORMAT_R32G32B32A32_SFLOAT;
-    case EVertexAttribute::UV0:
-    case EVertexAttribute::UV1:       return VK_FORMAT_R32G32_SFLOAT;
-    default:                          return VK_FORMAT_UNDEFINED;
-    }
-}
-
 // FVertexLayout 实现
 void FVertexLayout::AddElement(const EVertexAttribute attribute, const uint32_t formatSize)
 {
-    FVertexElement element;
+    FVertexElement element{};
     element.Attribute = attribute;
     element.Offset = Stride;
     element.FormatSize = formatSize;
@@ -29,21 +13,6 @@ void FVertexLayout::AddElement(const EVertexAttribute attribute, const uint32_t 
     Stride += formatSize;
 }
 
-std::vector<VkVertexInputAttributeDescription> FVertexLayout::GetAttributeDescriptions() const
-{
-    std::vector<VkVertexInputAttributeDescription> descriptions;
-    uint32_t location = 0;
-    for (const auto& element : Elements)
-    {
-        VkVertexInputAttributeDescription desc{};
-        desc.binding = 0;
-        desc.location = location++;
-        desc.format = GetVertexFormat(element.Attribute); // 调用内部辅助函数
-        desc.offset = element.Offset;
-        descriptions.push_back(desc);
-    }
-    return descriptions;
-}
 
 // FMesh 实现
 FMesh FMesh::CreatePlane(const float width, const float height, const uint32_t subdivisionsWidth, const uint32_t subdivisionsHeight)

@@ -41,6 +41,8 @@ public:
     // 数据访问 (供 Renderer 使用)
     // ==========================================
 
-    const std::vector<std::unique_ptr<FActor>>& GetAllActors()const;
+    [[nodiscard]] const std::vector<std::unique_ptr<FActor>>& GetAllActors()const;
+
+    [[nodiscard]] FActor* FindActorByName(const std::string& name) const;
 
 };

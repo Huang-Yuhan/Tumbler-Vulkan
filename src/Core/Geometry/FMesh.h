@@ -1,7 +1,6 @@
 #pragma once
 
 #include <vector>
-#include <vulkan/vulkan_core.h> // 这里不得不包含，因为 VkFormat 也是接口的一部分
 
 
 // 枚举保持在头文件
@@ -29,7 +28,6 @@ struct FVertexLayout
 
     // 只保留声明
     void AddElement(EVertexAttribute attribute, uint32_t formatSize);
-    std::vector<VkVertexInputAttributeDescription> GetAttributeDescriptions() const;
 };
 
 class FMesh
@@ -41,9 +39,9 @@ private:
 
 public:
     // Getters 写在头文件里没问题，方便内联
-    const std::vector<uint8_t>& GetRawVertexData() const { return RawVertexData; }
-    const std::vector<uint32_t>& GetIndices() const { return Indices; }
-    const FVertexLayout& GetVertexLayout() const { return VertexLayout; }
+    [[nodiscard]] const std::vector<uint8_t>& GetRawVertexData() const { return RawVertexData; }
+    [[nodiscard]] const std::vector<uint32_t>& GetIndices() const { return Indices; }
+    [[nodiscard]] const FVertexLayout& GetVertexLayout() const { return VertexLayout; }
 
     // [重点] 复杂的工厂函数只保留声明
     static FMesh CreatePlane(float width, float height, uint32_t subdivisionsWidth, uint32_t subdivisionsHeight);
