@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.31)
 project(Tumbler-Engine LANGUAGES CXX)
 
+# 强制要求使用 MSVC 编译器
+if(WIN32 AND NOT MSVC)
+    message(FATAL_ERROR "本项目必须使用 MSVC 编译器编译。请在 CLion Toolchain 中切换为 Visual Studio 并重新 Reload。")
+endif()
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 

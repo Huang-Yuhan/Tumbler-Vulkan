@@ -1,0 +1,11 @@
+{
+  "name": "vulkan-project",
+  "version-string": "0.1.0",
+  "dependencies": [
+    "vulkan",
+    "glfw3",
+    "glm",
+    "vulkan-memory-allocator",
+    "spdlog"
+  ]
+}
