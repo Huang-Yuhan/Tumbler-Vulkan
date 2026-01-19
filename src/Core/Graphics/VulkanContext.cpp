@@ -215,6 +215,7 @@ void VulkanContext::PickPhysicalDevice() {
         if (indices.isComplete()) {
             PhysicalDevice = device;
             GraphicsQueueFamilyIndex = indices.graphicsFamily.value();
+            PresentQueueFamilyIndex = indices.presentFamily.value();
             break;
         }
     }

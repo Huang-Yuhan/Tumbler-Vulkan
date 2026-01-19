@@ -63,6 +63,8 @@ public:
     // 获取图形队列族索引 (在创建 CommandPool 时需要用到)
     [[nodiscard]] uint32_t GetGraphicsQueueFamily() const { return GraphicsQueueFamilyIndex; }
 
+    [[nodiscard]] uint32_t GetPresentQueueFamily() const { return PresentQueueFamilyIndex; }
+
     // 获取 VMA 内存分配器 (用于高效分配显存)
     [[nodiscard]] VmaAllocator GetAllocator() const { return Allocator; }
 
@@ -90,6 +92,8 @@ private:
 
     // 队列族索引：记录图形队列属于哪个家族 (Family)
     uint32_t GraphicsQueueFamilyIndex = 0;
+
+    uint32_t PresentQueueFamilyIndex = 0;
 
     // 7. VMA 分配器：Vulkan Memory Allocator 库的句柄，用来简化极其复杂的显存管理
     VmaAllocator Allocator = VK_NULL_HANDLE;
