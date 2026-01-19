@@ -100,6 +100,8 @@ void VulkanSwapchain::Init(VulkanContext* context, uint32_t width, uint32_t heig
         }
     }
 
+    CreateDepthResources();
+
     LOG_INFO("Swapchain Created. Size: {}x{}, Images: {}", Extent.width, Extent.height, Images.size());
 }
 
@@ -111,6 +113,19 @@ void VulkanSwapchain::Cleanup() {
             vkDestroyImageView(device, imageView, nullptr);
         }
         ImageViews.clear();
+
+        if (Swapchain != VK_NULL_HANDLE) {
+            vkDestroySwapchainKHR(device, Swapchain, nullptr);
+            Swapchain = VK_NULL_HANDLE;
+        }
+        if (DepthImage.ImageView != VK_NULL_HANDLE) {
+            vkDestroyImageView(device, DepthImage.ImageView, nullptr);
+            DepthImage.ImageView = VK_NULL_HANDLE;
+        }
+        if (DepthImage.Image != VK_NULL_HANDLE) {
+            vmaDestroyImage(ContextRef->GetAllocator(), DepthImage.Image, DepthImage.Allocation);
+            DepthImage.Image = VK_NULL_HANDLE;
+        }
 
         if (Swapchain != VK_NULL_HANDLE) {
             vkDestroySwapchainKHR(device, Swapchain, nullptr);
@@ -142,6 +157,58 @@ VkResult VulkanSwapchain::PresentImage(VkSemaphore renderFinishedSemaphore, uint
 // ==========================================
 // 辅助选择函数
 // ==========================================
+
+void VulkanSwapchain::CreateDepthResources()
+{// 我们要找一种显卡支持的深度格式 (通常是 D32_SFLOAT)
+    DepthFormat = VK_FORMAT_D32_SFLOAT;
+
+    VkExtent2D extent = GetExtent();
+
+    // 1. 创建 Image 也就是显存
+    VkImageCreateInfo imageInfo{};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.extent.width = extent.width;
+    imageInfo.extent.height = extent.height;
+    imageInfo.extent.depth = 1;
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 1;
+    imageInfo.format = DepthFormat;
+    // Tiling Optimal 意味着让显卡用它最喜欢的内存排列方式（此时 CPU 无法直接读写，但渲染极快）
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    // 用途：作为深度/模板附件
+    imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VmaAllocationCreateInfo allocInfo{};
+    allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE; // 纯 GPU 显存
+    allocInfo.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+    if (vmaCreateImage(ContextRef->GetAllocator(), &imageInfo, &allocInfo,
+        &DepthImage.Image, &DepthImage.Allocation, nullptr) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create depth image!");
+    }
+
+    // 2. 创建 ImageView (让 Vulkan 知道怎么看这张图)
+    VkImageViewCreateInfo viewInfo{};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = DepthImage.Image;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format = DepthFormat;
+    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT; // 这是一个深度图
+    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.levelCount = 1;
+    viewInfo.subresourceRange.baseArrayLayer = 0;
+    viewInfo.subresourceRange.layerCount = 1;
+
+    if (vkCreateImageView(ContextRef->GetDevice(), &viewInfo, nullptr, &DepthImage.ImageView) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create depth image view!");
+    }
+
+    LOG_INFO("Depth Resources Created");
+}
 
 VkSurfaceFormatKHR VulkanSwapchain::ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
     // 优先选 SRGB (标准颜色空间)

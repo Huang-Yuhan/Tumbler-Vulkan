@@ -81,35 +81,41 @@ void VulkanContext::Init(AppWindow* window) {
     InitVMA();
 }
 
-void VulkanContext::CleanUp() {
-    // 销毁顺序与创建相反
-
+void VulkanContext::Cleanup() {
     // 1. 销毁 VMA
     if (Allocator != VK_NULL_HANDLE) {
         vmaDestroyAllocator(Allocator);
+        Allocator = VK_NULL_HANDLE; // ✅ 必须置空！防止二次销毁
     }
 
     // 2. 销毁逻辑设备
     if (Device != VK_NULL_HANDLE) {
         vkDestroyDevice(Device, nullptr);
+        Device = VK_NULL_HANDLE; // ✅ 必须置空
     }
 
     // 3. 销毁 Surface
     if (Surface != VK_NULL_HANDLE) {
         vkDestroySurfaceKHR(Instance, Surface, nullptr);
+        Surface = VK_NULL_HANDLE; // ✅ 必须置空
     }
 
     // 4. 销毁调试器
     if (enableValidationLayers) {
-        DestroyDebugUtilsMessengerEXT(Instance, DebugMessenger, nullptr);
+        if (DebugMessenger != VK_NULL_HANDLE) {
+            DestroyDebugUtilsMessengerEXT(Instance, DebugMessenger, nullptr);
+            DebugMessenger = VK_NULL_HANDLE; // ✅ 必须置空
+        }
     }
 
     // 5. 销毁 Instance
     if (Instance != VK_NULL_HANDLE) {
         vkDestroyInstance(Instance, nullptr);
+        Instance = VK_NULL_HANDLE; // ✅ 必须置空
     }
 
     LOG_INFO("VulkanContext Cleaned up");
+
 }
 
 void VulkanContext::CreateInstance() {

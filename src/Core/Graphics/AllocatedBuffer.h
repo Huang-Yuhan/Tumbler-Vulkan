@@ -4,9 +4,9 @@
 
 struct AllocatedBuffer
 {
-    VkBuffer buffer=VK_NULL_HANDLE;
-    VmaAllocation allocation=nullptr;
+    VkBuffer Buffer=VK_NULL_HANDLE;
+    VmaAllocation Allocation=nullptr;
 
-    VmaAllocationInfo allocationInfo{};
+    VmaAllocationInfo Info{};
 };
 

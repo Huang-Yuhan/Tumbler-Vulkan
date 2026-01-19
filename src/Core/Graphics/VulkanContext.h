@@ -11,10 +11,10 @@ class VulkanContext
 {
 public:
     VulkanContext()=default;
-    ~VulkanContext(){CleanUp();}
+    ~VulkanContext(){Cleanup();}
 
     void Init(AppWindow* window);
-    void CleanUp();
+    void Cleanup();
 
     // ==========================================
     // Getter

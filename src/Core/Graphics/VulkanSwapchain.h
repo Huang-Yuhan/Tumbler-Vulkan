@@ -3,8 +3,16 @@
 #include <vulkan/vulkan.h>
 #include <vector>
 
+#include "AllocatedBuffer.h"
+
 // 前置声明
 class VulkanContext;
+
+struct AllocatedImage {
+    VkImage Image = VK_NULL_HANDLE;
+    VkImageView ImageView = VK_NULL_HANDLE;
+    VmaAllocation Allocation = VK_NULL_HANDLE;
+};
 
 class VulkanSwapchain {
 public:
@@ -32,6 +40,8 @@ public:
     VkExtent2D GetExtent() const { return Extent; }
     const std::vector<VkImageView>& GetImageViews() const { return ImageViews; }
     size_t GetImageCount() const { return Images.size(); }
+    VkFormat GetDepthFormat() const { return DepthFormat; }
+    VkImageView GetDepthImageView() const { return DepthImage.ImageView; }
 
 private:
     // 持有 Context 的指针，方便调用 vkDevice
@@ -47,6 +57,12 @@ private:
 
     VkFormat ImageFormat;
     VkExtent2D Extent;
+
+    AllocatedImage DepthImage;
+    VkFormat DepthFormat;
+
+    // 【新增】内部辅助函数
+    void CreateDepthResources();
 
     // 内部辅助函数
     VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);

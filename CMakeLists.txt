@@ -66,4 +66,4 @@ endif()
 # 4. 添加例子子目录
 # =========================================================
 # CMake 会进入这个文件夹寻找另一个 CMakeLists.txt
-add_subdirectory(src/examples)
+add_subdirectory(src/Examples)
