@@ -99,7 +99,7 @@ void VulkanSwapchain::Init(VulkanContext* context, uint32_t width, uint32_t heig
     CreateDepthResources();
     LOG_INFO("Vulkan Depth Resources Created");
 
-    LOG_INFO("Swapchain Created. Size: {}x{}, Images: {}", Extent.width, Extent.height, Images.size());
+    LOG_INFO("================= VulkanSwapchain Initialization Completed ================");
 }
 
 void VulkanSwapchain::Cleanup() {

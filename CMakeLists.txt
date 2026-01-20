@@ -20,6 +20,7 @@ find_package(glfw3 CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
+find_package(Stb REQUIRED)
 
 
 # 2. 编译 Shader (跟之前一样)
@@ -43,6 +44,7 @@ add_library(TumblerCore STATIC ${CORE_SOURCES})
 target_include_directories(TumblerCore PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
+        ${Stb_INCLUDE_DIR}
 )
 
 # 配置库的链接依赖

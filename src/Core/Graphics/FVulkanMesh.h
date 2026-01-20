@@ -1,6 +1,6 @@
 #pragma once
 
-#include "AllocatedBuffer.h"
+#include <Core/Graphics/VulkanTypes.h>
 #include "vulkan/vulkan.h"
 
 struct FVulkanMesh

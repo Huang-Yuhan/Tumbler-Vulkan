@@ -1,15 +1,19 @@
 #version 450
 
-// 1. 输入：从 Vertex Shader 传过来的颜色（如果有的话）
-layout(location = 0) in vec3 fragColor;
+// 输入：从 Vertex Shader 传来的 UV
+layout(location = 0) in vec2 inUV;
 
+// 输出
+layout(location = 0) out vec4 outFragColor;
 
-
-// 2. 输出：必须显式声明！Location 0 对应 Swapchain 的第一个附件
-layout(location = 0) out vec4 outColor;
+// 【新增】描述符绑定 (Set 0, Binding 0)
+// 对应 InitDescriptors 里的设置
+layout(set = 0, binding = 0) uniform sampler2D texSampler;
 
 void main() {
-    // 3. 赋值给输出变量，而不是 gl_FragColor
-    // 这里输出红色 (R=1, G=0, B=0, A=1)
-    outColor = vec4(fragColor, 1.0);
+    // 采样纹理颜色
+    outFragColor = texture(texSampler, inUV);
+
+    // 调试：如果你想把纹理和红色混合，可以写成:
+    // outFragColor = texture(texSampler, inUV) * vec4(1.0, 0.0, 0.0, 1.0);
 }

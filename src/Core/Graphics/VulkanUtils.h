@@ -1,5 +1,5 @@
 #pragma once
-#include <geometry/FMesh.h>
+#include <Core/Geometry/FMesh.h>
 #include <vulkan/vulkan.h>
 
 inline VkFormat GetVulkanFormat(EVertexAttribute attribute)

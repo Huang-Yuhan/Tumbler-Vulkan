@@ -237,7 +237,9 @@ void VulkanContext::CreateLogicalDevice() {
     };
 
     // 2. 描述逻辑设备特性 (暂时什么都不开启)
-    VkPhysicalDeviceFeatures deviceFeatures{};
+    VkPhysicalDeviceFeatures deviceFeatures{
+        .samplerAnisotropy = VK_TRUE
+    };
 
     // 3. 创建逻辑设备
 

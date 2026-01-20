@@ -1,19 +1,22 @@
 #version 450
 
+// 输入
 layout(location = 0) in vec3 inPosition;
-layout(location = 0) out vec3 fragColor;
+// layout(location = 1) in vec3 inNormal; // 暂时不用，但在内存里是存在的
+layout(location = 2) in vec2 inUV;       // 【新增】读取 UV
 
-// 【新增】Push Constant 数据块
-// 就像一个结构体，CPU 会把数据推送到这里
+// 输出
+layout(location = 0) out vec2 outUV;     // 【新增】传给 Fragment Shader
+
+// Push Constants
 layout(push_constant) uniform PushConstants {
-    mat4 render_matrix; // 变换矩阵 (MVP)
+    mat4 render_matrix;
 } constants;
 
 void main() {
-    // 矩阵乘法：Matrix * Vector
-    // 这将把顶点从模型空间变换到裁剪空间
+    // 变换坐标
     gl_Position = constants.render_matrix * vec4(inPosition, 1.0);
 
-    // 简单的颜色调试
-    fragColor = vec3(1.0, 0.0, 0.0);
+    // 传递 UV
+    outUV = inUV;
 }

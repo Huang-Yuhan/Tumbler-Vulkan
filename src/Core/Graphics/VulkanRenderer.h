@@ -3,12 +3,18 @@
 #include "VulkanContext.h"
 #include "VulkanSwapchain.h"
 #include "FVulkanMesh.h"
+#include "VulkanTypes.h"
 #include <vulkan/vulkan.h>
 #include <vector>
 #include <unordered_map>
 #include <functional>
+#include <memory>
+#include <string>
 #include <glm/glm.hpp>
 
+#include "Core/Assets/TextureManager.h"
+
+class FTexture;
 class AppWindow;
 class FMesh; // 前置声明
 
@@ -19,8 +25,8 @@ struct MeshPushConstants {
 
 class VulkanRenderer {
 public:
-    VulkanRenderer() = default;
-    ~VulkanRenderer() { Cleanup(); }
+    VulkanRenderer();
+    ~VulkanRenderer();
 
     void Init(AppWindow* window);
     void Cleanup();
@@ -29,7 +35,14 @@ public:
     void Render(FVulkanMesh* mesh, const glm::mat4& transformMatrix);
     FVulkanMesh& UploadMesh(FMesh* cpuMesh);
 
-    VkDevice GetDevice() const { return Context.GetDevice(); }
+    [[nodiscard]] VkDevice GetDevice() const { return Context.GetDevice(); }
+
+    // 让外部能获取到 TextureManager (比如逻辑层要预加载纹理)
+    [[nodiscard]] TextureManager* GetTextureManager() const { return TexManager.get(); }
+
+    // 【修改】LoadTexture 依然保留，但变成 public 或 friend，供 Manager 调用
+    // 建议把返回值改为 shared_ptr 以配合 Manager
+    std::shared_ptr<FTexture> LoadTexture(const std::string& filePath);
 
 private:
     VulkanContext Context;
@@ -53,6 +66,19 @@ private:
     VkPipelineLayout PipelineLayout = VK_NULL_HANDLE;
     VkPipeline GraphicsPipeline = VK_NULL_HANDLE;
 
+
+    // 改为持有 Manager
+    std::unique_ptr<TextureManager> TexManager;
+
+    // 我们可能需要一个变量来暂时存一下当前演示用的纹理
+    std::shared_ptr<FTexture> CurrentDemoTexture;
+
+
+    VkDescriptorSetLayout DescriptorSetLayout = VK_NULL_HANDLE;
+    VkDescriptorPool DescriptorPool = VK_NULL_HANDLE;
+    VkDescriptorSet TextureDescriptorSet = VK_NULL_HANDLE;
+
+
     // ==========================================
     // 内部函数
     // ==========================================
@@ -70,4 +96,9 @@ private:
     void ImmediateSubmit(std::function<void(VkCommandBuffer cmd)>&& function);
     void CreateBuffer(size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage, AllocatedBuffer& outBuffer);
     void DestroyBuffer(AllocatedBuffer& buffer);
+
+    void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+    void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+
+    void InitDescriptors();
 };

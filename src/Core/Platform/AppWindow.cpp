@@ -6,6 +6,7 @@
 #include <stdexcept>
 
 #include "Core/Utils/Log.h"
+#include "Core/Utils/VulkanUtils.h"
 
 AppWindow::AppWindow(const AppWindowConfig& config)
     : WindowConfig(config)
@@ -72,9 +73,7 @@ void AppWindow::GetFramebufferSize(int& width, int& height) const
 VkSurfaceKHR AppWindow::CreateSurface(VkInstance instance)
 {
     VkSurfaceKHR surface;
-    if (glfwCreateWindowSurface(instance, Handle, nullptr, &surface) != VK_SUCCESS) {
-        LOG_ERROR("Failed to create window surface");
-        throw std::runtime_error("Failed to create Vulkan surface");
-    }
+
+    VK_CHECK(glfwCreateWindowSurface(instance, Handle, nullptr, &surface));
     return surface;
 }
