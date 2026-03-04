@@ -30,7 +30,7 @@ add_subdirectory(assets/shaders)
 # 3. 构建核心引擎库 (关键步骤)
 # =========================================================
 # 收集核心源码
-file(GLOB_RECURSE CORE_SOURCES "${CMAKE_SOURCE_DIR}/src/core/*.cpp")
+file(GLOB_RECURSE CORE_SOURCES "${CMAKE_SOURCE_DIR}/src/Core/*.cpp")
 
 
 

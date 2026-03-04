@@ -24,7 +24,11 @@ void AppWindow::Init()
     if (!glfwInit()) {
         throw std::runtime_error("Failed to initialize GLFW");
     }
-
+    // 【新增】严格检查 GLFW 是否在当前系统上找到了 Vulkan
+    if (!glfwVulkanSupported()) {
+        LOG_CRITICAL("GLFW: Vulkan is NOT supported on this system!");
+        throw std::runtime_error("GLFW Vulkan not supported");
+    }
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, WindowConfig.Resizable ? GLFW_TRUE : GLFW_FALSE);
 

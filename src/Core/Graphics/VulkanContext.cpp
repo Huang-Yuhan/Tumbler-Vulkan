@@ -85,7 +85,7 @@ void VulkanContext::Init(AppWindow* window) {
 
     // 3. 创建 Surface (连接窗口)
     // 必须在 PickPhysicalDevice 之前，因为我们需要检查显卡是否支持画到这个窗口上
-    LOG_INFO("Creating Vulkan Instance");
+    LOG_INFO("Creating Vulkan Surface");
     Surface = window->CreateSurface(Instance);
 
     // 4. 选择物理显卡
@@ -306,7 +306,21 @@ std::vector<const char*> VulkanContext::GetRequiredExtensions() {
     uint32_t glfwExtensionCount = 0;
     const char **glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
+    // 【新增】严格检查 GLFW 是否成功获取到了平台扩展
+    if (glfwExtensions == nullptr) {
+        const char* description;
+        int code = glfwGetError(&description);
+        LOG_CRITICAL("GLFW failed to find required Vulkan surface extensions! Code: {}, Desc: {}",
+                     code, description ? description : "Unknown");
+        throw std::runtime_error("glfwGetRequiredInstanceExtensions returned NULL");
+    }
+
     std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+
+    // 【新增】打印一下它到底请求了什么扩展，心里有底
+    for (uint32_t i = 0; i < glfwExtensionCount; i++) {
+        LOG_INFO("GLFW Requested Extension: {}", glfwExtensions[i]);
+    }
 
     if constexpr (enableValidationLayers) {
         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
