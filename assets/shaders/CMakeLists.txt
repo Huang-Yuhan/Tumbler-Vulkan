@@ -13,7 +13,8 @@ endif()
 set(SHADER_SOURCE_DIR "${CMAKE_SOURCE_DIR}/assets/shaders")
 
 # 递归查找所有 shader 源码
-file(GLOB_RECURSE SHADER_SOURCES
+# 加上 CONFIGURE_DEPENDS，让 CMake 自动监控 Shader 文件的增减
+file(GLOB_RECURSE SHADER_SOURCES CONFIGURE_DEPENDS
         "${SHADER_SOURCE_DIR}/*.vert"
         "${SHADER_SOURCE_DIR}/*.frag"
         "${SHADER_SOURCE_DIR}/*.comp"

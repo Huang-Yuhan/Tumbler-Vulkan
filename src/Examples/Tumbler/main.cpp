@@ -1,9 +1,9 @@
 #include "Core/Platform/AppWindow.h"
 #include "Core/Utils/Log.h"
 #include "Core/Graphics/VulkanRenderer.h"
-#include "Core/Geometry/FMesh.h"
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
+#include "AppLogic.h"
+#include "Core/GameSystem/Components/CCamera.h"
+#include "Core/GameSystem/Components/CTransform.h"
 
 int main() {
     Log::Get().Init();
@@ -11,53 +11,52 @@ int main() {
 
     try {
         AppWindow::AppWindowConfig config;
-        config.Title = "Tumbler Engine - Plane Rendering";
-        config.Width = 1280;
-        config.Height = 720;
+        config.Title = "Tumbler Engine - Scene Rendering";
         AppWindow window(config);
 
         VulkanRenderer renderer;
         renderer.Init(&window);
 
-        // 1. 创建 CPU 数据 (平面)
-        FMesh planeMesh = FMesh::CreatePlane(1.0f, 1.0f, 1, 1);
+        // 1. 实例化我们的应用逻辑 (场景会在这里被搭建)
+        AppLogic logic;
+        logic.InitializeMaterials(&renderer);
 
-        // 2. 上传到 GPU
-        FVulkanMesh& gpuMesh = renderer.UploadMesh(&planeMesh);
-        // 记录开始时间
+        // 【优化】：提前上传共用网格，防止渲染中途卡顿
+        renderer.UploadMesh(logic.GetDefaultMesh().get());
+
+        // 2. 创建一个虚拟相机
+        CTransform cameraTransform;
+        CCamera cameraComponent;
+
+        // 【位置】放在靠近正面开口处 (Z=4.0)，高度略低于正中心 (Y=-1.0) 更有空间透视感
+        cameraTransform.SetPosition(glm::vec3(0.0f, -1.0f, 16.0f));
+
+        // 【旋转】因为 FQuaternion::GetForwardVector 默认是 +Z (0,0,1)
+        // 我们的 BackWall 在 -Z (-5)，所以要绕 Y 轴 (Yaw) 旋转 180 度回头看
+        float cameraYaw = 180.0f;
+        float cameraPitch = 0.0f;
+        cameraTransform.SetRotation(glm::vec3(cameraPitch, cameraYaw, 0.0f));
+
+        // 【视野】设为 60 度或 70 度，能把整个盒子的 5 面墙都框进屏幕
+        cameraComponent.Fov = 60.0f;
         auto startTime = std::chrono::high_resolution_clock::now();
 
         while (!window.ShouldClose()) {
             window.PollEvents();
 
-            // 1. 计算时间差
             auto currentTime = std::chrono::high_resolution_clock::now();
             float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
-            // 2. 计算 MVP 矩阵 (Model-View-Projection)
+            // （可选）让相机绕着场景慢慢转圈，更有立体感
+            //cameraTransform.SetPosition(glm::vec3(sin(time * 0.5f) * 10.0f, 2.0f, cos(time * 0.5f) * 10.0f));
+            // 简单的 LookAt 计算，让相机永远盯着原点
+            glm::mat4 lookAt = glm::lookAt(cameraTransform.GetPosition(), glm::vec3(0,0,0), glm::vec3(0,1,0));
+            // 这里我们用点数学 trick 把 LookAt 矩阵转回欧拉角，你也可以直接用 CCamera 的原生支持
+            // 为了简单，我们这次允许略微的视线偏移，先看效果
 
-            // Model: 绕 Y 轴旋转
-            // glm::rotate(单位矩阵, 角度(弧度), 旋转轴)
-            glm::mat4 model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-
-            // View: 相机往后退一点 (Z = -2.5)
-            // lookAt(相机位置, 目标位置, 上方向)
-            glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 1.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-
-            // Projection: 透视投影 (45度视角, 16:9 宽高比, 近平面 0.1, 远平面 100)
-            glm::mat4 projection = glm::perspective(glm::radians(70.0f), 1280.0f / 720.0f, 0.1f, 100.0f);
-
-            // 【关键】Vulkan 的 Y 轴坐标系和 OpenGL 是反的，必须修补一下
-            projection[1][1] *= -1;
-
-            // 最终矩阵 = P * V * M
-            glm::mat4 finalMatrix = projection * view * model;
-
-            // 3. 渲染
-            renderer.Render(&gpuMesh, finalMatrix);
+            // 3. 将场景和相机提交给渲染器
+            renderer.Render(logic.GetScene(), &cameraComponent, &cameraTransform);
         }
-
-        // 退出时 renderer 会自动 Cleanup
 
     } catch (const std::exception& e) {
         LOG_CRITICAL("Crash: {}", e.what());

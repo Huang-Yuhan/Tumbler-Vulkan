@@ -16,12 +16,10 @@
 
 class FTexture;
 class AppWindow;
-class FMesh; // 前置声明
-
-struct MeshPushConstants {
-    glm::vec4 data;
-    glm::mat4 render_matrix;
-};
+class FMesh;
+class FScene;
+class CCamera;
+class CTransform;
 
 class VulkanRenderer {
 public:
@@ -31,22 +29,29 @@ public:
     void Init(AppWindow* window);
     void Cleanup();
 
-    // 修改：允许传入 Mesh 指针进行绘制
-    void Render(FVulkanMesh* mesh, const glm::mat4& transformMatrix);
+    // 渲染接口：传入场景和相机
+    void Render(const FScene* scene, const CCamera* camera, const CTransform* cameraTransform);
     FVulkanMesh& UploadMesh(FMesh* cpuMesh);
 
     [[nodiscard]] VkDevice GetDevice() const { return Context.GetDevice(); }
-
-    // 让外部能获取到 TextureManager (比如逻辑层要预加载纹理)
     [[nodiscard]] TextureManager* GetTextureManager() const { return TexManager.get(); }
 
-    // 【修改】LoadTexture 依然保留，但变成 public 或 friend，供 Manager 调用
-    // 建议把返回值改为 shared_ptr 以配合 Manager
     std::shared_ptr<FTexture> LoadTexture(const std::string& filePath);
+
+    // ==========================================
+    // 【新增】公开给 FMaterial / FMaterialInstance 使用的接口
+    // ==========================================
+    [[nodiscard]] VkRenderPass GetRenderPass() const { return RenderPass; }
+    [[nodiscard]] VkExtent2D GetSwapchainExtent() const { return SwapChain.GetExtent(); }
+
+    bool LoadShaderModule(const char* filePath, VkShaderModule* outShaderModule);
+    void CreateBuffer(size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage, AllocatedBuffer& outBuffer);
+    void DestroyBuffer(AllocatedBuffer& buffer);
+    VkDescriptorSet AllocateDescriptorSet(VkDescriptorSetLayout layout);
 
 private:
     VulkanContext Context;
-    VulkanSwapchain Swapchain;
+    VulkanSwapchain SwapChain;
 
     VkRenderPass RenderPass = VK_NULL_HANDLE;
     std::vector<VkFramebuffer> Framebuffers;
@@ -57,48 +62,25 @@ private:
     VkSemaphore ImageAvailableSemaphore = VK_NULL_HANDLE;
     VkSemaphore RenderFinishedSemaphore = VK_NULL_HANDLE;
     VkFence RenderFence = VK_NULL_HANDLE;
-
-    // 数据上传相关
     VkFence UploadFence = VK_NULL_HANDLE;
+
     std::unordered_map<FMesh*, FVulkanMesh> MeshCache;
-
-    // 管线相关
-    VkPipelineLayout PipelineLayout = VK_NULL_HANDLE;
-    VkPipeline GraphicsPipeline = VK_NULL_HANDLE;
-
-
-    // 改为持有 Manager
     std::unique_ptr<TextureManager> TexManager;
 
-    // 我们可能需要一个变量来暂时存一下当前演示用的纹理
-    std::shared_ptr<FTexture> CurrentDemoTexture;
-
-
-    VkDescriptorSetLayout DescriptorSetLayout = VK_NULL_HANDLE;
+    // 【修改】只保留池子，删除具体的 Layout 和 Pipeline
     VkDescriptorPool DescriptorPool = VK_NULL_HANDLE;
-    VkDescriptorSet TextureDescriptorSet = VK_NULL_HANDLE;
 
-
-    // ==========================================
     // 内部函数
-    // ==========================================
     void InitRenderPass();
     void InitFramebuffers();
     void InitCommands();
     void InitSyncStructures();
     void InitUploadSync();
-    void InitGraphicsPipeline(); // 初始化管线
+    void InitDescriptors(); // 这个还在，但内容变了
 
-    bool LoadShaderModule(const char* filePath, VkShaderModule* outShaderModule);
-
-    // 修改：Record 接收 Mesh 参数
-    void RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, FVulkanMesh* mesh, const glm::mat4& matrix);
+    // 录制命令缓冲
+    void RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, const FScene* scene, const CCamera* camera, const CTransform* cameraTransform);
     void ImmediateSubmit(std::function<void(VkCommandBuffer cmd)>&& function);
-    void CreateBuffer(size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage, AllocatedBuffer& outBuffer);
-    void DestroyBuffer(AllocatedBuffer& buffer);
-
     void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
     void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
-
-    void InitDescriptors();
 };

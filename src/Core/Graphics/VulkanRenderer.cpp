@@ -1,6 +1,12 @@
+#include "Core/GameSystem/FScene.h"
+#include "Core/GameSystem/FActor.h"
+#include "Core/GameSystem/Components/CMeshRenderer.h"
+#include "Core/GameSystem/Components/CCamera.h"
 #include "Core/Graphics/VulkanRenderer.h"
 #include "Core/Platform/AppWindow.h"
 #include "Core/Utils/Log.h"
+#include "Core/Assets/FMaterial.h"          // 【新增】
+#include "Core/Assets/FMaterialInstance.h"  // 【新增】
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -33,7 +39,7 @@ void VulkanRenderer::Init(AppWindow* window) {
 
     int width, height;
     window->GetFramebufferSize(width, height);
-    Swapchain.Init(&Context, width, height);
+    SwapChain.Init(&Context, width, height);
 
     InitRenderPass();
     InitFramebuffers();
@@ -43,14 +49,8 @@ void VulkanRenderer::Init(AppWindow* window) {
 
     TexManager=std::make_unique<TextureManager>(this);
 
-    CurrentDemoTexture= TexManager->GetTexture("assets/textures/1.jpg");
 
     InitDescriptors();
-
-    // 管线依赖 RenderPass，必须在之后初始化
-    InitGraphicsPipeline();
-
-
 
     LOG_INFO("================= VulkanRenderer Initialization Completed ================");
 }
@@ -69,10 +69,6 @@ void VulkanRenderer::Cleanup() {
     }
     MeshCache.clear();
 
-    // 2. 清理管线 (新增)
-    if (GraphicsPipeline != VK_NULL_HANDLE) vkDestroyPipeline(device, std::exchange(GraphicsPipeline,VK_NULL_HANDLE), nullptr);
-    if (PipelineLayout != VK_NULL_HANDLE) vkDestroyPipelineLayout(device, std::exchange(PipelineLayout,VK_NULL_HANDLE), nullptr);
-
     // 3. 清理同步对象
     if (UploadFence != VK_NULL_HANDLE) vkDestroyFence(device,std::exchange(UploadFence,VK_NULL_HANDLE), nullptr);
     if (RenderFence != VK_NULL_HANDLE) vkDestroyFence(device, std::exchange(RenderFence,VK_NULL_HANDLE), nullptr);
@@ -89,22 +85,19 @@ void VulkanRenderer::Cleanup() {
     if (auto descriptorPool = std::exchange(DescriptorPool, VK_NULL_HANDLE); descriptorPool != VK_NULL_HANDLE) {
         vkDestroyDescriptorPool(device, descriptorPool, nullptr);
     }
-    if (auto descriptorSetLayout = std::exchange(DescriptorSetLayout, VK_NULL_HANDLE); descriptorSetLayout != VK_NULL_HANDLE) {
-        vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
-    }
 
-    CurrentDemoTexture.reset();
-    TexManager->Cleanup();
+
+    if (TexManager)TexManager->Cleanup();
     TexManager.reset();
 
-    Swapchain.Cleanup();
+    SwapChain.Cleanup();
     Context.Cleanup();
 }
 
 void VulkanRenderer::InitRenderPass() {
     // 1. 颜色附件 (保持不变)
     VkAttachmentDescription colorAttachment{};
-    colorAttachment.format = Swapchain.GetImageFormat();
+    colorAttachment.format = SwapChain.GetImageFormat();
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -121,7 +114,7 @@ void VulkanRenderer::InitRenderPass() {
     // 【新增】2. 深度附件
     // ===========================================
     VkAttachmentDescription depthAttachment{};
-    depthAttachment.format = Swapchain.GetDepthFormat(); // D32_SFLOAT
+    depthAttachment.format = SwapChain.GetDepthFormat(); // D32_SFLOAT
     depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
     depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // 每一帧都要清除深度！
     depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // 渲染完我们不需要保存深度图
@@ -169,8 +162,8 @@ void VulkanRenderer::InitRenderPass() {
 }
 
 void VulkanRenderer::InitFramebuffers() {
-    const auto& imageViews = Swapchain.GetImageViews();
-    VkExtent2D extent = Swapchain.GetExtent();
+    const auto& imageViews = SwapChain.GetImageViews();
+    VkExtent2D extent = SwapChain.GetExtent();
 
     Framebuffers.resize(imageViews.size());
 
@@ -178,7 +171,7 @@ void VulkanRenderer::InitFramebuffers() {
         // 【修改】附件列表：颜色 + 深度
         std::array<VkImageView, 2> attachments = {
             imageViews[i],
-            Swapchain.GetDepthImageView() // 所有的 Framebuffer 共用这一张深度图
+            SwapChain.GetDepthImageView() // 所有的 Framebuffer 共用这一张深度图
         };
 
         VkFramebufferCreateInfo framebufferInfo{};
@@ -226,21 +219,19 @@ void VulkanRenderer::InitSyncStructures() {
     VK_CHECK(vkCreateFence(device, &fenceInfo, nullptr, &RenderFence));
 }
 
-void VulkanRenderer::Render(FVulkanMesh* mesh,const glm::mat4& transformMatrix) {
+void VulkanRenderer::Render(const FScene* scene, const CCamera* camera, const CTransform* cameraTransform) {
     VkDevice device = Context.GetDevice();
     vkWaitForFences(device, 1, &RenderFence, VK_TRUE, UINT64_MAX);
 
     uint32_t imageIndex;
-    VkResult result = Swapchain.AcquireNextImage(ImageAvailableSemaphore, imageIndex);
-    if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-        throw std::runtime_error("Failed to acquire swap chain image!");
-    }
+    VkResult result = SwapChain.AcquireNextImage(ImageAvailableSemaphore, imageIndex);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) return; // 窗口大小改变时防崩溃
 
     vkResetFences(device, 1, &RenderFence);
     vkResetCommandBuffer(MainCommandBuffer, 0);
 
-    // 传递 Mesh 给录制函数
-    RecordCommandBuffer(MainCommandBuffer, imageIndex, mesh,transformMatrix);
+    // 把场景和相机传给录制函数
+    RecordCommandBuffer(MainCommandBuffer, imageIndex, scene, camera, cameraTransform);
 
     VkSubmitInfo submitInfo{VK_STRUCTURE_TYPE_SUBMIT_INFO};
     VkSemaphore waitSemaphores[] = {ImageAvailableSemaphore};
@@ -256,10 +247,9 @@ void VulkanRenderer::Render(FVulkanMesh* mesh,const glm::mat4& transformMatrix) 
 
     VK_CHECK(vkQueueSubmit(Context.GetGraphicsQueue(), 1, &submitInfo, RenderFence));
 
-    Swapchain.PresentImage(RenderFinishedSemaphore, imageIndex);
+    SwapChain.PresentImage(RenderFinishedSemaphore, imageIndex);
 }
-void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t imageIndex, FVulkanMesh* mesh, const glm::mat4& matrix) {
-     // 更新 Push Constants
+void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t imageIndex, const FScene* scene, const CCamera* camera, const CTransform* cameraTransform) {
     VkCommandBufferBeginInfo beginInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
     vkBeginCommandBuffer(cmdBuffer, &beginInfo);
 
@@ -267,56 +257,54 @@ void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t ima
     renderPassInfo.renderPass = RenderPass;
     renderPassInfo.framebuffer = Framebuffers[imageIndex];
     renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent = Swapchain.GetExtent();
+    renderPassInfo.renderArea.extent = SwapChain.GetExtent();
 
-    // 【修改】清除值数组
     std::array<VkClearValue, 2> clearValues{};
-    // 0: 颜色 (深青色)
     clearValues[0].color = {{0.1f, 0.1f, 0.1f, 1.0f}};
-    // 1: 深度 (1.0 代表最远，所以我们清除为 1.0)
     clearValues[1].depthStencil = {1.0f, 0};
-
     renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
     renderPassInfo.pClearValues = clearValues.data();
 
     vkCmdBeginRenderPass(cmdBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    // 1. 绑定管线
-    vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, GraphicsPipeline);
+    // 获取相机的矩阵
+    glm::mat4 view = camera->GetViewMatrix(*cameraTransform);
+    float aspect = (float)SwapChain.GetExtent().width / (float)SwapChain.GetExtent().height;
+    glm::mat4 proj = camera->GetProjectionMatrix(aspect);
 
-    // 2. 绘制 Mesh
-    if (mesh) {
-        vkCmdPushConstants(
-            cmdBuffer,
-            PipelineLayout,
-            VK_SHADER_STAGE_VERTEX_BIT,
-            0,
-            sizeof(glm::mat4),
-            &matrix // 数据指针
-        );
+    // 【核心】遍历场景绘制
+    if (scene) {
+        for (const auto& actorPtr : scene->GetAllActors()) {
+            FActor* actor = actorPtr.get();
+            auto* meshRenderer = actor->GetComponent<CMeshRenderer>();
 
-        vkCmdBindDescriptorSets(
-                    cmdBuffer,
-                    VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    PipelineLayout,
-                    0, // First Set
-                    1, // DescriptorSetCount
-                    &TextureDescriptorSet, // 我们的纹理集
-                    0, nullptr // Dynamic Offsets
-                );
+            // 安全检查
+            if (!meshRenderer || !meshRenderer->IsVisible() || !meshRenderer->GetMesh() || !meshRenderer->GetMaterial()) continue;
 
+            auto materialInstance = meshRenderer->GetMaterial();
+            auto parentMaterial = materialInstance->GetParent();
 
-        VkBuffer vertexBuffers[] = {mesh->VertexBuffer.Buffer};
-        VkDeviceSize offsets[] = {0};
+            // 1. 绑定母体管线 (Pipeline)
+            vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, parentMaterial->Pipeline);
 
-        // 绑定 Vertex Buffer (Slot 0)
-        vkCmdBindVertexBuffers(cmdBuffer, 0, 1, vertexBuffers, offsets);
+            // 2. 绑定实例的参数 (Descriptor Set: 包含贴图和UBO)
+            VkDescriptorSet descSet = materialInstance->GetDescriptorSet();
+            vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, parentMaterial->PipelineLayout, 0, 1, &descSet, 0, nullptr);
 
-        // 绑定 Index Buffer
-        vkCmdBindIndexBuffer(cmdBuffer, mesh->IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+            // 3. 计算并推送 MVP 矩阵
+            glm::mat4 model = actor->Transform.GetLocalToWorldMatrix();
+            glm::mat4 mvp = proj * view * model;
+            vkCmdPushConstants(cmdBuffer, parentMaterial->PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &mvp);
 
-        // 绘制
-        vkCmdDrawIndexed(cmdBuffer, mesh->IndexCount, 1, 0, 0, 0);
+            // 4. 上传并绑定 Mesh，执行绘制
+            FVulkanMesh& gpuMesh = UploadMesh(meshRenderer->GetMesh().get());
+            VkBuffer vertexBuffers[] = {gpuMesh.VertexBuffer.Buffer};
+            VkDeviceSize offsets[] = {0};
+            vkCmdBindVertexBuffers(cmdBuffer, 0, 1, vertexBuffers, offsets);
+            vkCmdBindIndexBuffer(cmdBuffer, gpuMesh.IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+
+            vkCmdDrawIndexed(cmdBuffer, gpuMesh.IndexCount, 1, 0, 0, 0);
+        }
     }
 
     vkCmdEndRenderPass(cmdBuffer);
@@ -470,91 +458,6 @@ FVulkanMesh& VulkanRenderer::UploadMesh(FMesh* cpuMesh) {
     return MeshCache[cpuMesh];
 }
 
-void VulkanRenderer::InitGraphicsPipeline() {
-    VkDevice device = Context.GetDevice();
-
-    // 1. 加载 Shader 二进制代码
-    // 注意：请根据你的运行目录调整路径
-    // 如果你在 CLion 运行，通常需要退两层目录找到 assets
-    VkShaderModule vertModule, fragModule;
-    if (!LoadShaderModule("./assets/shaders/example/triangle/triangle.vert.spv", &vertModule) ||
-        !LoadShaderModule("./assets/shaders/example/triangle/triangle.frag.spv", &fragModule))
-    {
-        throw std::runtime_error("Failed to load shader modules!");
-    }
-    // ===========================================
-    // 【修改】配置 Push Constants 范围
-    // ===========================================
-    VkPushConstantRange pushConstantRange{};
-    pushConstantRange.offset = 0;
-    pushConstantRange.size = sizeof(glm::mat4); // 一个矩阵的大小 (64字节)
-    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT; // 只有 Vertex Shader 用到了
-
-
-    // 2. 创建 Pipeline Layout
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-
-    pipelineLayoutInfo.pushConstantRangeCount = 1;
-    pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
-
-    pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &DescriptorSetLayout; // 绑定描述符集布局
-
-    VK_CHECK(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &PipelineLayout));
-
-    // 3. 配置顶点输入 (Input State)
-    auto builder = VulkanPipelineBuilder::Begin(PipelineLayout);
-
-    // [关键] 绑定描述：告诉 GPU 每个顶点跨度多少字节
-    // FMesh::CreatePlane 的布局是 Pos(3) + Norm(3) + UV(2) = 8 floats = 32 bytes
-    VkVertexInputBindingDescription bindingDescription{};
-    bindingDescription.binding = 0;
-    bindingDescription.stride = 8 * sizeof(float); // 32 bytes
-    bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-    std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
-
-    // 顶点
-    attributeDescriptions.push_back({
-        .location = 0,
-        .binding = 0,
-        .format = VK_FORMAT_R32G32B32_SFLOAT,
-        .offset = 0
-    });
-
-    // 法线先跳过
-
-    // UV
-    attributeDescriptions.push_back({
-        .location = 2,
-        .binding = 0,
-        .format = VK_FORMAT_R32G32_SFLOAT,
-        .offset = 6 * sizeof(float)
-    });
-
-
-
-    builder.VertexInputInfo.vertexBindingDescriptionCount = 1;
-    builder.VertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-    builder.VertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
-    builder.VertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
-
-    // 4. 构建管线
-    GraphicsPipeline = builder
-        .SetShaders(vertModule, fragModule)
-        .SetViewport(Swapchain.GetExtent().width, Swapchain.GetExtent().height)
-        .SetInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
-        .SetPolygonMode(VK_POLYGON_MODE_FILL)
-        .SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE) // 暂时不剔除，方便调试
-        .SetMultisamplingNone()
-        .EnableDepthTest(VK_TRUE,VK_COMPARE_OP_LESS)
-        .SetColorBlending(true)
-        .Build(device, RenderPass);
-
-    vkDestroyShaderModule(device, vertModule, nullptr);
-    vkDestroyShaderModule(device, fragModule, nullptr);
-    LOG_INFO("Graphics Pipeline Created");
-}
 
 
 std::shared_ptr<FTexture> VulkanRenderer::LoadTexture(const std::string& filePath) {
@@ -723,76 +626,33 @@ void VulkanRenderer::CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t 
 void VulkanRenderer::InitDescriptors() {
     VkDevice device = Context.GetDevice();
 
-    // ---------------------------------------------------------
-    // 1. 创建 Layout (描述符的形状)
-    // 告诉管线：Binding 0 是一个 Combined Image Sampler，只在 Fragment Shader 使用
-    // ---------------------------------------------------------
-    VkDescriptorSetLayoutBinding textureBinding{};
-    textureBinding.binding = 0;
-    textureBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    textureBinding.descriptorCount = 1;
-    textureBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    textureBinding.pImmutableSamplers = nullptr;
-
-    VkDescriptorSetLayoutCreateInfo layoutInfo{};
-    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 1;
-    layoutInfo.pBindings = &textureBinding;
-
-    if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &DescriptorSetLayout) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create descriptor set layout!");
-    }
-
-    // ---------------------------------------------------------
-    // 2. 创建 Pool (显存池)
-    // 我们只需要 1 个 Set，里面包含 1 个 Sampler
-    // ---------------------------------------------------------
-    VkDescriptorPoolSize poolSize{};
-    poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSize.descriptorCount = 1;
+    // 准备两份容量：支持 1000 个采样器和 1000 个 UBO
+    std::array<VkDescriptorPoolSize, 2> poolSizes{};
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[0].descriptorCount = 1000;
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[1].descriptorCount = 1000;
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = 1;
-    poolInfo.pPoolSizes = &poolSize;
-    poolInfo.maxSets = 1; // 池子总容量
+    poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+    poolInfo.pPoolSizes = poolSizes.data();
+    poolInfo.maxSets = 1000; // 池子总共能发 1000 套 Set
 
     if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &DescriptorPool) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create descriptor pool!");
     }
+    LOG_INFO("Descriptor Pool Initialized (Capacity: 1000 Sets)");
+}
 
-    // ---------------------------------------------------------
-    // 3. 分配 Set (Allocate)
-    // ---------------------------------------------------------
+VkDescriptorSet VulkanRenderer::AllocateDescriptorSet(VkDescriptorSetLayout layout) {
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocInfo.descriptorPool = DescriptorPool;
     allocInfo.descriptorSetCount = 1;
-    allocInfo.pSetLayouts = &DescriptorSetLayout;
+    allocInfo.pSetLayouts = &layout;
 
-    if (vkAllocateDescriptorSets(device, &allocInfo, &TextureDescriptorSet) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate descriptor set!");
-    }
-
-    // ---------------------------------------------------------
-    // 4. 写入/更新 Set (Update)
-    // 把真正的纹理资源 (Stage 7.1 创建的) 填进去
-    // ---------------------------------------------------------
-    VkDescriptorImageInfo imageInfo{};
-    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // Shader 读取时的布局
-    imageInfo.imageView = CurrentDemoTexture->GetImageView();
-    imageInfo.sampler = CurrentDemoTexture->GetSampler();
-
-    VkWriteDescriptorSet descriptorWrite{};
-    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrite.dstSet = TextureDescriptorSet;
-    descriptorWrite.dstBinding = 0; // 对应 Layout 中的 Binding 0
-    descriptorWrite.dstArrayElement = 0;
-    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    descriptorWrite.descriptorCount = 1;
-    descriptorWrite.pImageInfo = &imageInfo;
-
-    vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
-
-    LOG_INFO("Descriptor Sets Initialized & Updated");
+    VkDescriptorSet newSet;
+    VK_CHECK(vkAllocateDescriptorSets(Context.GetDevice(), &allocInfo, &newSet));
+    return newSet;
 }

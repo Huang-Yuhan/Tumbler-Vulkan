@@ -30,8 +30,8 @@ add_subdirectory(assets/shaders)
 # 3. 构建核心引擎库 (关键步骤)
 # =========================================================
 # 收集核心源码
-file(GLOB_RECURSE CORE_SOURCES "${CMAKE_SOURCE_DIR}/src/Core/*.cpp")
-
+# 加上 CONFIGURE_DEPENDS，这样你新建 cpp 文件时，CMake 会自动重新加载
+file(GLOB_RECURSE CORE_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/Core/*.cpp")
 
 
 # 创建一个静态库 "TumblerCore"
