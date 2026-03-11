@@ -86,6 +86,10 @@ void VulkanRenderer::Cleanup() {
         vkDestroyDescriptorPool(device, descriptorPool, nullptr);
     }
 
+    if (GlobalSetLayout!=VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(device, std::exchange(GlobalSetLayout, VK_NULL_HANDLE), nullptr);
+    }
+    DestroyBuffer((SceneParameterBuffer));
 
     if (TexManager)TexManager->Cleanup();
     TexManager.reset();
@@ -272,6 +276,13 @@ void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t ima
     float aspect = (float)SwapChain.GetExtent().width / (float)SwapChain.GetExtent().height;
     glm::mat4 proj = camera->GetProjectionMatrix(aspect);
 
+    FSceneData sceneData;
+    sceneData.ViewProjection= view*proj;
+    sceneData.CameraPosition=glm::vec4(cameraTransform->GetPosition(),1.0f);
+    sceneData.LightPosition = glm::vec4(0.0f, 4.0f, 0.0f, 1.0f);    // 灯光坐标 (0, 4, 0)
+    sceneData.LightColor = glm::vec4(1.0f, 1.0f, 1.0f, 50.0f); // 白色光
+
+    memcpy(SceneParameterBuffer.Info.pMappedData, &sceneData, sizeof(FSceneData));
     // 【核心】遍历场景绘制
     if (scene) {
         for (const auto& actorPtr : scene->GetAllActors()) {
@@ -288,13 +299,12 @@ void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t ima
             vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, parentMaterial->Pipeline);
 
             // 2. 绑定实例的参数 (Descriptor Set: 包含贴图和UBO)
-            VkDescriptorSet descSet = materialInstance->GetDescriptorSet();
-            vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, parentMaterial->PipelineLayout, 0, 1, &descSet, 0, nullptr);
+            VkDescriptorSet descSet[] = {GlobalDescriptorSet, materialInstance->GetDescriptorSet()};
+            vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, parentMaterial->PipelineLayout, 0, 2, descSet, 0, nullptr);
 
             // 3. 计算并推送 MVP 矩阵
             glm::mat4 model = actor->Transform.GetLocalToWorldMatrix();
-            glm::mat4 mvp = proj * view * model;
-            vkCmdPushConstants(cmdBuffer, parentMaterial->PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &mvp);
+            vkCmdPushConstants(cmdBuffer, parentMaterial->PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &model);
 
             // 4. 上传并绑定 Mesh，执行绘制
             FVulkanMesh& gpuMesh = UploadMesh(meshRenderer->GetMesh().get());
@@ -643,6 +653,47 @@ void VulkanRenderer::InitDescriptors() {
         throw std::runtime_error("Failed to create descriptor pool!");
     }
     LOG_INFO("Descriptor Pool Initialized (Capacity: 1000 Sets)");
+
+    VkDescriptorSetLayoutBinding sceneBind{
+        .binding = 0,
+        .descriptorType =  VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .descriptorCount = 1,
+        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,
+    };
+
+    VkDescriptorSetLayoutCreateInfo globalLayoutInfo{
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .bindingCount = 1,
+        .pBindings = &sceneBind
+    };
+    VK_CHECK(vkCreateDescriptorSetLayout(Context.GetDevice(), &globalLayoutInfo, nullptr, &GlobalSetLayout));
+
+    GlobalDescriptorSet = AllocateDescriptorSet(GlobalSetLayout);
+
+    CreateBuffer(sizeof(FSceneData),VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,VMA_MEMORY_USAGE_AUTO_PREFER_HOST,SceneParameterBuffer);
+
+    VkDescriptorBufferInfo sceneBufferInfo{
+        .buffer = SceneParameterBuffer.Buffer,
+        .offset = 0,
+        .range = sizeof(FSceneData),
+        };
+
+    VkWriteDescriptorSet setWrite
+    {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .pNext = nullptr,
+        .dstSet = GlobalDescriptorSet,
+        .dstBinding = 0,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .pBufferInfo = &sceneBufferInfo,
+    };
+
+    vkUpdateDescriptorSets(Context.GetDevice(), 1, &setWrite, 0, nullptr);
+
+
+
+
 }
 
 VkDescriptorSet VulkanRenderer::AllocateDescriptorSet(VkDescriptorSetLayout layout) {

@@ -35,7 +35,7 @@ public:
 
     [[nodiscard]] VkDevice GetDevice() const { return Context.GetDevice(); }
     [[nodiscard]] TextureManager* GetTextureManager() const { return TexManager.get(); }
-
+    [[nodiscard]] VkDescriptorSetLayout GetGlobalSetLayout() const { return GlobalSetLayout; }
     std::shared_ptr<FTexture> LoadTexture(const std::string& filePath);
 
     // ==========================================
@@ -69,6 +69,10 @@ private:
 
     // 【修改】只保留池子，删除具体的 Layout 和 Pipeline
     VkDescriptorPool DescriptorPool = VK_NULL_HANDLE;
+
+    VkDescriptorSetLayout GlobalSetLayout = VK_NULL_HANDLE;
+    VkDescriptorSet GlobalDescriptorSet = VK_NULL_HANDLE;
+    AllocatedBuffer SceneParameterBuffer{};
 
     // 内部函数
     void InitRenderPass();

@@ -1,53 +1,46 @@
 #version 450
 
-// ==========================================
-// 输入 (来自 Vertex Shader)
-// ==========================================
 layout(location = 0) in vec2 inUV;
 layout(location = 1) in vec3 inNormal;
 layout(location = 2) in vec3 inWorldPos;
 
-// ==========================================
-// 输出 (输出到 Framebuffer)
-// ==========================================
 layout(location = 0) out vec4 outFragColor;
 
-// ==========================================
-// 材质参数绑定 (FMaterialInstance 将提供这些数据)
-// ==========================================
+// 【新增】Binding 0: 全局场景参数
+layout(set = 0, binding = 0) uniform SceneData {
+    mat4 ViewProj;
+    vec4 CameraPos;
+    vec4 LightPos;
+    vec4 LightColor;
+} scene;
 
-// Binding 0: 基础漫反射贴图 (Albedo / Base Color)
-layout(set = 0, binding = 0) uniform sampler2D BaseColorMap;
+// 【修改】材质数据退居 Set 1
+layout(set = 1, binding = 0) uniform sampler2D BaseColorMap;
 
-// Binding 1: 材质数值参数 (UBO)
-// 注意：std140 内存对齐规则！
-layout(set = 0, binding = 1) uniform MaterialParams {
-    vec4  BaseColorTint; // 基础色染色 (16 bytes)
-    float Roughness;     // 粗糙度 (4 bytes)
-    float Metallic;      // 金属度 (4 bytes)
-    vec2  Padding;       // 凑齐 16 字节对齐 (8 bytes)
+layout(set = 1, binding = 1) uniform MaterialParams {
+    vec4  BaseColorTint;
+    float Roughness;
+    float Metallic;
+    vec2  Padding;
 } params;
 
-// TODO: 未来还会加入法线贴图 (NormalMap), ORM 贴图等
-// layout(set = 0, binding = 2) uniform sampler2D NormalMap;
-
 void main() {
-    // 1. 采样基础颜色
+    // 基础颜色 (反照率)
     vec4 albedo = texture(BaseColorMap, inUV) * params.BaseColorTint;
 
-    // 2. 提取粗糙度和金属度 (目前没有用上，但确保数据能传过来)
-    float roughness = params.Roughness;
-    float metallic = params.Metallic;
+    // 向量准备
+    vec3 N = normalize(inNormal);
+    vec3 L = normalize(scene.LightPos.xyz - inWorldPos);
 
-    // ==========================================
-    // [TODO] PBR 光照计算核心 (BRDF, 辐射度量学)
-    // ==========================================
-    // vec3 N = normalize(inNormal);
-    // vec3 V = normalize(CameraPos - inWorldPos);
-    // vec3 L = normalize(LightDir);
-    // ...
-    // vec3 finalColor = Ambient + Lo;
+    // 【简易光照测试】最基础的 Lambert 漫反射 (N dot L)
+    // 如果法线和光线方向一致，最亮 (1.0)；如果背对光线，则全黑 (0.0)
+    float NdotL = max(dot(N, L), 0.0);
 
-    // 3. 临时输出：为了测试材质框架是否联通，我们先直接输出带染色的 Albedo 颜色
-    outFragColor = albedo;
+    // 添加一点极其微弱的环境光，防止暗部彻底死黑
+    vec3 ambient = albedo.rgb * 0.05;
+
+    // 最终颜色 = 环境光 + (基础色 * 光照强度)
+    vec3 finalColor = ambient + (albedo.rgb * NdotL);
+
+    outFragColor = vec4(finalColor, 1.0);
 }
