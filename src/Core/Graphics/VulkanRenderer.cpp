@@ -277,7 +277,7 @@ void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t ima
     glm::mat4 proj = camera->GetProjectionMatrix(aspect);
 
     FSceneData sceneData;
-    sceneData.ViewProjection= view*proj;
+    sceneData.ViewProjection= proj*view;
     sceneData.CameraPosition=glm::vec4(cameraTransform->GetPosition(),1.0f);
     sceneData.LightPosition = glm::vec4(0.0f, 4.0f, 0.0f, 1.0f);    // 灯光坐标 (0, 4, 0)
     sceneData.LightColor = glm::vec4(1.0f, 1.0f, 1.0f, 50.0f); // 白色光
