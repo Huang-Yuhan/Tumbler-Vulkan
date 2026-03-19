@@ -1,13 +1,14 @@
 #include "FMaterialInstance.h"
 #include "FMaterial.h"
 #include "Core/Assets/FTexture.h"
+#include "Core/Assets/FAssetManager.h"
 #include "Core/Graphics/VulkanRenderer.h"
 #include "Core/Utils/Log.h"
 #include <cstring>
 #include <vector>
 
-FMaterialInstance::FMaterialInstance(std::shared_ptr<FMaterial> parentMaterial, VulkanRenderer* renderer, VkDescriptorSet descriptorSet)
-    : ParentMaterial(std::move(parentMaterial)), Renderer(renderer), DescriptorSet(descriptorSet) 
+FMaterialInstance::FMaterialInstance(std::shared_ptr<FMaterial> parentMaterial, VulkanRenderer* renderer, FAssetManager* assetMgr, VkDescriptorSet descriptorSet)
+    : ParentMaterial(std::move(parentMaterial)), Renderer(renderer), AssetManager(assetMgr), DescriptorSet(descriptorSet) 
 {
     // 【核心】实例创建时，向 VMA 申请一块“CPU 可写，GPU 可读”的显存存放 UBO
     Renderer->CreateBuffer(
@@ -66,7 +67,7 @@ void FMaterialInstance::ApplyChanges() {
     if (Textures.find("BaseColorMap") != Textures.end()) {
         texToBind = Textures["BaseColorMap"];
     } else {
-        texToBind = Renderer->GetTextureManager()->GetTexture("assets/textures/white.png");
+        texToBind = AssetManager->GetOrLoadTexture("DefaultWhite", "assets/textures/white.png");
     }
 
     // 只要有贴图就绑定（理论上 fallback 是一定有的）

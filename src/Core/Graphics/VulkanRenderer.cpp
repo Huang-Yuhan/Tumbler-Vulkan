@@ -17,7 +17,7 @@
 #include <stb_image.h>
 
 #include "Core/Assets/FTexture.h"
-#include "Core/Assets/TextureManager.h"
+#include "Core/Assets/FAssetManager.h"
 #include "Core/Graphics/LightData.h"
 
 VulkanRenderer::VulkanRenderer()=default;
@@ -42,8 +42,6 @@ void VulkanRenderer::Init(AppWindow* window) {
     InitCommands();
     InitSyncStructures();
     InitUploadSync();
-
-    TexManager=std::make_unique<TextureManager>(this);
 
 
     InitDescriptors();
@@ -86,9 +84,6 @@ void VulkanRenderer::Cleanup() {
         vkDestroyDescriptorSetLayout(device, std::exchange(GlobalSetLayout, VK_NULL_HANDLE), nullptr);
     }
     DestroyBuffer((SceneParameterBuffer));
-
-    if (TexManager)TexManager->Cleanup();
-    TexManager.reset();
 
     SwapChain.Cleanup();
     Context.Cleanup();

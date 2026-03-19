@@ -19,9 +19,11 @@ struct FMaterialUBO {
     glm::vec2 Padding; // 凑齐 16 字节对齐
 };
 
+class FAssetManager;
+
 class FMaterialInstance {
 public:
-    FMaterialInstance(std::shared_ptr<FMaterial> parentMaterial, VulkanRenderer* renderer, VkDescriptorSet descriptorSet);
+    FMaterialInstance(std::shared_ptr<FMaterial> parentMaterial, VulkanRenderer* renderer, FAssetManager* assetMgr, VkDescriptorSet descriptorSet);
     ~FMaterialInstance(); // 必须自定义析构，用于释放 UBO 显存
 
     // ==========================================
@@ -42,6 +44,7 @@ public:
 private:
     std::shared_ptr<FMaterial> ParentMaterial;
     VulkanRenderer* Renderer;
+    FAssetManager* AssetManager;
     VkDescriptorSet DescriptorSet = VK_NULL_HANDLE;
 
     // 逻辑数据镜像

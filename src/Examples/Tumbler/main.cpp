@@ -2,6 +2,7 @@
 #include "Core/Utils/Log.h"
 #include "Core/Graphics/VulkanRenderer.h"
 #include "AppLogic.h"
+#include "Core/Assets/FAssetManager.h"
 #include "Core/Editor/UIManager.h"
 #include "Core/GameSystem/Components/CCamera.h"
 #include "Core/GameSystem/Components/CTransform.h"
@@ -24,12 +25,15 @@ int main() {
         VulkanRenderer renderer;
         renderer.Init(&window);
 
-        // 2. 游戏逻辑与场景初始化
+        // 2. 资源管理与场景级逻辑
+        FAssetManager assetManager;
+        assetManager.Initialize(&renderer);
+
         AppLogic logic;
-        logic.InitializeMaterials(&renderer);
+        logic.Init(&renderer, &assetManager);
 
         // 提前上传共用网格，防止渲染中途卡顿
-        renderer.UploadMesh(logic.GetDefaultMesh().get());
+        renderer.UploadMesh(assetManager.GetOrLoadMesh("DefaultPlane").get());
 
         // 3. 创建虚拟相机 (属于游戏逻辑世界)
         CTransform cameraTransform;

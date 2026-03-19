@@ -13,7 +13,6 @@
 #include <glm/glm.hpp>
 
 #include "SceneViewData.h"
-#include "Core/Assets/TextureManager.h"
 #include "Core/Graphics/RenderPacket.h"
 
 class FTexture;
@@ -31,11 +30,9 @@ public:
     // 渲染接口：传入场景和相机
     void Render(const SceneViewData& viewData, const std::vector<RenderPacket>& renderPackets, std::function<void(VkCommandBuffer)> onUIRender = nullptr);
 
-
     FVulkanMesh& UploadMesh(FMesh* cpuMesh);
 
     [[nodiscard]] VkDevice GetDevice() const { return Context.GetDevice(); }
-    [[nodiscard]] TextureManager* GetTextureManager() const { return TexManager.get(); }
     [[nodiscard]] VkDescriptorSetLayout GetGlobalSetLayout() const { return GlobalSetLayout; }
     [[nodiscard]] const VulkanContext& GetContext()const{return Context;}
     std::shared_ptr<FTexture> LoadTexture(const std::string& filePath);
@@ -67,7 +64,6 @@ private:
     VkFence UploadFence = VK_NULL_HANDLE;
 
     std::unordered_map<FMesh*, FVulkanMesh> MeshCache;
-    std::unique_ptr<TextureManager> TexManager;
 
     // 【修改】只保留池子，删除具体的 Layout 和 Pipeline
     VkDescriptorPool DescriptorPool = VK_NULL_HANDLE;

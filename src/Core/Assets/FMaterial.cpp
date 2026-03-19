@@ -5,9 +5,11 @@
 #include "Core/Utils/Log.h"
 #include <stdexcept>
 
-FMaterial::FMaterial(VulkanRenderer* renderer) : Renderer(renderer) {}
+FMaterial::FMaterial(VulkanRenderer* renderer, FAssetManager* assetMgr) : Renderer(renderer), AssetManager(assetMgr) {
+}
 
 FMaterial::~FMaterial() {
+    if (Renderer == VK_NULL_HANDLE) return;
     VkDevice device = Renderer->GetDevice();
     if (Pipeline != VK_NULL_HANDLE) vkDestroyPipeline(device, Pipeline, nullptr);
     if (PipelineLayout != VK_NULL_HANDLE) vkDestroyPipelineLayout(device, PipelineLayout, nullptr);
@@ -105,5 +107,5 @@ void FMaterial::BuildPipeline(const std::string& vertPath, const std::string& fr
 
 std::shared_ptr<FMaterialInstance> FMaterial::CreateInstance() {
     VkDescriptorSet newSet = Renderer->AllocateDescriptorSet(DescriptorSetLayout);
-    return std::make_shared<FMaterialInstance>(shared_from_this(), Renderer, newSet);
+    return std::make_shared<FMaterialInstance>(shared_from_this(), Renderer, AssetManager, newSet);
 }

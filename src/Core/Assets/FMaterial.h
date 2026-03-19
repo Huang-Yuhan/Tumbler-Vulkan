@@ -6,10 +6,11 @@
 
 class VulkanRenderer;
 class FMaterialInstance;
+class FAssetManager;
 
 class FMaterial : public std::enable_shared_from_this<FMaterial> {
 public:
-    explicit FMaterial(VulkanRenderer* renderer);
+    FMaterial(VulkanRenderer* renderer, FAssetManager* assetMgr);
     ~FMaterial();
 
     // 禁止拷贝
@@ -28,7 +29,9 @@ public:
     // ==========================================
     void BuildPipeline(const std::string& vertPath, const std::string& fragPath);
     std::shared_ptr<FMaterialInstance> CreateInstance();
+    FAssetManager* GetAssetManager() const { return AssetManager; }
 
 private:
     VulkanRenderer* Renderer;
-};
+    FAssetManager* AssetManager;
+};
