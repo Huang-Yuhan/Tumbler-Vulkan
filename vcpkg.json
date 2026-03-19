@@ -10,6 +10,13 @@
     "glm",
     "vulkan-memory-allocator",
     "spdlog",
-    "stb"
+    "stb",
+    {
+      "name": "imgui",
+      "features": [
+        "glfw-binding",
+        "vulkan-binding"
+      ]
+    }
   ]
 }

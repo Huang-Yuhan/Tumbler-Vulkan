@@ -2,8 +2,10 @@
 #include "Core/Utils/Log.h"
 #include "Core/Graphics/VulkanRenderer.h"
 #include "AppLogic.h"
+#include "Core/Editor/UIManager.h"
 #include "Core/GameSystem/Components/CCamera.h"
 #include "Core/GameSystem/Components/CTransform.h"
+#include"imgui.h"
 
 int main() {
     Log::Get().Init();
@@ -41,21 +43,25 @@ int main() {
         cameraComponent.Fov = 60.0f;
         auto startTime = std::chrono::high_resolution_clock::now();
 
+        UIManager ui_manager;
+        ui_manager.Init(&window, &renderer);
+
         while (!window.ShouldClose()) {
             window.PollEvents();
 
-            auto currentTime = std::chrono::high_resolution_clock::now();
-            float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-
-            // （可选）让相机绕着场景慢慢转圈，更有立体感
-            //cameraTransform.SetPosition(glm::vec3(sin(time * 0.5f) * 10.0f, 2.0f, cos(time * 0.5f) * 10.0f));
-            // 简单的 LookAt 计算，让相机永远盯着原点
-            glm::mat4 lookAt = glm::lookAt(cameraTransform.GetPosition(), glm::vec3(0,0,0), glm::vec3(0,1,0));
-            // 这里我们用点数学 trick 把 LookAt 矩阵转回欧拉角，你也可以直接用 CCamera 的原生支持
-            // 为了简单，我们这次允许略微的视线偏移，先看效果
+            ui_manager.BeginFrame();
+            ImGui::Begin("PBR Debug Engine");
+            ImGui::DragFloat3("Light Pos", &renderer.GlobalLightPos.x, 0.1f, -10.0f, 10.0f);
+            ImGui::ColorEdit3("Light Color", &renderer.GlobalLightColor.x);
+            ImGui::SliderFloat("Light Power", &renderer.GlobalLightIntensity, 0.0f, 200.0f);
+            ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
+            ImGui::End();
+            ui_manager.EndFrame();
 
             // 3. 将场景和相机提交给渲染器
-            renderer.Render(logic.GetScene(), &cameraComponent, &cameraTransform);
+            renderer.Render(logic.GetScene(), &cameraComponent, &cameraTransform, [&](VkCommandBuffer cmdBuffer){
+                ui_manager.RecordDrawCommands(cmdBuffer);
+            });
         }
 
     } catch (const std::exception& e) {

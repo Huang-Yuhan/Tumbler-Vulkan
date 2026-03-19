@@ -223,7 +223,8 @@ void VulkanRenderer::InitSyncStructures() {
     VK_CHECK(vkCreateFence(device, &fenceInfo, nullptr, &RenderFence));
 }
 
-void VulkanRenderer::Render(const FScene* scene, const CCamera* camera, const CTransform* cameraTransform) {
+void VulkanRenderer::Render(const FScene* scene, const CCamera* camera, const CTransform* cameraTransform,std::function<void(VkCommandBuffer)> onUIRender){
+
     VkDevice device = Context.GetDevice();
     vkWaitForFences(device, 1, &RenderFence, VK_TRUE, UINT64_MAX);
 
@@ -235,7 +236,7 @@ void VulkanRenderer::Render(const FScene* scene, const CCamera* camera, const CT
     vkResetCommandBuffer(MainCommandBuffer, 0);
 
     // 把场景和相机传给录制函数
-    RecordCommandBuffer(MainCommandBuffer, imageIndex, scene, camera, cameraTransform);
+    RecordCommandBuffer(MainCommandBuffer, imageIndex, scene, camera, cameraTransform,onUIRender);
 
     VkSubmitInfo submitInfo{VK_STRUCTURE_TYPE_SUBMIT_INFO};
     VkSemaphore waitSemaphores[] = {ImageAvailableSemaphore};
@@ -253,7 +254,7 @@ void VulkanRenderer::Render(const FScene* scene, const CCamera* camera, const CT
 
     SwapChain.PresentImage(RenderFinishedSemaphore, imageIndex);
 }
-void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t imageIndex, const FScene* scene, const CCamera* camera, const CTransform* cameraTransform) {
+void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t imageIndex, const FScene* scene, const CCamera* camera, const CTransform* cameraTransform,std::function<void(VkCommandBuffer)> onUIRender) {
     VkCommandBufferBeginInfo beginInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
     vkBeginCommandBuffer(cmdBuffer, &beginInfo);
 
@@ -279,8 +280,8 @@ void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t ima
     FSceneData sceneData;
     sceneData.ViewProjection= proj*view;
     sceneData.CameraPosition=glm::vec4(cameraTransform->GetPosition(),1.0f);
-    sceneData.LightPosition = glm::vec4(0.0f, 4.0f, 0.0f, 1.0f);    // 灯光坐标 (0, 4, 0)
-    sceneData.LightColor = glm::vec4(1.0f, 1.0f, 1.0f, 50.0f); // 白色光
+    sceneData.LightPosition = glm::vec4(GlobalLightPos, 1.0f);
+    sceneData.LightColor = glm::vec4(GlobalLightColor, GlobalLightIntensity);
 
     memcpy(SceneParameterBuffer.Info.pMappedData, &sceneData, sizeof(FSceneData));
     // 【核心】遍历场景绘制
@@ -315,6 +316,10 @@ void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t ima
 
             vkCmdDrawIndexed(cmdBuffer, gpuMesh.IndexCount, 1, 0, 0, 0);
         }
+    }
+
+    if (onUIRender) {
+        onUIRender(cmdBuffer);
     }
 
     vkCmdEndRenderPass(cmdBuffer);

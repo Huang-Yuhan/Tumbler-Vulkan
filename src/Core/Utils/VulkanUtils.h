@@ -2,6 +2,8 @@
 #include <vulkan/vulkan.h>
 #include <vector>
 #include <type_traits> // 需要这个头文件
+#include "Core/Utils/Log.h"
+#include <stdexcept>
 
 namespace VkUtils {
 

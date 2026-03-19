@@ -30,12 +30,13 @@ public:
     void Cleanup();
 
     // 渲染接口：传入场景和相机
-    void Render(const FScene* scene, const CCamera* camera, const CTransform* cameraTransform);
+    void Render(const FScene* scene, const CCamera* camera, const CTransform* cameraTransform, std::function<void(VkCommandBuffer)> onUIRender = nullptr);
     FVulkanMesh& UploadMesh(FMesh* cpuMesh);
 
     [[nodiscard]] VkDevice GetDevice() const { return Context.GetDevice(); }
     [[nodiscard]] TextureManager* GetTextureManager() const { return TexManager.get(); }
     [[nodiscard]] VkDescriptorSetLayout GetGlobalSetLayout() const { return GlobalSetLayout; }
+    [[nodiscard]] const VulkanContext& GetContext()const{return Context;}
     std::shared_ptr<FTexture> LoadTexture(const std::string& filePath);
 
     // ==========================================
@@ -48,6 +49,10 @@ public:
     void CreateBuffer(size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage, AllocatedBuffer& outBuffer);
     void DestroyBuffer(AllocatedBuffer& buffer);
     VkDescriptorSet AllocateDescriptorSet(VkDescriptorSetLayout layout);
+
+    glm::vec3 GlobalLightPos = glm::vec3(0.0f, 4.0f, 0.0f);
+    glm::vec3 GlobalLightColor = glm::vec3(1.0f, 1.0f, 1.0f);
+    float GlobalLightIntensity = 50.0f;
 
 private:
     VulkanContext Context;
@@ -83,7 +88,7 @@ private:
     void InitDescriptors(); // 这个还在，但内容变了
 
     // 录制命令缓冲
-    void RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, const FScene* scene, const CCamera* camera, const CTransform* cameraTransform);
+    void RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, const FScene* scene, const CCamera* camera, const CTransform* cameraTransform,std::function<void(VkCommandBuffer)> onUIRender=nullptr);
     void ImmediateSubmit(std::function<void(VkCommandBuffer cmd)>&& function);
     void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
     void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);

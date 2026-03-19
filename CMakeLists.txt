@@ -21,7 +21,7 @@ find_package(glm CONFIG REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(Stb REQUIRED)
-
+find_package(imgui CONFIG REQUIRED)
 
 # 2. 编译 Shader (跟之前一样)
 add_subdirectory(assets/shaders)
@@ -55,6 +55,7 @@ target_link_libraries(TumblerCore PUBLIC
         glm::glm
         GPUOpen::VulkanMemoryAllocator
         spdlog::spdlog
+        imgui::imgui
 )
 
 # 平台适配
