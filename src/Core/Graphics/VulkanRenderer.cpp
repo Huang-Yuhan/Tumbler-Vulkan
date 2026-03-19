@@ -18,6 +18,7 @@
 
 #include "Core/Assets/FTexture.h"
 #include "Core/Assets/TextureManager.h"
+#include "Core/Graphics/LightData.h"
 
 VulkanRenderer::VulkanRenderer()=default;
 
@@ -271,9 +272,9 @@ void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t ima
     SceneDataUBO scene_data_ubo;
     scene_data_ubo.ViewProjection = viewData.ProjectionMatrix * viewData.ViewMatrix;
     scene_data_ubo.CameraPosition = glm::vec4(viewData.CameraPosition, 1.0f);
-    scene_data_ubo.LightPosition  = glm::vec4(viewData.LightPosition, 1.0f);
-    scene_data_ubo.LightColor     = glm::vec4(viewData.LightColor, viewData.LightIntensity);
-
+    const LightData& mainLight = !viewData.Lights.empty() ? viewData.Lights[0] : LightData{};
+    scene_data_ubo.LightPosition  = glm::vec4(mainLight.Position, 1.0f);
+    scene_data_ubo.LightColor     = glm::vec4(mainLight.Color, mainLight.Intensity);
     memcpy(SceneParameterBuffer.Info.pMappedData, &scene_data_ubo, sizeof(SceneDataUBO));
     // 【核心】遍历场景绘制
     // 【核心净化】：渲染器变成了纯粹的画图机器

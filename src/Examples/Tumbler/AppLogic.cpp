@@ -4,8 +4,9 @@
 #include "Core/Assets/FMaterial.h"
 #include "Core/Assets/FMaterialInstance.h"
 #include "Core/GameSystem/FActor.h"
-#include "Core/Geometry/FMesh.h"                           // 【新增】
-#include "Core/GameSystem/Components/CMeshRenderer.h"      // 【新增】
+#include "Core/Geometry/FMesh.h"
+#include "Core/GameSystem/Components/CMeshRenderer.h"
+#include "Core/GameSystem/Components/CPointLight.h"
 
 void AppLogic::InitializeScene()
 {
@@ -116,6 +117,15 @@ void AppLogic::InitializeMaterials(VulkanRenderer* renderer) {
 
     // 提前上传到 GPU（避免首帧卡顿）
     renderer->UploadMesh(swordMesh.get());
+
+    // ==========================================
+    // 7. 创建主光源 (使用新组件系统)
+    // ==========================================
+    FActor* lightActor = Scene->CreateActor("MainLight");
+    lightActor->Transform.SetPosition(glm::vec3(0.0f, 4.0f, 0.0f));
+    auto* pl = lightActor->AddComponent<CPointLight>();
+    pl->Color = glm::vec3(1.0f, 1.0f, 1.0f);
+    pl->Intensity = 50.0f;
 }
 
 std::shared_ptr<FMesh> AppLogic::LoadOBJMesh(const std::string& filePath, const std::string& actorName)

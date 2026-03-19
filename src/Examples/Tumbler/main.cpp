@@ -5,8 +5,11 @@
 #include "Core/Editor/UIManager.h"
 #include "Core/GameSystem/Components/CCamera.h"
 #include "Core/GameSystem/Components/CTransform.h"
+#include "Core/GameSystem/Components/CPointLight.h"
 #include <imgui.h>
 #include <vector>
+
+#include "Core/GameSystem/FActor.h"
 
 int main() {
     Log::Get().Init();
@@ -49,10 +52,20 @@ int main() {
             ui_manager.BeginFrame();
             ImGui::Begin("PBR Debug Engine");
 
-            // 注意：由于解耦，灯光数据不再放在 renderer 里，这里假设你把它移到了 Scene 里
-            ImGui::DragFloat3("Light Pos", &logic.GetScene()->GlobalLightPos.x, 0.1f, -10.0f, 10.0f);
-            ImGui::ColorEdit3("Light Color", &logic.GetScene()->GlobalLightColor.x);
-            ImGui::SliderFloat("Light Power", &logic.GetScene()->GlobalLightIntensity, 0.0f, 200.0f);
+            if (FActor* mainLight = logic.GetScene()->FindActorByName("MainLight")) {
+                if (auto* pl = mainLight->GetComponent<CPointLight>()) {
+                    // 控制光源的 Transform
+                    glm::vec3 pos = mainLight->Transform.GetPosition();
+                    if (ImGui::DragFloat3("Light Pos", &pos.x, 0.1f, -10.0f, 10.0f)) {
+                        mainLight->Transform.SetPosition(pos);
+                    }
+                    // 控制光源的组件属性
+                    ImGui::ColorEdit3("Light Color", &pl->Color.x);
+                    ImGui::SliderFloat("Light Power", &pl->Intensity, 0.0f, 200.0f);
+                }
+            } else {
+                ImGui::Text("MainLight not found");
+            }
 
             ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
             ImGui::End();

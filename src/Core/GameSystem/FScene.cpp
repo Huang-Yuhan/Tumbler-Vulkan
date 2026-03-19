@@ -1,11 +1,13 @@
-#include "FActor.h"
+﻿#include "FActor.h"
 #include "FScene.h"
 
 #include <algorithm>
 #include <iostream>
 
 #include "Components/CMeshRenderer.h"
-
+#include "Components/CPointLight.h"
+#include "Components/CDirectionalLight.h"
+#include "Core/Graphics/LightData.h"
 
 FScene::FScene()=default;
 FScene::~FScene()=default;
@@ -97,16 +99,36 @@ void FScene::ExtractRenderPackets(std::vector<RenderPacket>& outPackets) const {
 SceneViewData FScene::GenerateSceneView(const CCamera *camera, const CTransform *cameraTransform) const {
     SceneViewData viewData;
 
-    // 1. 从 Camera 获取“怎么看” (视角)
+    // 1. Camera view
     viewData.ViewMatrix = camera->GetViewMatrix(*cameraTransform);
-    // 这里 aspect 的获取如果不想依赖 renderer，可以传进来，或者写死为 1280/720 临时用
     viewData.ProjectionMatrix = camera->GetProjectionMatrix(1280.0f / 720.0f);
     viewData.CameraPosition = cameraTransform->GetPosition();
 
-    // 2. 从 Scene 获取“环境光照” (环境)
-    viewData.LightPosition = GlobalLightPos;
-    viewData.LightColor = GlobalLightColor;
-    viewData.LightIntensity = GlobalLightIntensity;
+    // 2. Collect lights from components
+    for (const auto& actorPtr : Actors)
+    {
+        FActor* actor = actorPtr.get();
+
+        if (auto* pl = actor->GetComponent<CPointLight>())
+        {
+            LightData data;
+            data.Type      = ELightType::Point;
+            data.Position  = actor->Transform.GetPosition();
+            data.Color     = pl->Color;
+            data.Intensity = pl->Intensity;
+            viewData.Lights.push_back(data);
+        }
+
+        if (auto* dl = actor->GetComponent<CDirectionalLight>())
+        {
+            LightData data;
+            data.Type      = ELightType::Directional;
+            data.Direction = actor->Transform.GetForwardVector();
+            data.Color     = dl->Color;
+            data.Intensity = dl->Intensity;
+            viewData.Lights.push_back(data);
+        }
+    }
 
     return viewData;
 }
