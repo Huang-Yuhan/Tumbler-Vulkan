@@ -1,14 +1,22 @@
 #version 450
 
+// ==========================================
+// 顶点输入
+// ==========================================
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inNormal;
 layout(location = 2) in vec2 inUV;
 
+// ==========================================
+// 传给 Fragment Shader 的数据
+// ==========================================
 layout(location = 0) out vec2 outUV;
 layout(location = 1) out vec3 outNormal;
 layout(location = 2) out vec3 outWorldPos;
 
-// 【新增】Binding 0: 全局场景参数
+// ==========================================
+// 描述符与常量
+// ==========================================
 layout(set = 0, binding = 0) uniform SceneData {
     mat4 ViewProj;
     vec4 CameraPos;
@@ -16,7 +24,6 @@ layout(set = 0, binding = 0) uniform SceneData {
     vec4 LightColor;
 } scene;
 
-// 【修改】Push Constants 现在只接收 Model 矩阵
 layout(push_constant) uniform PushConstants {
     mat4 ModelMatrix;
 } constants;
@@ -26,11 +33,14 @@ void main() {
     vec4 worldPos = constants.ModelMatrix * vec4(inPosition, 1.0);
     outWorldPos = worldPos.xyz;
 
-    // 2. 结合 Set 0 里的 ViewProj 计算裁剪坐标
+    // 2. 计算裁剪坐标
     gl_Position = scene.ViewProj * worldPos;
 
+    // 3. 透传 UV
     outUV = inUV;
 
-    // 3. 计算法线 (目前先简单乘一下 Model，严格来说应该用逆转置矩阵)
-    outNormal = mat3(constants.ModelMatrix) * inNormal;
+    // 4. 【核心修复】计算正确的法线矩阵 (逆转置矩阵)
+    // 防止非等比缩放 (如墙壁的 Scale) 导致法线变得不垂直
+    mat3 normalMatrix = transpose(inverse(mat3(constants.ModelMatrix)));
+    outNormal = normalMatrix * inNormal;
 }

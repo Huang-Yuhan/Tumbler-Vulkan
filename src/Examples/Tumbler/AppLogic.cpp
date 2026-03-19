@@ -40,13 +40,13 @@ void AppLogic::InitializePlanes() const
     FActor* LeftWall = Scene->CreateActor("LeftWall");
     LeftWall->Transform.SetPosition(glm::vec3(-5.0f, 0.0f, 0.0f));
     LeftWall->Transform.SetScale(glm::vec3(10.0f, 1.0f,10.0f));
-    LeftWall->Transform.SetRotation(glm::vec3(0.0f, 0.0f, 90.0f));
+    LeftWall->Transform.SetRotation(glm::vec3(0.0f, 0.0f, -90.0f));
     LeftWall->AddComponent<CMeshRenderer>()->SetMesh(DefaultPlaneMesh);
 
     FActor* RightWall = Scene->CreateActor("RightWall");
     RightWall->Transform.SetPosition(glm::vec3(5.0f, 0.0f, 0.0f));
     RightWall->Transform.SetScale(glm::vec3(10.0f, 1.0f,10.0f));
-    RightWall->Transform.SetRotation(glm::vec3(0.0f, 0.0f, -90.0f));
+    RightWall->Transform.SetRotation(glm::vec3(0.0f, 0.0f, 90.0f));
     RightWall->AddComponent<CMeshRenderer>()->SetMesh(DefaultPlaneMesh);
 }
 
@@ -73,6 +73,14 @@ void AppLogic::InitializeMaterials(VulkanRenderer* renderer) {
     auto matWhite = pbrMaterial->CreateInstance();
     matWhite->SetVector("BaseColorTint", glm::vec4(0.73f, 0.73f, 0.73f, 1.0f));
     matWhite->ApplyChanges();
+
+    // 测试 1：绝缘体（非常粗糙的塑料）- 给左边的红墙
+    matRed->SetFloat("Roughness", 0.9f);
+    matRed->SetFloat("Metallic", 0.0f);
+
+    // 测试 2：纯金属（极度光滑的金/铜镜面）- 给右边的绿墙
+    matGreen->SetFloat("Roughness", 0.1f); // 留一点点粗糙度，能看到光斑
+    matGreen->SetFloat("Metallic", 1.0f);
 
     // 5. 挂载到我们之前创建好的墙壁上
     Scene->FindActorByName("LeftWall")->GetComponent<CMeshRenderer>()->SetMaterial(matRed);
