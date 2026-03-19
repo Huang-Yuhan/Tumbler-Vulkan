@@ -30,6 +30,7 @@ VulkanRenderer::~VulkanRenderer()
 void VulkanRenderer::Init(AppWindow* window) {
 
     LOG_INFO("================= VulkanRenderer Initialization Started ================");
+    Window = window;
 
     Context.Init(window);
 
@@ -71,8 +72,7 @@ void VulkanRenderer::Cleanup() {
 
     // 4. 清理命令与缓冲
     if (CommandPool != VK_NULL_HANDLE) vkDestroyCommandPool(device, std::exchange(CommandPool,VK_NULL_HANDLE), nullptr);
-    for (const auto& framebuffer : Framebuffers) vkDestroyFramebuffer(device, framebuffer, nullptr);
-    Framebuffers.clear();
+    DestroyFramebuffers();
 
     if (RenderPass != VK_NULL_HANDLE) vkDestroyRenderPass(device, std::exchange(RenderPass,VK_NULL_HANDLE), nullptr);
 
@@ -87,6 +87,7 @@ void VulkanRenderer::Cleanup() {
 
     SwapChain.Cleanup();
     Context.Cleanup();
+    Window = nullptr;
 }
 
 void VulkanRenderer::InitRenderPass() {
@@ -182,6 +183,41 @@ void VulkanRenderer::InitFramebuffers() {
     }
 }
 
+void VulkanRenderer::DestroyFramebuffers() {
+    VkDevice device = Context.GetDevice();
+    for (const auto& framebuffer : Framebuffers) {
+        vkDestroyFramebuffer(device, framebuffer, nullptr);
+    }
+    Framebuffers.clear();
+}
+
+bool VulkanRenderer::RecreateSwapchain() {
+    if (Window == nullptr) {
+        return false;
+    }
+
+    int width = 0;
+    int height = 0;
+    Window->GetFramebufferSize(width, height);
+    if (width == 0 || height == 0) {
+        return false;
+    }
+
+    VkDevice device = Context.GetDevice();
+    vkDeviceWaitIdle(device);
+
+    DestroyFramebuffers();
+    if (RenderPass != VK_NULL_HANDLE) {
+        vkDestroyRenderPass(device, std::exchange(RenderPass, VK_NULL_HANDLE), nullptr);
+    }
+
+    SwapChain.Cleanup();
+    SwapChain.Init(&Context, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+    InitRenderPass();
+    InitFramebuffers();
+    return true;
+}
+
 void VulkanRenderer::InitCommands() {
     VkCommandPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -221,6 +257,11 @@ void VulkanRenderer::Render(const SceneViewData &viewData, const std::vector<Ren
 
     uint32_t imageIndex;
     VkResult result = SwapChain.AcquireNextImage(ImageAvailableSemaphore, imageIndex);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        RecreateSwapchain();
+        return;
+    }
+    VK_CHECK(result);
     if (result == VK_ERROR_OUT_OF_DATE_KHR) return; // 窗口大小改变时防崩溃
 
     vkResetFences(device, 1, &RenderFence);
@@ -243,7 +284,12 @@ void VulkanRenderer::Render(const SceneViewData &viewData, const std::vector<Ren
 
     VK_CHECK(vkQueueSubmit(Context.GetGraphicsQueue(), 1, &submitInfo, RenderFence));
 
-    SwapChain.PresentImage(RenderFinishedSemaphore, imageIndex);
+    result = SwapChain.PresentImage(RenderFinishedSemaphore, imageIndex);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        RecreateSwapchain();
+    } else {
+        VK_CHECK(result);
+    }
 }
 void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t imageIndex, const SceneViewData& viewData,const std::vector<RenderPacket>& renderPackets, std::function<void(VkCommandBuffer)> onUIRender) {
     VkCommandBufferBeginInfo beginInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
@@ -262,6 +308,20 @@ void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t ima
     renderPassInfo.pClearValues = clearValues.data();
 
     vkCmdBeginRenderPass(cmdBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(renderPassInfo.renderArea.extent.width);
+    viewport.height = static_cast<float>(renderPassInfo.renderArea.extent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = renderPassInfo.renderArea.extent;
+    vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 
     // 不需要在这里算 proj 和 view 了，直接用外部喂进来的数据！
     SceneDataUBO scene_data_ubo;

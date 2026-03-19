@@ -59,6 +59,7 @@ public:
 
     // 获取图形队列 (用于提交绘制命令)
     [[nodiscard]] VkQueue GetGraphicsQueue() const { return GraphicsQueue; }
+    [[nodiscard]] VkQueue GetPresentQueue() const { return PresentQueue; }
 
     // 获取图形队列族索引 (在创建 CommandPool 时需要用到)
     [[nodiscard]] uint32_t GetGraphicsQueueFamily() const { return GraphicsQueueFamilyIndex; }
@@ -89,6 +90,7 @@ private:
 
     // 6. 图形队列：从逻辑设备中获取的句柄，用于执行渲染命令
     VkQueue GraphicsQueue = VK_NULL_HANDLE;
+    VkQueue PresentQueue = VK_NULL_HANDLE;
 
     // 队列族索引：记录图形队列属于哪个家族 (Family)
     uint32_t GraphicsQueueFamilyIndex = 0;

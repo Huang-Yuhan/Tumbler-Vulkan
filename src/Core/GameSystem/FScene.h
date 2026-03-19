@@ -51,6 +51,6 @@ public:
 
     void ExtractRenderPackets(std::vector<RenderPacket>& outPackets) const;
 
-    SceneViewData GenerateSceneView(const CCamera* camera, const CTransform* cameraTransform) const;
+    SceneViewData GenerateSceneView(const CCamera* camera, const CTransform* cameraTransform, float aspectRatio) const;
 
 };

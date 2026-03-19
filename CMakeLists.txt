@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.31)
+cmake_minimum_required(VERSION 3.29)
 project(Tumbler-Engine LANGUAGES CXX)
 
 # 强制要求使用 MSVC 编译器

@@ -53,8 +53,8 @@ void UIManager::Init(AppWindow* window, VulkanRenderer* renderer) {
     init_info.Queue = renderer->GetContext().GetGraphicsQueue();
     init_info.DescriptorPool = ImGuiPool;
     init_info.RenderPass = renderer->GetRenderPass();
-    init_info.MinImageCount = 3;
-    init_info.ImageCount = 3;
+    init_info.MinImageCount = renderer->GetSwapchainImageCount();
+    init_info.ImageCount = renderer->GetSwapchainImageCount();
     init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
     ImGui_ImplVulkan_Init(&init_info);
 

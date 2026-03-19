@@ -41,6 +41,7 @@ public:
 
     // 深度/模板测试
     VkPipelineDepthStencilStateCreateInfo DepthStencil{};
+    std::vector<VkDynamicState> DynamicStates;
 
     // 管线布局 (Push Constants, Descriptor Sets)
     VkPipelineLayout PipelineLayout{};
@@ -73,6 +74,7 @@ public:
 
     // 设置视口大小 (通常和 Swapchain 图像大小一致)
     VulkanPipelineBuilder& SetViewport(uint32_t width, uint32_t height);
+    VulkanPipelineBuilder& SetDynamicViewportScissor();
 
     // 设置拓扑结构 (例如 VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
     VulkanPipelineBuilder& SetInputTopology(VkPrimitiveTopology topology);

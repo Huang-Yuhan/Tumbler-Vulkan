@@ -127,11 +127,6 @@ void VulkanSwapchain::Cleanup() {
             LOG_INFO("Depth Image Destroyed");
         }
 
-        if (Swapchain != VK_NULL_HANDLE) {
-            vkDestroySwapchainKHR(device, std::exchange(Swapchain,VK_NULL_HANDLE), nullptr);
-            LOG_INFO("Swapchain Destroyed");
-        }
-
         LOG_INFO("================= VulkanSwapchain Cleanup Completed ================");
     }
 }
@@ -155,7 +150,7 @@ VkResult VulkanSwapchain::PresentImage(VkSemaphore renderFinishedSemaphore, uint
     presentInfo.pSwapchains = swapChains;
     presentInfo.pImageIndices = &imageIndex;
 
-    return vkQueuePresentKHR(ContextRef->GetGraphicsQueue(), &presentInfo);
+    return vkQueuePresentKHR(ContextRef->GetPresentQueue(), &presentInfo);
 }
 
 // ==========================================

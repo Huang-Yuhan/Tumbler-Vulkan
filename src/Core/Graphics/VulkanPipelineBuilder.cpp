@@ -29,6 +29,11 @@ VkPipeline VulkanPipelineBuilder::Build(VkDevice device, VkRenderPass renderPass
     colorBlending.attachmentCount = 1;
     colorBlending.pAttachments = &ColorBlendAttachment;
 
+    VkPipelineDynamicStateCreateInfo dynamicStateInfo{};
+    dynamicStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicStateInfo.dynamicStateCount = static_cast<uint32_t>(DynamicStates.size());
+    dynamicStateInfo.pDynamicStates = DynamicStates.empty() ? nullptr : DynamicStates.data();
+
     // 3. 最终的大结构体：Graphics Pipeline Create Info
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -45,6 +50,7 @@ VkPipeline VulkanPipelineBuilder::Build(VkDevice device, VkRenderPass renderPass
     pipelineInfo.pMultisampleState = &Multisampling;
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDepthStencilState = &DepthStencil;
+    pipelineInfo.pDynamicState = DynamicStates.empty() ? nullptr : &dynamicStateInfo;
     
     // 链接布局和 RenderPass
     pipelineInfo.layout = PipelineLayout;
@@ -102,6 +108,11 @@ VulkanPipelineBuilder& VulkanPipelineBuilder::SetViewport(uint32_t width, uint32
     Scissor.offset = {0, 0};
     Scissor.extent = {width, height};
 
+    return *this;
+}
+
+VulkanPipelineBuilder& VulkanPipelineBuilder::SetDynamicViewportScissor() {
+    DynamicStates = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
     return *this;
 }
 

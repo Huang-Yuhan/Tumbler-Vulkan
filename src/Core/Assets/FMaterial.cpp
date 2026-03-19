@@ -92,6 +92,7 @@ void FMaterial::BuildPipeline(const std::string& vertPath, const std::string& fr
     Pipeline = builder
         .SetShaders(vertModule, fragModule)
         .SetViewport(Renderer->GetSwapchainExtent().width, Renderer->GetSwapchainExtent().height)
+        .SetDynamicViewportScissor()
         .SetInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
         .SetPolygonMode(VK_POLYGON_MODE_FILL)
         .SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE) // 测试期先关掉剔除

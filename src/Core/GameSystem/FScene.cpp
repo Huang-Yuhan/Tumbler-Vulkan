@@ -96,12 +96,12 @@ void FScene::ExtractRenderPackets(std::vector<RenderPacket>& outPackets) const {
     }
 }
 
-SceneViewData FScene::GenerateSceneView(const CCamera *camera, const CTransform *cameraTransform) const {
+SceneViewData FScene::GenerateSceneView(const CCamera *camera, const CTransform *cameraTransform, float aspectRatio) const {
     SceneViewData viewData;
 
     // 1. Camera view
     viewData.ViewMatrix = camera->GetViewMatrix(*cameraTransform);
-    viewData.ProjectionMatrix = camera->GetProjectionMatrix(1280.0f / 720.0f);
+    viewData.ProjectionMatrix = camera->GetProjectionMatrix(aspectRatio);
     viewData.CameraPosition = cameraTransform->GetPosition();
 
     // 2. Collect lights from components

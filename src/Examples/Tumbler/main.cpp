@@ -82,7 +82,11 @@ int main() {
             logic.GetScene()->ExtractRenderPackets(renderPackets);
 
             // 2. 提取当前观察者的视图与环境数据 (SceneViewData)
-            SceneViewData viewData = logic.GetScene()->GenerateSceneView(&cameraComponent, &cameraTransform);
+            VkExtent2D swapchainExtent = renderer.GetSwapchainExtent();
+            float aspectRatio = swapchainExtent.height == 0
+                ? 1.0f
+                : static_cast<float>(swapchainExtent.width) / static_cast<float>(swapchainExtent.height);
+            SceneViewData viewData = logic.GetScene()->GenerateSceneView(&cameraComponent, &cameraTransform, aspectRatio);
 
             // --- C. 发送给底层渲染器执行 ---
             // 渲染器同时接收“视图”和“包裹”，并将 UI 录制指令作为回调传入

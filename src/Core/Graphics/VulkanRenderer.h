@@ -42,6 +42,7 @@ public:
     // ==========================================
     [[nodiscard]] VkRenderPass GetRenderPass() const { return RenderPass; }
     [[nodiscard]] VkExtent2D GetSwapchainExtent() const { return SwapChain.GetExtent(); }
+    [[nodiscard]] uint32_t GetSwapchainImageCount() const { return static_cast<uint32_t>(SwapChain.GetImageCount()); }
 
     bool LoadShaderModule(const char* filePath, VkShaderModule* outShaderModule);
     void CreateBuffer(size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage, AllocatedBuffer& outBuffer);
@@ -49,6 +50,7 @@ public:
     VkDescriptorSet AllocateDescriptorSet(VkDescriptorSetLayout layout);
 
 private:
+    AppWindow* Window = nullptr;
     VulkanContext Context;
     VulkanSwapchain SwapChain;
 
@@ -78,6 +80,8 @@ private:
     void InitCommands();
     void InitSyncStructures();
     void InitUploadSync();
+    bool RecreateSwapchain();
+    void DestroyFramebuffers();
     void InitDescriptors(); // 这个还在，但内容变了
 
     // 录制命令缓冲

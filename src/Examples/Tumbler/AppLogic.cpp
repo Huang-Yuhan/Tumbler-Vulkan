@@ -70,12 +70,10 @@ void AppLogic::Init(VulkanRenderer* renderer, FAssetManager* assetMgr) {
     // 2. 康奈尔经典红 (左墙)
     auto matRed = pbrMaterial->CreateInstance();
     matRed->SetVector("BaseColorTint", glm::vec4(0.63f, 0.06f, 0.05f, 1.0f));
-    matRed->ApplyChanges(); 
 
     // 3. 康奈尔经典绿 (右墙)
     auto matGreen = pbrMaterial->CreateInstance();
     matGreen->SetVector("BaseColorTint", glm::vec4(0.15f, 0.48f, 0.09f, 1.0f));
-    matGreen->ApplyChanges();
 
     // 4. 康奈尔经典白 (天花板、地板、后墙)
     auto matWhite = pbrMaterial->CreateInstance();
@@ -85,10 +83,12 @@ void AppLogic::Init(VulkanRenderer* renderer, FAssetManager* assetMgr) {
     // 测试 1：绝缘体（非常粗糙的塑料）- 给左边的红墙
     matRed->SetFloat("Roughness", 0.9f);
     matRed->SetFloat("Metallic", 0.0f);
+    matRed->ApplyChanges();
 
     // 测试 2：纯金属（极度光滑的金/铜镜面）- 给右边的绿墙
     matGreen->SetFloat("Roughness", 0.1f);
     matGreen->SetFloat("Metallic", 1.0f);
+    matGreen->ApplyChanges();
 
     // 5. 挂载到我们之前创建好的墙壁上
     Scene->FindActorByName("LeftWall")->GetComponent<CMeshRenderer>()->SetMaterial(matRed);
@@ -127,4 +127,4 @@ void AppLogic::Init(VulkanRenderer* renderer, FAssetManager* assetMgr) {
     auto* pl = lightActor->AddComponent<CPointLight>();
     pl->Color = glm::vec3(1.0f, 1.0f, 1.0f);
     pl->Intensity = 50.0f;
-}
+}

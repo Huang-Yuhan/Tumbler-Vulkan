@@ -12,9 +12,6 @@
 // 全局配置：Validation Layers
 // ==========================================
 
-#define NDEBUG
-#undef NDEBUG
-
 #ifdef NDEBUG
 constexpr bool enableValidationLayers = false;
 #else
@@ -228,13 +225,18 @@ void VulkanContext::PickPhysicalDevice() {
 void VulkanContext::CreateLogicalDevice() {
     // 1. 描述队列
     float queuePriority = 1.0f;
+    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+    std::set<uint32_t> uniqueQueueFamilies = {GraphicsQueueFamilyIndex, PresentQueueFamilyIndex};
 
-    VkDeviceQueueCreateInfo queueCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-        .queueFamilyIndex = GraphicsQueueFamilyIndex,
-        .queueCount = 1,
-        .pQueuePriorities = &queuePriority
-    };
+    queueCreateInfos.reserve(uniqueQueueFamilies.size());
+    for (uint32_t queueFamilyIndex : uniqueQueueFamilies) {
+        queueCreateInfos.push_back(VkDeviceQueueCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+            .queueFamilyIndex = queueFamilyIndex,
+            .queueCount = 1,
+            .pQueuePriorities = &queuePriority
+        });
+    }
 
     // 2. 描述逻辑设备特性 (暂时什么都不开启)
     VkPhysicalDeviceFeatures deviceFeatures{
@@ -256,8 +258,8 @@ void VulkanContext::CreateLogicalDevice() {
 
     const VkDeviceCreateInfo createInfo{
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .queueCreateInfoCount = 1,
-        .pQueueCreateInfos = &queueCreateInfo,
+        .queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size()),
+        .pQueueCreateInfos = queueCreateInfos.data(),
         .enabledLayerCount = layerCount,
         .ppEnabledLayerNames = layerNames,
         .enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size()),
@@ -271,6 +273,7 @@ void VulkanContext::CreateLogicalDevice() {
 
     // 4. 获取队列句柄
     vkGetDeviceQueue(Device, GraphicsQueueFamilyIndex, 0, &GraphicsQueue);
+    vkGetDeviceQueue(Device, PresentQueueFamilyIndex, 0, &PresentQueue);
     LOG_INFO("Logical Device Created");
 }
 
