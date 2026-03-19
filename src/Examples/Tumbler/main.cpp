@@ -64,6 +64,11 @@ int main() {
             });
         }
 
+        vkDeviceWaitIdle(renderer.GetDevice());
+
+        // 2. 清理门户：手动销毁 ImGui 底层庞大的 Vulkan 资源
+        ui_manager.Cleanup(renderer.GetDevice());
+
     } catch (const std::exception& e) {
         LOG_CRITICAL("Crash: {}", e.what());
         return -1;
