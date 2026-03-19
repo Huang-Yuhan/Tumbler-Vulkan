@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "Core/Graphics/RenderPacket.h"
+
 class FActor;
 
 class FScene
@@ -44,5 +46,7 @@ public:
     [[nodiscard]] const std::vector<std::unique_ptr<FActor>>& GetAllActors()const;
 
     [[nodiscard]] FActor* FindActorByName(const std::string& name) const;
+
+    void ExtractRenderPackets(std::vector<RenderPacket>& outPackets) const;
 
 };

@@ -223,8 +223,7 @@ void VulkanRenderer::InitSyncStructures() {
     VK_CHECK(vkCreateFence(device, &fenceInfo, nullptr, &RenderFence));
 }
 
-void VulkanRenderer::Render(const FScene* scene, const CCamera* camera, const CTransform* cameraTransform,std::function<void(VkCommandBuffer)> onUIRender){
-
+void VulkanRenderer::Render(const std::vector<RenderPacket>& renderPackets, const CCamera* camera, const CTransform* cameraTransform, std::function<void(VkCommandBuffer)> onUIRender){
     VkDevice device = Context.GetDevice();
     vkWaitForFences(device, 1, &RenderFence, VK_TRUE, UINT64_MAX);
 
@@ -236,7 +235,7 @@ void VulkanRenderer::Render(const FScene* scene, const CCamera* camera, const CT
     vkResetCommandBuffer(MainCommandBuffer, 0);
 
     // 把场景和相机传给录制函数
-    RecordCommandBuffer(MainCommandBuffer, imageIndex, scene, camera, cameraTransform,onUIRender);
+    RecordCommandBuffer(MainCommandBuffer, imageIndex, renderPackets, camera, cameraTransform,onUIRender);
 
     VkSubmitInfo submitInfo{VK_STRUCTURE_TYPE_SUBMIT_INFO};
     VkSemaphore waitSemaphores[] = {ImageAvailableSemaphore};
@@ -254,7 +253,7 @@ void VulkanRenderer::Render(const FScene* scene, const CCamera* camera, const CT
 
     SwapChain.PresentImage(RenderFinishedSemaphore, imageIndex);
 }
-void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t imageIndex, const FScene* scene, const CCamera* camera, const CTransform* cameraTransform,std::function<void(VkCommandBuffer)> onUIRender) {
+void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t imageIndex, const std::vector<RenderPacket>& renderPackets, const CCamera* camera, const CTransform* cameraTransform,std::function<void(VkCommandBuffer)> onUIRender) {
     VkCommandBufferBeginInfo beginInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
     vkBeginCommandBuffer(cmdBuffer, &beginInfo);
 
@@ -285,37 +284,25 @@ void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t ima
 
     memcpy(SceneParameterBuffer.Info.pMappedData, &sceneData, sizeof(FSceneData));
     // 【核心】遍历场景绘制
-    if (scene) {
-        for (const auto& actorPtr : scene->GetAllActors()) {
-            FActor* actor = actorPtr.get();
-            auto* meshRenderer = actor->GetComponent<CMeshRenderer>();
+    // 【核心净化】：渲染器变成了纯粹的画图机器
+    for (const auto& packet : renderPackets) {
+        auto parentMaterial = packet.Material->GetParent();
 
-            // 安全检查
-            if (!meshRenderer || !meshRenderer->IsVisible() || !meshRenderer->GetMesh() || !meshRenderer->GetMaterial()) continue;
+        vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, parentMaterial->Pipeline);
 
-            auto materialInstance = meshRenderer->GetMaterial();
-            auto parentMaterial = materialInstance->GetParent();
+        VkDescriptorSet descSet[] = {GlobalDescriptorSet, packet.Material->GetDescriptorSet()};
+        vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, parentMaterial->PipelineLayout, 0, 2, descSet, 0, nullptr);
 
-            // 1. 绑定母体管线 (Pipeline)
-            vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, parentMaterial->Pipeline);
+        // 直接拿矩阵，不需要知道这是谁的矩阵
+        vkCmdPushConstants(cmdBuffer, parentMaterial->PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &packet.TransformMatrix);
 
-            // 2. 绑定实例的参数 (Descriptor Set: 包含贴图和UBO)
-            VkDescriptorSet descSet[] = {GlobalDescriptorSet, materialInstance->GetDescriptorSet()};
-            vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, parentMaterial->PipelineLayout, 0, 2, descSet, 0, nullptr);
+        FVulkanMesh& gpuMesh = UploadMesh(packet.Mesh);
+        VkBuffer vertexBuffers[] = {gpuMesh.VertexBuffer.Buffer};
+        VkDeviceSize offsets[] = {0};
+        vkCmdBindVertexBuffers(cmdBuffer, 0, 1, vertexBuffers, offsets);
+        vkCmdBindIndexBuffer(cmdBuffer, gpuMesh.IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 
-            // 3. 计算并推送 MVP 矩阵
-            glm::mat4 model = actor->Transform.GetLocalToWorldMatrix();
-            vkCmdPushConstants(cmdBuffer, parentMaterial->PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &model);
-
-            // 4. 上传并绑定 Mesh，执行绘制
-            FVulkanMesh& gpuMesh = UploadMesh(meshRenderer->GetMesh().get());
-            VkBuffer vertexBuffers[] = {gpuMesh.VertexBuffer.Buffer};
-            VkDeviceSize offsets[] = {0};
-            vkCmdBindVertexBuffers(cmdBuffer, 0, 1, vertexBuffers, offsets);
-            vkCmdBindIndexBuffer(cmdBuffer, gpuMesh.IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
-
-            vkCmdDrawIndexed(cmdBuffer, gpuMesh.IndexCount, 1, 0, 0, 0);
-        }
+        vkCmdDrawIndexed(cmdBuffer, gpuMesh.IndexCount, 1, 0, 0, 0);
     }
 
     if (onUIRender) {

@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <iostream>
 
+#include "Components/CMeshRenderer.h"
+
 
 FScene::FScene()=default;
 FScene::~FScene()=default;
@@ -70,4 +72,23 @@ FActor * FScene::FindActorByName(const std::string &name) const
         }
     }
     return nullptr;
+}
+
+void FScene::ExtractRenderPackets(std::vector<RenderPacket>& outPackets) const {
+    outPackets.clear(); // 清空上一帧的旧包裹
+
+    for (const auto& actorPtr : Actors) {
+        FActor* actor = actorPtr.get();
+        auto* meshRenderer = actor->GetComponent<CMeshRenderer>();
+
+        if (meshRenderer && meshRenderer->IsVisible() && meshRenderer->GetMesh() && meshRenderer->GetMaterial()) {
+
+            RenderPacket packet;
+            packet.Mesh = meshRenderer->GetMesh().get();
+            packet.Material = meshRenderer->GetMaterial().get();
+            packet.TransformMatrix = actor->Transform.GetLocalToWorldMatrix();
+
+            outPackets.push_back(packet);
+        }
+    }
 }

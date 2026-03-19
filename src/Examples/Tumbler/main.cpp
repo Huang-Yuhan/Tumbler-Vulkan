@@ -45,7 +45,7 @@ int main() {
 
         UIManager ui_manager;
         ui_manager.Init(&window, &renderer);
-
+        std::vector<RenderPacket> renderPackets;
         while (!window.ShouldClose()) {
             window.PollEvents();
 
@@ -58,10 +58,14 @@ int main() {
             ImGui::End();
             ui_manager.EndFrame();
 
+            logic.GetScene()->ExtractRenderPackets(renderPackets);
+
             // 3. 将场景和相机提交给渲染器
-            renderer.Render(logic.GetScene(), &cameraComponent, &cameraTransform, [&](VkCommandBuffer cmdBuffer){
-                ui_manager.RecordDrawCommands(cmdBuffer);
-            });
+            renderer.Render(renderPackets, &cameraComponent, &cameraTransform,
+                            [&](VkCommandBuffer cmd) {
+                                ui_manager.RecordDrawCommands(cmd);
+                            }
+                        );
         }
 
         vkDeviceWaitIdle(renderer.GetDevice());

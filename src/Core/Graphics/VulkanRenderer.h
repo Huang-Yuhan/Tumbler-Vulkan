@@ -13,6 +13,7 @@
 #include <glm/glm.hpp>
 
 #include "Core/Assets/TextureManager.h"
+#include "Core/Graphics/RenderPacket.h"
 
 class FTexture;
 class AppWindow;
@@ -30,8 +31,7 @@ public:
     void Cleanup();
 
     // 渲染接口：传入场景和相机
-    void Render(const FScene* scene, const CCamera* camera, const CTransform* cameraTransform, std::function<void(VkCommandBuffer)> onUIRender = nullptr);
-    FVulkanMesh& UploadMesh(FMesh* cpuMesh);
+void Render(const std::vector<RenderPacket>& renderPackets, const CCamera* camera, const CTransform* cameraTransform, std::function<void(VkCommandBuffer)> onUIRender = nullptr);    FVulkanMesh& UploadMesh(FMesh* cpuMesh);
 
     [[nodiscard]] VkDevice GetDevice() const { return Context.GetDevice(); }
     [[nodiscard]] TextureManager* GetTextureManager() const { return TexManager.get(); }
@@ -88,7 +88,7 @@ private:
     void InitDescriptors(); // 这个还在，但内容变了
 
     // 录制命令缓冲
-    void RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, const FScene* scene, const CCamera* camera, const CTransform* cameraTransform,std::function<void(VkCommandBuffer)> onUIRender=nullptr);
+void RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, const std::vector<RenderPacket>& renderPackets, const CCamera* camera, const CTransform* cameraTransform,std::function<void(VkCommandBuffer)> onUIRender);
     void ImmediateSubmit(std::function<void(VkCommandBuffer cmd)>&& function);
     void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
     void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
