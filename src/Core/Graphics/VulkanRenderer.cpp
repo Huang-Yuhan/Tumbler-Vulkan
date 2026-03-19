@@ -267,9 +267,14 @@ void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t ima
     SceneDataUBO scene_data_ubo;
     scene_data_ubo.ViewProjection = viewData.ProjectionMatrix * viewData.ViewMatrix;
     scene_data_ubo.CameraPosition = glm::vec4(viewData.CameraPosition, 1.0f);
-    const LightData& mainLight = !viewData.Lights.empty() ? viewData.Lights[0] : LightData{};
-    scene_data_ubo.LightPosition  = glm::vec4(mainLight.Position, 1.0f);
-    scene_data_ubo.LightColor     = glm::vec4(mainLight.Color, mainLight.Intensity);
+    if (!viewData.Lights.empty()) {
+        scene_data_ubo.LightPosition = glm::vec4(viewData.Lights[0].Position, 1.0f);
+        scene_data_ubo.LightColor    = glm::vec4(viewData.Lights[0].Color, viewData.Lights[0].Intensity);
+    } else {
+        // 场景全黑的默认保底值，避免纯黑或者未定义行为
+        scene_data_ubo.LightPosition = glm::vec4(0.0f);
+        scene_data_ubo.LightColor    = glm::vec4(0.0f);
+    }
     memcpy(SceneParameterBuffer.Info.pMappedData, &scene_data_ubo, sizeof(SceneDataUBO));
     // 【核心】遍历场景绘制
     // 【核心净化】：渲染器变成了纯粹的画图机器

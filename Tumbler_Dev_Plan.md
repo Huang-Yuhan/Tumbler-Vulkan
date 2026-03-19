@@ -1,57 +1,56 @@
-# 🚀 Tumbler Engine 开发路线图 (Current Status)
+# 🚀 Tumbler Engine 开发路线图 (Roadmap)
 
-**状态**：🚧 **Stage 10: 交互式调试与资产接入 (进行中)**
-**当前成就**：成功手撕 Cook-Torrance BRDF，跑通直接光照管线；集成 `tinyobjloader`，实现 `FMesh::LoadFromOBJ` 与 `AppLogic::LoadOBJMesh`。
-**当前焦点**：ImGui UI 接入与法线映射实现。
+**当前状态**：🚧 **稳固地基期 (架构重构与 PBR 基础完成)**
 
----
+经过阶段 1~10 的打磨，Tumbler 引擎已具备：
+✅ 基于实体-组件 (ECS雏形) 的逻辑架构
+✅ 严格物理隔离的 `SceneViewData` 与 `RenderPacket` 数据流
+✅ 基于资源缓存与依赖注入的 `FAssetManager`
+✅ 高效的 Vulkan PBR 材质母体/实例管线绑定模型
+✅ 包含环境采样、GGX微表面、Schlick菲涅尔的 Cook-Torrance BRDF Shader
 
-## ✅ 已完成里程碑 (Milestones Completed)
-* [x] 基础架构、渲染循环、管线与同步 (Stage 1-6)。
-* [x] 纹理映射、资源缓存与 RAII 封装 (Stage 7)。
-* [x] 材质母体/实例分离系统，描述符集的高效绑定 (Stage 8)。
-* [x] **PBR 光照核心**：实现 GGX 微表面分布、Schlick 几何遮蔽、Fresnel 近似，并完成能量守恒计算 (Stage 9)。
-* [x] 修复 `ModelMatrix` 缩放导致的法线扭曲 (逆转置矩阵)。
+站在这个坚实的地基上，未来的开发计划按照由近及远、由基础设施到高级渲染，划分为 4 个优先级：
 
 ---
 
-## 🚧 阶段十：交互式调试与资产接入 (UI & Assets) - **[当前任务]**
+## 🔴 优先级 1：引擎基础设施补全 (Engine Hygiene)
+*完善引擎的基础卫生，越早做后续开发越顺畅。*
 
-**目标**：摆脱硬编码，引入 UI 面板和复杂模型，让引擎“活”起来。
+- [ ] **1.1 输入系统与漫游相机 (Camera Controller)**
+  - 封装 GLFW 键盘/鼠标输入。
+  - 实现 `CFirstPersonCamera` 或 `COrbitCamera` 组件，摆脱写死的相机坐标，实现 3D 漫游 (WASD + 鼠标转动)。
+- [ ] **1.2 窗口重置处理 (Swapchain Recreation)**
+  - 捕获 GLFW 的 Resize 事件。
+  - 在调整窗口大小时暂停渲染，销毁旧的 Swapchain 及其附属附件（DepthBuffer、Framebuffer 等）并基于新尺寸重建，避免 `VK_ERROR_OUT_OF_DATE_KHR` 崩溃。
+- [ ] **1.3 真实的 DeltaTime (dt)**
+  - 在主循环中接入 `std::chrono` 计算两帧真实的时间差。
+  - 传入 `Tick(float deltaTime)`，使相机的移动与旋转跟帧率解绑。
 
-### 10.1 引入交互式 UI (ImGui Integration)
-* *每次改颜色都要重新编译 C++ 太痛苦了，我们需要实时反馈。*
-* [ ] 引入 `imgui` 库 (通过 vcpkg)。
-* [ ] 搭建 Vulkan 的 ImGui 渲染后端 (`ImGui_ImplVulkan`)。
-* [ ] 在每帧渲染末尾绘制 UI，实现滑块动态调整 `FMaterialInstance` 的粗糙度、金属度和光源坐标。
+## 🟡 优先级 2：PBR 与视觉效果的究极进化 (Visuals First)
+*让引擎画面从“不错”迈向“惊艳”的核心步骤。*
 
-### 10.2 复杂 3D 模型加载 (Model Loading) - ✅ **已完成**
-* [x] 集成 `tinyobjloader`（`vcpkg.json` + `CMakeLists.txt`）。
-* [x] `FMesh::LoadFromOBJ`：解析 Position/Normal/UV，哈希去重顶点，V 轴翻转兼容 Vulkan。
-* [x] `AppLogic::LoadOBJMesh(path, name)`：加载并自动创建 Actor 挂入场景。
+- [ ] **2.1 法线映射与切线空间 (Normal Mapping)**
+  - 顶点布局增加 `Tangent` 属性并在 `FAssetManager` 的 OBJ 加载中计算切线。
+  - 在 Shader 构建 TBN 矩阵，从 Normal Map 采样并转换法线，赋予模型极其逼真的宏观凹凸质感。
+- [ ] **2.2 基于图像的光照 (IBL - Image Based Lighting)**
+  - 加载 `.hdr` 全景天空盒资源。
+  - 预计算 Irradiance Map (用于 Diffuse 环境光) 替代现在的硬编码纯色。
+  - 预计算 Prefilter Map 与 BRDF LUT (用于 Specular 环境反射)，使金属拥有真实的倒影。
 
-> 把 OBJ 放到 `assets/models/`，在 renderer 初始化**后**调用：
-> ```cpp
-> auto mesh = appLogic.LoadOBJMesh("assets/models/bunny.obj", "Bunny");
-> renderer.UploadMesh(mesh.get());
-> ```
+## 🟢 优先级 3：高级渲染管线 (Advanced Rendering)
+*打破单光的枯燥环境，迈入复杂的场景构建。*
 
-### 10.3 法线映射与切线空间 (Normal Mapping)
-* *让平坦的模型表面长出逼真的凹凸细节。*
-* [ ] 修改顶点布局，增加 `Tangent` (切线) 属性。
-* [ ] 在 C++ 加载模型时计算切线向量。
-* [ ] 在 Shader 中构建 TBN 矩阵，从 Normal Map 采样并转换法线。
+- [ ] **3.1 多光源支持 (Multi-Lights Support)**
+  - 扩展 `SceneDataUBO` 以支持多光源数组 `LightData[MAX_LIGHTS]`。
+  - 修改 `pbr.frag` 用循环对所有点光源和平行光的光照贡献进行能量累加。
+- [ ] **3.2 基础阴影映射 (Shadow Mapping)**
+  - 新增 Shadow Pass，从光源视角将场景深度渲染到一张 Depth Map 中。
+  - Normal Pass 采样该深度图比较遮挡关系，生成真实的几何阴影。
 
----
+## 🔵 优先级 4：引擎架构的深度优化 (Architecture Depth)
+*向着大型工业级引擎的复杂度迈进。*
 
-## 📅 阶段十一：基于图像的照明 (Image-Based Lighting, IBL)
-
-**目标**：PBR 的终极形态。用一张全景 HDR 照片照亮整个场景。
-
-* [ ] 解析 `.hdr` 格式的高动态范围环境图。
-* [ ] **Diffuse IBL**：预计算辐照度贴图 (Irradiance Map) 替换当前的单一固定环境光。
-* [ ] **Specular IBL**：预计算环境反射贴图 (Prefiltered Env Map) 与 BRDF 积分图 (LUT)。
-
-## 📅 阶段十二：多光源与阴影 (Lights & Shadows)
-* [ ] 扩展 Scene UBO，支持点光源数组 (Point Light Array)。
-* [ ] 实现基础阴影映射 (Shadow Mapping)。
+- [ ] **4.1 Transform 层级树 (Hierarchy)**
+  - 为 `CTransform` 增加 `Parent` 和 `Children` 指针，实现世界/局部矩阵的层级相乘连带（例如角色手拿武器）。
+- [ ] **4.2 后台异步加载 (Async Asset Loading)**
+  - 利用 C++ `std::thread` 或线程池，在后台线程中执行耗时的模型解析、贴图解码，并使用 Vulkan 的 StagingBuffer 与 Transfer Queue 配合 Fence 做到主线程零卡顿上传，彻底消除游戏启动或切图时的黑屏卡死！
