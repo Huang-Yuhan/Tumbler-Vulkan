@@ -94,3 +94,18 @@ void AppLogic::InitializeMaterials(VulkanRenderer* renderer) {
     Scene->FindActorByName("Ceiling")->GetComponent<CMeshRenderer>()->SetMaterial(matWhite);
     Scene->FindActorByName("BackWall")->GetComponent<CMeshRenderer>()->SetMaterial(matWhite);
 }
+
+std::shared_ptr<FMesh> AppLogic::LoadOBJMesh(const std::string& filePath, const std::string& actorName)
+{
+    // 1. 加载 OBJ，解析顶点数据
+    auto mesh = std::make_shared<FMesh>(FMesh::LoadFromOBJ(filePath));
+
+    // 2. 创建 Actor，挂载 CMeshRenderer（材质由调用方另行设置）
+    FActor* actor = Scene->CreateActor(actorName);
+    actor->AddComponent<CMeshRenderer>()->SetMesh(mesh);
+
+    // 3. 保存所有权，防止 mesh 在函数外被提前析构
+    ObjMeshes.push_back(mesh);
+
+    return mesh;
+}

@@ -17,7 +17,7 @@ struct AllocatedImage {
     VmaAllocation Allocation = VK_NULL_HANDLE;
 };
 
-struct FSceneData {
+struct SceneDataUBO {
     glm::mat4 ViewProjection;
     glm::vec4 CameraPosition;
     glm::vec4 LightPosition;

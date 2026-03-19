@@ -1,8 +1,8 @@
 # 🚀 Tumbler Engine 开发路线图 (Current Status)
 
-**状态**：🚧 **Stage 10: 交互式调试与资产接入 (启动中)**
-**当前成就**：成功手撕 Cook-Torrance BRDF，跑通了包含金属度/粗糙度的直接光照 (Direct Lighting) 渲染管线。
-**当前焦点**：引入 UI 界面实时调节光影，并加载真实的 3D 模型和法线贴图来验证 PBR 的极致效果。
+**状态**：🚧 **Stage 10: 交互式调试与资产接入 (进行中)**
+**当前成就**：成功手撕 Cook-Torrance BRDF，跑通直接光照管线；集成 `tinyobjloader`，实现 `FMesh::LoadFromOBJ` 与 `AppLogic::LoadOBJMesh`。
+**当前焦点**：ImGui UI 接入与法线映射实现。
 
 ---
 
@@ -25,10 +25,16 @@
 * [ ] 搭建 Vulkan 的 ImGui 渲染后端 (`ImGui_ImplVulkan`)。
 * [ ] 在每帧渲染末尾绘制 UI，实现滑块动态调整 `FMaterialInstance` 的粗糙度、金属度和光源坐标。
 
-### 10.2 复杂 3D 模型加载 (Model Loading)
-* *用 PBR 渲染一个圆滑的头盔或球体，远比渲染一面平墙震撼。*
-* [ ] 引入 `tiny_obj_loader` 库。
-* [ ] 编写 `FMesh::LoadFromObj`，解析 `.obj` 文件中的 Vertex, Normal, UV 数据。
+### 10.2 复杂 3D 模型加载 (Model Loading) - ✅ **已完成**
+* [x] 集成 `tinyobjloader`（`vcpkg.json` + `CMakeLists.txt`）。
+* [x] `FMesh::LoadFromOBJ`：解析 Position/Normal/UV，哈希去重顶点，V 轴翻转兼容 Vulkan。
+* [x] `AppLogic::LoadOBJMesh(path, name)`：加载并自动创建 Actor 挂入场景。
+
+> 把 OBJ 放到 `assets/models/`，在 renderer 初始化**后**调用：
+> ```cpp
+> auto mesh = appLogic.LoadOBJMesh("assets/models/bunny.obj", "Bunny");
+> renderer.UploadMesh(mesh.get());
+> ```
 
 ### 10.3 法线映射与切线空间 (Normal Mapping)
 * *让平坦的模型表面长出逼真的凹凸细节。*

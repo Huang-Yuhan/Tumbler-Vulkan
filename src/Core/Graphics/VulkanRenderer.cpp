@@ -268,13 +268,13 @@ void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t ima
     vkCmdBeginRenderPass(cmdBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
     // 不需要在这里算 proj 和 view 了，直接用外部喂进来的数据！
-    FSceneData sceneData;
-    sceneData.ViewProjection = viewData.ProjectionMatrix * viewData.ViewMatrix;
-    sceneData.CameraPosition = glm::vec4(viewData.CameraPosition, 1.0f);
-    sceneData.LightPosition  = glm::vec4(viewData.LightPosition, 1.0f);
-    sceneData.LightColor     = glm::vec4(viewData.LightColor, viewData.LightIntensity);
+    SceneDataUBO scene_data_ubo;
+    scene_data_ubo.ViewProjection = viewData.ProjectionMatrix * viewData.ViewMatrix;
+    scene_data_ubo.CameraPosition = glm::vec4(viewData.CameraPosition, 1.0f);
+    scene_data_ubo.LightPosition  = glm::vec4(viewData.LightPosition, 1.0f);
+    scene_data_ubo.LightColor     = glm::vec4(viewData.LightColor, viewData.LightIntensity);
 
-    memcpy(SceneParameterBuffer.Info.pMappedData, &sceneData, sizeof(FSceneData));
+    memcpy(SceneParameterBuffer.Info.pMappedData, &scene_data_ubo, sizeof(SceneDataUBO));
     // 【核心】遍历场景绘制
     // 【核心净化】：渲染器变成了纯粹的画图机器
     for (const auto& packet : renderPackets) {
@@ -654,12 +654,12 @@ void VulkanRenderer::InitDescriptors() {
 
     GlobalDescriptorSet = AllocateDescriptorSet(GlobalSetLayout);
 
-    CreateBuffer(sizeof(FSceneData),VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,VMA_MEMORY_USAGE_AUTO_PREFER_HOST,SceneParameterBuffer);
+    CreateBuffer(sizeof(SceneDataUBO),VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,VMA_MEMORY_USAGE_AUTO_PREFER_HOST,SceneParameterBuffer);
 
     VkDescriptorBufferInfo sceneBufferInfo{
         .buffer = SceneParameterBuffer.Buffer,
         .offset = 0,
-        .range = sizeof(FSceneData),
+        .range = sizeof(SceneDataUBO),
         };
 
     VkWriteDescriptorSet setWrite

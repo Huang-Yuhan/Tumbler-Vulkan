@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <string>
 
 
 // 枚举保持在头文件
@@ -46,4 +47,5 @@ public:
 
     // [重点] 复杂的工厂函数只保留声明
     static FMesh CreatePlane(float width, float height, uint32_t subdivisionsWidth, uint32_t subdivisionsHeight);
+    static FMesh LoadFromOBJ(const std::string& filePath);
 };

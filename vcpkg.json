@@ -11,6 +11,7 @@
     "vulkan-memory-allocator",
     "spdlog",
     "stb",
+    "tinyobjloader",
     {
       "name": "imgui",
       "features": [

@@ -22,6 +22,7 @@ find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 find_package(imgui CONFIG REQUIRED)
+find_package(tinyobjloader CONFIG REQUIRED)
 
 # 2. 编译 Shader (跟之前一样)
 add_subdirectory(assets/shaders)
@@ -56,6 +57,7 @@ target_link_libraries(TumblerCore PUBLIC
         GPUOpen::VulkanMemoryAllocator
         spdlog::spdlog
         imgui::imgui
+        tinyobjloader::tinyobjloader
 )
 
 # 平台适配

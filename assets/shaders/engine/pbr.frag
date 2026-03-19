@@ -124,7 +124,7 @@ void main() {
     // --- 结束 Cook-Torrance BRDF ---
 
     // 5. 加上一个极弱的环境光，防止背光面彻底变成死黑
-    vec3 ambient = vec3(0.03) * albedo * params.BaseColorTint.rgb;
+    vec3 ambient = vec3(0.03) * albedo;
     vec3 color = ambient + Lo;
 
     // 6. HDR 色调映射 (Tone Mapping)
