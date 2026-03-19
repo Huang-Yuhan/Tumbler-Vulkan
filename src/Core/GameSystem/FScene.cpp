@@ -92,3 +92,20 @@ void FScene::ExtractRenderPackets(std::vector<RenderPacket>& outPackets) const {
         }
     }
 }
+
+SceneViewData FScene::GenerateSceneView(const CCamera *camera, const CTransform *cameraTransform) const {
+    SceneViewData viewData;
+
+    // 1. 从 Camera 获取“怎么看” (视角)
+    viewData.ViewMatrix = camera->GetViewMatrix(*cameraTransform);
+    // 这里 aspect 的获取如果不想依赖 renderer，可以传进来，或者写死为 1280/720 临时用
+    viewData.ProjectionMatrix = camera->GetProjectionMatrix(1280.0f / 720.0f);
+    viewData.CameraPosition = cameraTransform->GetPosition();
+
+    // 2. 从 Scene 获取“环境光照” (环境)
+    viewData.LightPosition = GlobalLightPos;
+    viewData.LightColor = GlobalLightColor;
+    viewData.LightIntensity = GlobalLightIntensity;
+
+    return viewData;
+}
