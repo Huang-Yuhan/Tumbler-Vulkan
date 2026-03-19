@@ -93,6 +93,29 @@ void AppLogic::InitializeMaterials(VulkanRenderer* renderer) {
     Scene->FindActorByName("Floor")->GetComponent<CMeshRenderer>()->SetMaterial(matWhite);
     Scene->FindActorByName("Ceiling")->GetComponent<CMeshRenderer>()->SetMaterial(matWhite);
     Scene->FindActorByName("BackWall")->GetComponent<CMeshRenderer>()->SetMaterial(matWhite);
+
+    // ==========================================
+    // 6. 加载 Sting 剑模型
+    // ==========================================
+    auto swordMesh = LoadOBJMesh("assets/models/Sting-Sword-lowpoly.obj", "StingSword");
+
+    // 摆放在场景中央，竖直摆放，缩放到合适大小
+    FActor* sword = Scene->FindActorByName("StingSword");
+    sword->Transform.SetPosition(glm::vec3(0.0f, -3.0f, 0.0f));
+    sword->Transform.SetScale(glm::vec3(0.5f, 0.5f, 0.5f));
+    sword->Transform.SetRotation(glm::vec3(0.0f, 90.0f, 0.0f));  // 后续可调整朝向
+
+    // 钢铁金属质感：高金属度、中等粗糙度(有些磨损感)
+    auto matSword = pbrMaterial->CreateInstance();
+    matSword->SetVector("BaseColorTint", glm::vec4(0.80f, 0.77f, 0.70f, 1.0f)); // 淡银灰色
+    matSword->SetFloat("Roughness", 0.3f);  // 略有划痕，不是完美镜面
+    matSword->SetFloat("Metallic", 1.0f);   // 完全金属
+    matSword->ApplyChanges();
+
+    sword->GetComponent<CMeshRenderer>()->SetMaterial(matSword);
+
+    // 提前上传到 GPU（避免首帧卡顿）
+    renderer->UploadMesh(swordMesh.get());
 }
 
 std::shared_ptr<FMesh> AppLogic::LoadOBJMesh(const std::string& filePath, const std::string& actorName)

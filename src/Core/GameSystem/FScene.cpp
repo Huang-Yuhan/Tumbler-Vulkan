@@ -34,6 +34,7 @@ void FScene::Tick(float deltaTime)
             Actors.erase(it, Actors.end());
         }
     }
+    PendingKillActors.clear();
 }
 
 FActor* FScene::CreateActor(const std::string& name) {
