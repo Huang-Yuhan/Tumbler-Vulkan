@@ -5,72 +5,79 @@
 #include "Core/Editor/UIManager.h"
 #include "Core/GameSystem/Components/CCamera.h"
 #include "Core/GameSystem/Components/CTransform.h"
-#include"imgui.h"
+#include <imgui.h>
+#include <vector>
 
 int main() {
     Log::Get().Init();
     LOG_INFO("Tumbler Engine Starting...");
 
     try {
+        // 1. 基础系统初始化
         AppWindow::AppWindowConfig config;
-        config.Title = "Tumbler Engine - Scene Rendering";
+        config.Title = "Tumbler Engine - PBR Architecture";
         AppWindow window(config);
 
         VulkanRenderer renderer;
         renderer.Init(&window);
 
-        // 1. 实例化我们的应用逻辑 (场景会在这里被搭建)
+        // 2. 游戏逻辑与场景初始化
         AppLogic logic;
         logic.InitializeMaterials(&renderer);
 
-        // 【优化】：提前上传共用网格，防止渲染中途卡顿
+        // 提前上传共用网格，防止渲染中途卡顿
         renderer.UploadMesh(logic.GetDefaultMesh().get());
 
-        // 2. 创建一个虚拟相机
+        // 3. 创建虚拟相机 (属于游戏逻辑世界)
         CTransform cameraTransform;
         CCamera cameraComponent;
-
-        // 【位置】放在靠近正面开口处 (Z=4.0)，高度略低于正中心 (Y=-1.0) 更有空间透视感
         cameraTransform.SetPosition(glm::vec3(0.0f, -1.0f, 16.0f));
-
-        // 【旋转】因为 FQuaternion::GetForwardVector 默认是 +Z (0,0,1)
-        // 我们的 BackWall 在 -Z (-5)，所以要绕 Y 轴 (Yaw) 旋转 180 度回头看
-        float cameraYaw = 180.0f;
-        float cameraPitch = 0.0f;
-        cameraTransform.SetRotation(glm::vec3(cameraPitch, cameraYaw, 0.0f));
-
-        // 【视野】设为 60 度或 70 度，能把整个盒子的 5 面墙都框进屏幕
+        cameraTransform.SetRotation(glm::vec3(0.0f, 180.0f, 0.0f));
         cameraComponent.Fov = 60.0f;
-        auto startTime = std::chrono::high_resolution_clock::now();
 
+        // 4. UI 系统初始化
         UIManager ui_manager;
         ui_manager.Init(&window, &renderer);
-        std::vector<RenderPacket> renderPackets;
+
+        // ==========================================
+        // 核心游戏与渲染主循环
+        // ==========================================
         while (!window.ShouldClose()) {
             window.PollEvents();
 
+            // --- A. 游戏 UI 与交互逻辑 ---
             ui_manager.BeginFrame();
             ImGui::Begin("PBR Debug Engine");
-            ImGui::DragFloat3("Light Pos", &renderer.GlobalLightPos.x, 0.1f, -10.0f, 10.0f);
-            ImGui::ColorEdit3("Light Color", &renderer.GlobalLightColor.x);
-            ImGui::SliderFloat("Light Power", &renderer.GlobalLightIntensity, 0.0f, 200.0f);
+
+            // 注意：由于解耦，灯光数据不再放在 renderer 里，这里假设你把它移到了 Scene 里
+            ImGui::DragFloat3("Light Pos", &logic.GetScene()->GlobalLightPos.x, 0.1f, -10.0f, 10.0f);
+            ImGui::ColorEdit3("Light Color", &logic.GetScene()->GlobalLightColor.x);
+            ImGui::SliderFloat("Light Power", &logic.GetScene()->GlobalLightIntensity, 0.0f, 200.0f);
+
             ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
             ImGui::End();
             ui_manager.EndFrame();
 
+            // --- B. 数据打包装车 ---
+
+            // 1. 提取客观物体数据 (RenderPackets)
+            std::vector<RenderPacket> renderPackets;
             logic.GetScene()->ExtractRenderPackets(renderPackets);
 
-            // 3. 将场景和相机提交给渲染器
-            renderer.Render(renderPackets, &cameraComponent, &cameraTransform,
-                            [&](VkCommandBuffer cmd) {
-                                ui_manager.RecordDrawCommands(cmd);
-                            }
-                        );
+            // 2. 提取当前观察者的视图与环境数据 (SceneViewData)
+            SceneViewData viewData = logic.GetScene()->GenerateSceneView(&cameraComponent, &cameraTransform);
+
+            // --- C. 发送给底层渲染器执行 ---
+            // 渲染器同时接收“视图”和“包裹”，并将 UI 录制指令作为回调传入
+            renderer.Render(viewData, renderPackets, [&](VkCommandBuffer cmd) {
+                ui_manager.RecordDrawCommands(cmd);
+            });
         }
 
+        // ==========================================
+        // 安全退出与资源清理
+        // ==========================================
         vkDeviceWaitIdle(renderer.GetDevice());
-
-        // 2. 清理门户：手动销毁 ImGui 底层庞大的 Vulkan 资源
         ui_manager.Cleanup(renderer.GetDevice());
 
     } catch (const std::exception& e) {

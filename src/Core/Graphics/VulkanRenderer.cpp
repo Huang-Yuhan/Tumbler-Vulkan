@@ -223,7 +223,8 @@ void VulkanRenderer::InitSyncStructures() {
     VK_CHECK(vkCreateFence(device, &fenceInfo, nullptr, &RenderFence));
 }
 
-void VulkanRenderer::Render(const std::vector<RenderPacket>& renderPackets, const CCamera* camera, const CTransform* cameraTransform, std::function<void(VkCommandBuffer)> onUIRender){
+void VulkanRenderer::Render(const SceneViewData &viewData, const std::vector<RenderPacket> &renderPackets, std::function<void(VkCommandBuffer)> onUIRender) {
+
     VkDevice device = Context.GetDevice();
     vkWaitForFences(device, 1, &RenderFence, VK_TRUE, UINT64_MAX);
 
@@ -235,7 +236,7 @@ void VulkanRenderer::Render(const std::vector<RenderPacket>& renderPackets, cons
     vkResetCommandBuffer(MainCommandBuffer, 0);
 
     // 把场景和相机传给录制函数
-    RecordCommandBuffer(MainCommandBuffer, imageIndex, renderPackets, camera, cameraTransform,onUIRender);
+    RecordCommandBuffer(MainCommandBuffer, imageIndex, viewData, renderPackets,onUIRender);
 
     VkSubmitInfo submitInfo{VK_STRUCTURE_TYPE_SUBMIT_INFO};
     VkSemaphore waitSemaphores[] = {ImageAvailableSemaphore};
@@ -253,7 +254,7 @@ void VulkanRenderer::Render(const std::vector<RenderPacket>& renderPackets, cons
 
     SwapChain.PresentImage(RenderFinishedSemaphore, imageIndex);
 }
-void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t imageIndex, const std::vector<RenderPacket>& renderPackets, const CCamera* camera, const CTransform* cameraTransform,std::function<void(VkCommandBuffer)> onUIRender) {
+void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t imageIndex, const SceneViewData& viewData,const std::vector<RenderPacket>& renderPackets, std::function<void(VkCommandBuffer)> onUIRender) {
     VkCommandBufferBeginInfo beginInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
     vkBeginCommandBuffer(cmdBuffer, &beginInfo);
 
@@ -271,16 +272,12 @@ void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t ima
 
     vkCmdBeginRenderPass(cmdBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    // 获取相机的矩阵
-    glm::mat4 view = camera->GetViewMatrix(*cameraTransform);
-    float aspect = (float)SwapChain.GetExtent().width / (float)SwapChain.GetExtent().height;
-    glm::mat4 proj = camera->GetProjectionMatrix(aspect);
-
+    // 不需要在这里算 proj 和 view 了，直接用外部喂进来的数据！
     FSceneData sceneData;
-    sceneData.ViewProjection= proj*view;
-    sceneData.CameraPosition=glm::vec4(cameraTransform->GetPosition(),1.0f);
-    sceneData.LightPosition = glm::vec4(GlobalLightPos, 1.0f);
-    sceneData.LightColor = glm::vec4(GlobalLightColor, GlobalLightIntensity);
+    sceneData.ViewProjection = viewData.ProjectionMatrix * viewData.ViewMatrix;
+    sceneData.CameraPosition = glm::vec4(viewData.CameraPosition, 1.0f);
+    sceneData.LightPosition  = glm::vec4(viewData.LightPosition, 1.0f);
+    sceneData.LightColor     = glm::vec4(viewData.LightColor, viewData.LightIntensity);
 
     memcpy(SceneParameterBuffer.Info.pMappedData, &sceneData, sizeof(FSceneData));
     // 【核心】遍历场景绘制

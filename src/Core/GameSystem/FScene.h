@@ -3,7 +3,9 @@
 #include <string>
 #include <vector>
 
+#include "Components/CCamera.h"
 #include "Core/Graphics/RenderPacket.h"
+#include "Core/Graphics/SceneViewData.h"
 
 class FActor;
 
@@ -48,5 +50,12 @@ public:
     [[nodiscard]] FActor* FindActorByName(const std::string& name) const;
 
     void ExtractRenderPackets(std::vector<RenderPacket>& outPackets) const;
+
+    SceneViewData GenerateSceneView(const CCamera* camera, const CTransform* cameraTransform) const;
+
+    // 假设场景目前存着这几个全局灯光变量（为了替换原来在 Renderer 里的硬编码）
+    glm::vec3 GlobalLightPos = glm::vec3(0.0f, 4.0f, 0.0f);
+    glm::vec3 GlobalLightColor = glm::vec3(1.0f, 1.0f, 1.0f);
+    float GlobalLightIntensity = 50.0f;
 
 };

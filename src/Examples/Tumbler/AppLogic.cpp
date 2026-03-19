@@ -52,6 +52,11 @@ void AppLogic::InitializePlanes() const
 
 AppLogic::AppLogic() { InitializeScene(); }
 AppLogic::~AppLogic() = default;
+
+FScene * AppLogic::GetScene() {
+    return Scene.get();
+}
+
 const FScene* AppLogic::GetScene() const { return Scene.get(); }
 
 void AppLogic::InitializeMaterials(VulkanRenderer* renderer) {

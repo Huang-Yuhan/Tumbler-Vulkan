@@ -12,6 +12,7 @@
 #include <string>
 #include <glm/glm.hpp>
 
+#include "SceneViewData.h"
 #include "Core/Assets/TextureManager.h"
 #include "Core/Graphics/RenderPacket.h"
 
@@ -31,7 +32,10 @@ public:
     void Cleanup();
 
     // 渲染接口：传入场景和相机
-void Render(const std::vector<RenderPacket>& renderPackets, const CCamera* camera, const CTransform* cameraTransform, std::function<void(VkCommandBuffer)> onUIRender = nullptr);    FVulkanMesh& UploadMesh(FMesh* cpuMesh);
+    void Render(const SceneViewData& viewData, const std::vector<RenderPacket>& renderPackets, std::function<void(VkCommandBuffer)> onUIRender = nullptr);
+
+
+    FVulkanMesh& UploadMesh(FMesh* cpuMesh);
 
     [[nodiscard]] VkDevice GetDevice() const { return Context.GetDevice(); }
     [[nodiscard]] TextureManager* GetTextureManager() const { return TexManager.get(); }
@@ -49,10 +53,6 @@ void Render(const std::vector<RenderPacket>& renderPackets, const CCamera* camer
     void CreateBuffer(size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage, AllocatedBuffer& outBuffer);
     void DestroyBuffer(AllocatedBuffer& buffer);
     VkDescriptorSet AllocateDescriptorSet(VkDescriptorSetLayout layout);
-
-    glm::vec3 GlobalLightPos = glm::vec3(0.0f, 4.0f, 0.0f);
-    glm::vec3 GlobalLightColor = glm::vec3(1.0f, 1.0f, 1.0f);
-    float GlobalLightIntensity = 50.0f;
 
 private:
     VulkanContext Context;
@@ -88,7 +88,7 @@ private:
     void InitDescriptors(); // 这个还在，但内容变了
 
     // 录制命令缓冲
-void RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, const std::vector<RenderPacket>& renderPackets, const CCamera* camera, const CTransform* cameraTransform,std::function<void(VkCommandBuffer)> onUIRender);
+    void RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, const SceneViewData& viewData, const std::vector<RenderPacket>& renderPackets, std::function<void(VkCommandBuffer)> onUIRender);
     void ImmediateSubmit(std::function<void(VkCommandBuffer cmd)>&& function);
     void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
     void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
