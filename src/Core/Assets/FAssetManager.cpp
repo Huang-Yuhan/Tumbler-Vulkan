@@ -104,7 +104,14 @@ std::shared_ptr<FMaterial> FAssetManager::GetOrLoadMaterial(const std::string& n
     }
 
     LOG_INFO("Building new Master Material: {} from {} / {}", name, vertPath, fragPath);
-    auto newMaterial = std::make_shared<FMaterial>(Renderer, this);
+    auto newMaterial = std::make_shared<FMaterial>(
+        Renderer->GetRenderDevice(),
+        Renderer->GetRenderPass(),
+        Renderer->GetGlobalSetLayout(),
+        Renderer->GetSwapchainExtent(),
+        this,
+        Renderer
+    );
     newMaterial->BuildPipeline(vertPath, fragPath);
 
     MaterialCache[name] = newMaterial;
