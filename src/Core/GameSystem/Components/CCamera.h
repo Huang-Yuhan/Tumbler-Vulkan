@@ -6,7 +6,7 @@
 
 class CTransform;
 
-class CCamera final:public Component
+class CCamera : public Component
 {
 public:
     float Fov=45.0f;

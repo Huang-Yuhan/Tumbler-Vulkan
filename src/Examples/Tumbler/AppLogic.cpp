@@ -1,6 +1,10 @@
 ﻿#include "AppLogic.h"
 #include <glm/vec3.hpp>
 
+#include "Core/GameSystem/Components/CFirstPersonCamera.h"
+#include "Core/GameSystem/InputManager.h"
+#include "Core/GameSystem/Components/CFirstPersonCamera.h"
+#include "Core/GameSystem/InputManager.h"
 #include "Core/Assets/FMaterial.h"
 #include "Core/Assets/FMaterialInstance.h"
 #include "Core/Assets/FAssetManager.h"
@@ -60,9 +64,18 @@ AppLogic::~AppLogic() = default;
 FScene* AppLogic::GetScene() { return Scene.get(); }
 const FScene* AppLogic::GetScene() const { return Scene.get(); }
 
-void AppLogic::Init(VulkanRenderer* renderer, FAssetManager* assetMgr) {
+void AppLogic::Init(VulkanRenderer* renderer, FAssetManager* assetMgr, InputManager* inputMgr) {
     AssetMgr = assetMgr;
+    InputMgr = inputMgr;
     InitializeScene();
+
+    // 0. 创建相机实体与漫游组件
+    FActor* cameraActor = Scene->CreateActor("MainCamera");
+    cameraActor->Transform.SetPosition(glm::vec3(0.0f, -1.0f, 16.0f));
+    cameraActor->Transform.SetRotation(glm::vec3(0.0f, 180.0f, 0.0f));
+    MainCamera = cameraActor->AddComponent<CFirstPersonCamera>();
+    MainCamera->Fov = 60.0f;
+    MainCamera->Init(InputMgr);
 
     // 1. 创建 PBR 母体材质 (由 AssetManager 管理)
     auto pbrMaterial = AssetMgr->GetOrLoadMaterial("PBR_Base", "assets/shaders/engine/pbr.vert.spv", "assets/shaders/engine/pbr.frag.spv");
@@ -127,4 +140,12 @@ void AppLogic::Init(VulkanRenderer* renderer, FAssetManager* assetMgr) {
     auto* pl = lightActor->AddComponent<CPointLight>();
     pl->Color = glm::vec3(1.0f, 1.0f, 1.0f);
     pl->Intensity = 50.0f;
+}
+
+void AppLogic::Tick(float deltaTime) {
+    if (MainCamera) {
+        MainCamera->Update(deltaTime);
+    }
+
+    // 场景中其它组件的 Tick 目前手动或后续交给 FScene::Tick
 }

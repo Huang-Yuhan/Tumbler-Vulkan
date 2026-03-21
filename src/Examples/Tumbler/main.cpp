@@ -9,8 +9,11 @@
 #include "Core/GameSystem/Components/CPointLight.h"
 #include <imgui.h>
 #include <vector>
+#include <chrono>
 
 #include "Core/GameSystem/FActor.h"
+#include "Core/GameSystem/InputManager.h"
+#include "Core/GameSystem/Components/CFirstPersonCamera.h"
 
 int main() {
     Log::Get().Init();
@@ -29,18 +32,22 @@ int main() {
         FAssetManager assetManager;
         assetManager.Initialize(&renderer);
 
+        InputManager inputManager;
+        inputManager.Init(window.GetNativeWindow());
+
+        // 绑定输入
+        inputManager.BindAxis("MoveForward", EKeyCode::W, EKeyCode::S);
+        inputManager.BindAxis("MoveRight", EKeyCode::D, EKeyCode::A);
+        inputManager.BindAxis("MoveUp", EKeyCode::E, EKeyCode::Q);
+
         AppLogic logic;
-        logic.Init(&renderer, &assetManager);
+        logic.Init(&renderer, &assetManager, &inputManager);
 
         // 提前上传共用网格，防止渲染中途卡顿
         renderer.UploadMesh(assetManager.GetOrLoadMesh("DefaultPlane").get());
 
-        // 3. 创建虚拟相机 (属于游戏逻辑世界)
-        CTransform cameraTransform;
-        CCamera cameraComponent;
-        cameraTransform.SetPosition(glm::vec3(0.0f, -1.0f, 16.0f));
-        cameraTransform.SetRotation(glm::vec3(0.0f, 180.0f, 0.0f));
-        cameraComponent.Fov = 60.0f;
+        // 3. 准备真实 DeltaTime 计时器
+        auto currentTime = std::chrono::high_resolution_clock::now();
 
         // 4. UI 系统初始化
         UIManager ui_manager;
@@ -51,6 +58,16 @@ int main() {
         // ==========================================
         while (!window.ShouldClose()) {
             window.PollEvents();
+
+            auto newTime = std::chrono::high_resolution_clock::now();
+            float frameTime = std::chrono::duration<float, std::chrono::seconds::period>(newTime - currentTime).count();
+            currentTime = newTime;
+
+            // 更新输入系统
+            inputManager.Tick();
+
+            // 更新游戏逻辑 (相机漫游等)
+            logic.Tick(frameTime);
 
             // --- A. 游戏 UI 与交互逻辑 ---
             ui_manager.BeginFrame();
@@ -86,7 +103,9 @@ int main() {
             float aspectRatio = swapchainExtent.height == 0
                 ? 1.0f
                 : static_cast<float>(swapchainExtent.width) / static_cast<float>(swapchainExtent.height);
-            SceneViewData viewData = logic.GetScene()->GenerateSceneView(&cameraComponent, &cameraTransform, aspectRatio);
+            
+            CFirstPersonCamera* cam = logic.GetMainCamera();
+            SceneViewData viewData = logic.GetScene()->GenerateSceneView(cam, &cam->GetOwner()->Transform, aspectRatio);
 
             // --- C. 发送给底层渲染器执行 ---
             // 渲染器同时接收“视图”和“包裹”，并将 UI 录制指令作为回调传入
