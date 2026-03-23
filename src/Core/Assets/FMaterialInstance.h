@@ -39,9 +39,22 @@ public:
     // 核心流转：将 CPU 参数提交给 GPU
     // ==========================================
     void ApplyChanges();
+    
+    // 快速更新 UBO 参数（不重新绑定描述符）
+    void UpdateUBO();
 
     [[nodiscard]] VkDescriptorSet GetDescriptorSet() const { return DescriptorSet; }
     [[nodiscard]] std::shared_ptr<FMaterial> GetParent() const { return ParentMaterial; }
+
+    // ==========================================
+    // 材质参数 Getter
+    // ==========================================
+    [[nodiscard]] const FMaterialUBO& GetParameters() const { return ParameterData; }
+    [[nodiscard]] glm::vec4 GetBaseColorTint() const { return ParameterData.BaseColorTint; }
+    [[nodiscard]] float GetRoughness() const { return ParameterData.Roughness; }
+    [[nodiscard]] float GetMetallic() const { return ParameterData.Metallic; }
+    [[nodiscard]] float GetNormalMapStrength() const { return ParameterData.NormalMapStrength; }
+    [[nodiscard]] bool IsTwoSided() const { return ParameterData.TwoSided != 0; }
 
 private:
     std::shared_ptr<FMaterial> ParentMaterial;

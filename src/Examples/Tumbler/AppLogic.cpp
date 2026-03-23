@@ -228,12 +228,95 @@ void AppLogic::DrawCameraPanel() {
     ImGui::End();
 }
 
+void AppLogic::DrawSceneHierarchyPanel() {
+    ImGui::Begin("Scene Hierarchy");
+    
+    if (Scene) {
+        const auto& actors = Scene->GetAllActors();
+        
+        for (const auto& actor : actors) {
+            bool isSelected = (SelectedActor == actor.get());
+            
+            if (ImGui::Selectable(actor->Name.c_str(), isSelected)) {
+                SelectedActor = actor.get();
+            }
+            
+            if (isSelected) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+    }
+    
+    ImGui::End();
+}
+
 void AppLogic::DrawMaterialPanel() {
     ImGui::Begin("Material Editor");
     
-    ImGui::Text("Material Editor (WIP)");
+    if (!SelectedActor) {
+        ImGui::Text("Select an object in the Scene Hierarchy");
+        ImGui::End();
+        return;
+    }
+    
+    CMeshRenderer* meshRenderer = SelectedActor->GetComponent<CMeshRenderer>();
+    if (!meshRenderer) {
+        ImGui::Text("Selected object has no MeshRenderer component");
+        ImGui::End();
+        return;
+    }
+    
+    auto material = meshRenderer->GetMaterial();
+    if (!material) {
+        ImGui::Text("Selected object has no material");
+        ImGui::End();
+        return;
+    }
+    
+    ImGui::Text("Actor: %s", SelectedActor->Name.c_str());
     ImGui::Separator();
-    ImGui::Text("Select an object to edit its material");
+    
+    bool materialChanged = false;
+    
+    glm::vec4 baseColor = material->GetBaseColorTint();
+    float roughness = material->GetRoughness();
+    float metallic = material->GetMetallic();
+    float normalStrength = material->GetNormalMapStrength();
+    bool twoSided = material->IsTwoSided();
+    
+    ImGui::Text("Material Parameters");
+    ImGui::Separator();
+    
+    if (ImGui::ColorEdit4("Base Color", &baseColor.x)) {
+        material->SetVector("BaseColorTint", baseColor);
+        materialChanged = true;
+    }
+    
+    if (ImGui::SliderFloat("Roughness", &roughness, 0.0f, 1.0f)) {
+        material->SetFloat("Roughness", roughness);
+        materialChanged = true;
+    }
+    
+    if (ImGui::SliderFloat("Metallic", &metallic, 0.0f, 1.0f)) {
+        material->SetFloat("Metallic", metallic);
+        materialChanged = true;
+    }
+    
+    if (ImGui::SliderFloat("Normal Strength", &normalStrength, 0.0f, 2.0f)) {
+        material->SetFloat("NormalMapStrength", normalStrength);
+        materialChanged = true;
+    }
+    
+    if (ImGui::Checkbox("Two Sided", &twoSided)) {
+        material->SetTwoSided(twoSided);
+        materialChanged = true;
+    }
+    
+    ImGui::Separator();
+    
+    if (materialChanged) {
+        material->UpdateUBO();
+    }
     
     ImGui::End();
 }
@@ -242,5 +325,6 @@ void AppLogic::DrawEditorUI() {
     DrawPerformancePanel();
     DrawLightPanel();
     DrawCameraPanel();
+    DrawSceneHierarchyPanel();
     DrawMaterialPanel();
 }

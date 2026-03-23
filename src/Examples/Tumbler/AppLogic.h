@@ -9,6 +9,8 @@ class FMesh; // 前置声明
 class FAssetManager;
 class InputManager;
 class CFirstPersonCamera;
+class FActor;
+class CMeshRenderer;
 
 class AppLogic
 {
@@ -19,6 +21,9 @@ private:
 
     // 缓存第一人称漫游相机组件
     CFirstPersonCamera* MainCamera = nullptr;
+
+    // 选中的物体
+    FActor* SelectedActor = nullptr;
 
     // 性能统计数据
     static constexpr int FRAME_TIME_HISTORY_SIZE = 100;
@@ -37,6 +42,7 @@ private:
     void DrawLightPanel();
     void DrawCameraPanel();
     void DrawMaterialPanel();
+    void DrawSceneHierarchyPanel();
 
 public:
     AppLogic() = default;
