@@ -37,9 +37,13 @@
 ## 🟡 优先级 2：PBR 与视觉效果的究极进化 (Visuals First)
 *让引擎画面从“不错”迈向“惊艳”的核心步骤。*
 
-- [ ] **2.1 法线映射与切线空间 (Normal Mapping)**
-  - 顶点布局增加 `Tangent` 属性并在 `FAssetManager` 的 OBJ 加载中计算切线。
-  - 在 Shader 构建 TBN 矩阵，从 Normal Map 采样并转换法线，赋予模型极其逼真的宏观凹凸质感。
+- [x] **2.1 法线映射与切线空间 (Normal Mapping)** ✅ 已完成
+  - ✅ 顶点布局增加 `Tangent` 属性并在 `FAssetManager` 的 OBJ 加载中计算切线
+  - ✅ 在 Shader 构建 TBN 矩阵，从 Normal Map 采样并转换法线，赋予模型极其逼真的宏观凹凸质感
+  - ✅ 扩展材质系统支持法线贴图参数（法线强度、贴图绑定）
+  - ✅ 在 `CFirstPersonCamera` 中优化数学计算，直接使用 `CTransform` 的方向向量
+  - ✅ 在 `InputManager` 中添加鼠标锁定功能，实现 Editor Camera 无尽拖拽体验
+  - ✅ 在 `AppLogic` 中添加 `Scene->Tick()` 调用，确保完整的场景生命周期
 - [ ] **2.2 基于图像的光照 (IBL - Image Based Lighting)**
   - 加载 `.hdr` 全景天空盒资源。
   - 预计算 Irradiance Map (用于 Diffuse 环境光) 替代现在的硬编码纯色。

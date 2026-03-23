@@ -233,7 +233,34 @@ while (!window.ShouldClose()) {
 }
 ```
 
-## 11. 设计特点
+## 11. 鼠标锁定功能 (Editor Camera 体验)
+
+输入系统内置了鼠标锁定功能，用于实现类似 Unreal/Unity 编辑器的无尽拖拽体验：
+
+### 11.1 功能说明
+
+- 当按住鼠标右键（`EKeyCode::MouseRight`）时，自动锁定鼠标到窗口中心并隐藏光标
+- 释放鼠标右键时，恢复鼠标正常模式
+- 在 UI 获得焦点时，自动解除鼠标锁定
+
+### 11.2 实现细节
+
+```cpp
+// 在 InputManager::Tick() 中自动处理
+// 1. 检测右键按下 -> 锁定鼠标
+if (bMouseRightJustPressed && !IsUIFocused()) {
+    glfwSetInputMode(WindowHandle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    bCursorLocked = true;
+}
+
+// 2. 检测右键释放 -> 解锁鼠标
+else if (bMouseRightJustReleased) {
+    glfwSetInputMode(WindowHandle, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    bCursorLocked = false;
+}
+```
+
+## 12. 设计特点
 
 | 特点 | 说明 |
 |------|------|
@@ -242,3 +269,5 @@ while (!window.ShouldClose()) {
 | **灵活绑定** | 支持运行时重新绑定输入 |
 | **UI 感知** | 支持检测 UI 焦点避免误触发 |
 | **鼠标位移** | 自动计算相对位移 |
+| **鼠标锁定** | Editor Camera 无尽拖拽体验 |
+| **类型安全** | 使用 `EKeyCode::MaxKeys` 自动管理数组大小 |
