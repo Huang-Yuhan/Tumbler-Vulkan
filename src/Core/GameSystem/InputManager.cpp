@@ -159,9 +159,8 @@ bool InputManager::IsActionPressed(const std::string& name) const {
     return false;
 }
 
-bool InputManager::GetKey(EKeyCode key)
+bool InputManager::GetKey(EKeyCode key) const
 {
-    int glfwKey=TranslateToGLFWKey(key);
     return CurrentKeys[static_cast<uint16_t>(key)];
 }
 

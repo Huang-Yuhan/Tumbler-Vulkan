@@ -32,7 +32,7 @@ public:
     // 动作是否一直被按住 (适合扫射机枪)
     bool IsActionPressed(const std::string& name) const;
 
-    bool GetKey(EKeyCode key);
+    bool GetKey(EKeyCode key) const;
 
     // 动作是否在当前帧【刚刚】被按下 (适合跳跃、打开菜单)
     bool IsActionJustPressed(const std::string& name) const;

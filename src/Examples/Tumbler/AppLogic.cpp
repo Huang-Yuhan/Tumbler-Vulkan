@@ -146,10 +146,6 @@ void AppLogic::Init(VulkanRenderer* renderer, FAssetManager* assetMgr, InputMana
 }
 
 void AppLogic::Tick(float deltaTime) {
-    if (MainCamera) {
-        MainCamera->Update(deltaTime);
-    }
-
     if (Scene) {
         Scene->Tick(deltaTime);
     }
