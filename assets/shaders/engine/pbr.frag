@@ -25,7 +25,7 @@ layout(set = 1, binding = 2) uniform MaterialParams {
     float Roughness;
     float Metallic;
     float NormalMapStrength;
-    float Padding;
+    int   TwoSided;
 } params;
 
 const float PI = 3.14159265359;
@@ -114,8 +114,11 @@ void main() {
 
     // --- 开始组装 Cook-Torrance BRDF ---
 
-    // 确保法线朝向相机 (双面光照)
-    vec3 N_fixed = faceforward(N, -V, N);
+    // 根据TwoSided选项决定是否使用双面光照
+    vec3 N_fixed = N;
+    if (params.TwoSided != 0) {
+        N_fixed = faceforward(N, -V, N);
+    }
 
     float NDF = DistributionGGX(N_fixed, H, roughness);
     float G   = GeometrySmith(N_fixed, V, L, roughness);

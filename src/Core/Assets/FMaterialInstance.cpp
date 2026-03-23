@@ -39,6 +39,10 @@ void FMaterialInstance::SetFloat(const std::string& name, float value) {
     else if (name == "NormalMapStrength") ParameterData.NormalMapStrength = value;
 }
 
+void FMaterialInstance::SetTwoSided(bool twoSided) {
+    ParameterData.TwoSided = twoSided ? 1 : 0;
+}
+
 void FMaterialInstance::ApplyChanges() {
     // 1. 将 CPU 中的 UBO 数据拷贝到显存 (因为是 AUTO_PREFER_HOST，所以 pMappedData 一直可用)
     memcpy(UBOBuffer.Info.pMappedData, &ParameterData, sizeof(FMaterialUBO));

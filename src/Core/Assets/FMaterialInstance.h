@@ -17,7 +17,7 @@ struct FMaterialUBO {
     float Roughness = 0.5f;
     float Metallic = 0.0f;
     float NormalMapStrength = 1.0f;
-    float Padding; // 凑齐 16 字节对齐
+    int32_t TwoSided = 0; // 0 = 单面, 1 = 双面
 };
 
 class FAssetManager;
@@ -33,6 +33,7 @@ public:
     void SetTexture(const std::string& name, std::shared_ptr<FTexture> texture);
     void SetVector(const std::string& name, const glm::vec4& value);
     void SetFloat(const std::string& name, float value);
+    void SetTwoSided(bool twoSided);
 
     // ==========================================
     // 核心流转：将 CPU 参数提交给 GPU

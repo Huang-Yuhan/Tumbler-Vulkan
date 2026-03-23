@@ -83,14 +83,17 @@ void AppLogic::Init(VulkanRenderer* renderer, FAssetManager* assetMgr, InputMana
     // 2. 康奈尔经典红 (左墙)
     auto matRed = pbrMaterial->CreateInstance();
     matRed->SetVector("BaseColorTint", glm::vec4(0.63f, 0.06f, 0.05f, 1.0f));
+    matRed->SetTwoSided(true);
 
     // 3. 康奈尔经典绿 (右墙)
     auto matGreen = pbrMaterial->CreateInstance();
     matGreen->SetVector("BaseColorTint", glm::vec4(0.15f, 0.48f, 0.09f, 1.0f));
+    matGreen->SetTwoSided(true);
 
     // 4. 康奈尔经典白 (天花板、地板、后墙)
     auto matWhite = pbrMaterial->CreateInstance();
     matWhite->SetVector("BaseColorTint", glm::vec4(0.73f, 0.73f, 0.73f, 1.0f));
+    matWhite->SetTwoSided(true);
     matWhite->ApplyChanges();
 
     // 测试 1：绝缘体（非常粗糙的塑料）- 给左边的红墙
