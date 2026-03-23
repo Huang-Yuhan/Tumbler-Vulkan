@@ -5,7 +5,8 @@
 // ==========================================
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inNormal;
-layout(location = 2) in vec2 inUV;
+layout(location = 2) in vec3 inTangent;
+layout(location = 3) in vec2 inUV;
 
 // ==========================================
 // 传给 Fragment Shader 的数据
@@ -13,6 +14,7 @@ layout(location = 2) in vec2 inUV;
 layout(location = 0) out vec2 outUV;
 layout(location = 1) out vec3 outNormal;
 layout(location = 2) out vec3 outWorldPos;
+layout(location = 3) out mat3 outTBN;
 
 // ==========================================
 // 描述符与常量
@@ -39,8 +41,21 @@ void main() {
     // 3. 透传 UV
     outUV = inUV;
 
-    // 4. 【核心修复】计算正确的法线矩阵 (逆转置矩阵)
-    // 防止非等比缩放 (如墙壁的 Scale) 导致法线变得不垂直
+    // 4. 计算正确的法线矩阵 (逆转置矩阵)
     mat3 normalMatrix = transpose(inverse(mat3(constants.ModelMatrix)));
-    outNormal = normalMatrix * inNormal;
+    
+    // 5. 计算 TBN (Tangent-Bitangent-Normal) 矩阵
+    vec3 T = normalize(normalMatrix * inTangent);
+    vec3 N = normalize(normalMatrix * inNormal);
+    
+    // 正交化 T 相对于 N
+    T = normalize(T - dot(T, N) * N);
+    
+    // 计算 Bitangent
+    vec3 B = cross(N, T);
+    
+    outTBN = mat3(T, B, N);
+    
+    // 也传递世界空间的法线作为备份
+    outNormal = N;
 }

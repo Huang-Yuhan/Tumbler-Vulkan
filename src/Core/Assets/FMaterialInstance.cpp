@@ -36,6 +36,7 @@ void FMaterialInstance::SetVector(const std::string& name, const glm::vec4& valu
 void FMaterialInstance::SetFloat(const std::string& name, float value) {
     if (name == "Roughness") ParameterData.Roughness = value;
     else if (name == "Metallic") ParameterData.Metallic = value;
+    else if (name == "NormalMapStrength") ParameterData.NormalMapStrength = value;
 }
 
 void FMaterialInstance::ApplyChanges() {
@@ -45,37 +46,19 @@ void FMaterialInstance::ApplyChanges() {
     // 2. 准备更新 Vulkan 描述符集
     std::vector<VkWriteDescriptorSet> descriptorWrites;
 
-    // --- (A) 配置 UBO (Binding 1) ---
-    VkDescriptorBufferInfo bufferInfo{};
-    bufferInfo.buffer = UBOBuffer.Buffer;
-    bufferInfo.offset = 0;
-    bufferInfo.range = sizeof(FMaterialUBO);
-
-    VkWriteDescriptorSet uboWrite{};
-    uboWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    uboWrite.dstSet = DescriptorSet;
-    uboWrite.dstBinding = 1; 
-    uboWrite.dstArrayElement = 0;
-    uboWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    uboWrite.descriptorCount = 1;
-    uboWrite.pBufferInfo = &bufferInfo;
-    descriptorWrites.push_back(uboWrite);
-
-    std::shared_ptr<FTexture> texToBind = nullptr;
-
-    // 如果用户设置了贴图，就用用户的；如果没设置，使用纯白色的 fallback 贴图
+    // --- (A) 配置 BaseColorMap (Binding 0) ---
+    std::shared_ptr<FTexture> baseColorTex = nullptr;
     if (Textures.find("BaseColorMap") != Textures.end()) {
-        texToBind = Textures["BaseColorMap"];
+        baseColorTex = Textures["BaseColorMap"];
     } else {
-        texToBind = AssetManager->GetOrLoadTexture("DefaultWhite", "assets/textures/white.png");
+        baseColorTex = AssetManager->GetOrLoadTexture("DefaultWhite", "assets/textures/white.png");
     }
 
-    // 只要有贴图就绑定（理论上 fallback 是一定有的）
-    if (texToBind) {
+    if (baseColorTex) {
         VkDescriptorImageInfo imageInfo{};
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo.imageView = texToBind->GetImageView();
-        imageInfo.sampler = texToBind->GetSampler();
+        imageInfo.imageView = baseColorTex->GetImageView();
+        imageInfo.sampler = baseColorTex->GetSampler();
 
         VkWriteDescriptorSet texWrite{};
         texWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -87,6 +70,47 @@ void FMaterialInstance::ApplyChanges() {
         texWrite.pImageInfo = &imageInfo;
         descriptorWrites.push_back(texWrite);
     }
+
+    // --- (B) 配置 NormalMap (Binding 1) ---
+    std::shared_ptr<FTexture> normalMapTex = nullptr;
+    if (Textures.find("NormalMap") != Textures.end()) {
+        normalMapTex = Textures["NormalMap"];
+    } else {
+        normalMapTex = AssetManager->GetOrLoadTexture("DefaultWhite", "assets/textures/white.png");
+    }
+
+    if (normalMapTex) {
+        VkDescriptorImageInfo imageInfo{};
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.imageView = normalMapTex->GetImageView();
+        imageInfo.sampler = normalMapTex->GetSampler();
+
+        VkWriteDescriptorSet texWrite{};
+        texWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        texWrite.dstSet = DescriptorSet;
+        texWrite.dstBinding = 1;
+        texWrite.dstArrayElement = 0;
+        texWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        texWrite.descriptorCount = 1;
+        texWrite.pImageInfo = &imageInfo;
+        descriptorWrites.push_back(texWrite);
+    }
+
+    // --- (C) 配置 UBO (Binding 2) ---
+    VkDescriptorBufferInfo bufferInfo{};
+    bufferInfo.buffer = UBOBuffer.Buffer;
+    bufferInfo.offset = 0;
+    bufferInfo.range = sizeof(FMaterialUBO);
+
+    VkWriteDescriptorSet uboWrite{};
+    uboWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    uboWrite.dstSet = DescriptorSet;
+    uboWrite.dstBinding = 2; 
+    uboWrite.dstArrayElement = 0;
+    uboWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboWrite.descriptorCount = 1;
+    uboWrite.pBufferInfo = &bufferInfo;
+    descriptorWrites.push_back(uboWrite);
 
     // 3. 提交给显卡
     if (!descriptorWrites.empty()) {

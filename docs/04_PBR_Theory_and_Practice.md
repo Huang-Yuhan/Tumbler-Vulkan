@@ -40,7 +40,37 @@ PBR 依赖于三个极其核心的物理法则：
 
 ---
 
-## 3. 在 Tumbler 引擎中的代码落地
+## 3. 法线映射与切线空间 (Normal Mapping & Tangent Space)
+
+### 为什么需要法线贴图？
+几何法线是顶点级别的，对于光滑表面足够，但无法表现细节（如砖墙的砖块纹理、皮革的褶皱）。法线贴图允许我们在像素级别扰动表面法线，创造丰富的视觉细节，而无需增加几何面数。
+
+### 切线空间 (Tangent Space)
+为了让法线贴图能正确应用到任意朝向的表面，我们需要**切线空间**：
+- **Tangent (切线)**：沿着 UV 坐标 U 轴增加的方向
+- **Bitangent (副切线)**：沿着 UV 坐标 V 轴增加的方向
+- **Normal (法线)**：表面几何法线
+
+这三个向量构成 **TBN 矩阵**，将切线空间的法线（从贴图采样得到）转换到世界空间。
+
+### 在 Tumbler 引擎中的实现
+1. **OBJ 加载时计算切线空间** (`FMesh::LoadFromOBJ()`)：
+   - 按三角形计算 deltaPos 和 deltaUV
+   - 使用公式计算 Tangent = (deltaPos1 * deltaUV2.y - deltaPos2 * deltaUV1.y) / (deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x)
+   - 顶点平均 + 正交化 + 归一化
+
+2. **顶点 Shader**：
+   - 输入：Position, Normal, Tangent, UV
+   - 计算 TBN 矩阵并传递给 Fragment Shader
+
+3. **Fragment Shader**：
+   - 从法线贴图采样：`texture(NormalMap, UV) * 2.0 - 1.0`
+   - 使用 TBN 矩阵转换到世界空间
+   - 支持 `NormalMapStrength` 参数控制强度
+
+---
+
+## 4. 在 Tumbler 引擎中的代码落地
 
 在我们的 Fragment Shader (`pbr.frag`) 中，我们实现了业界公认的 **Cook-Torrance BRDF**（双向反射分布函数）。它构成了当今所有 3A 引擎光照的基础：
 

@@ -16,7 +16,8 @@ struct FMaterialUBO {
     glm::vec4 BaseColorTint = glm::vec4(1.0f); // 默认白色，不染色
     float Roughness = 0.5f;
     float Metallic = 0.0f;
-    glm::vec2 Padding; // 凑齐 16 字节对齐
+    float NormalMapStrength = 1.0f;
+    float Padding; // 凑齐 16 字节对齐
 };
 
 class FAssetManager;

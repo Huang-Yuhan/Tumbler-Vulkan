@@ -100,23 +100,29 @@ void FMaterial::BuildPipeline(const std::string& vertPath, const std::string& fr
 
     VkDevice device = RenderDeviceRef->GetDevice();
 
-    VkDescriptorSetLayoutBinding textureBinding{};
-    textureBinding.binding = 0;
-    textureBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    textureBinding.descriptorCount = 1;
-    textureBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    VkDescriptorSetLayoutBinding baseColorBinding{};
+    baseColorBinding.binding = 0;
+    baseColorBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    baseColorBinding.descriptorCount = 1;
+    baseColorBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    VkDescriptorSetLayoutBinding normalMapBinding{};
+    normalMapBinding.binding = 1;
+    normalMapBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    normalMapBinding.descriptorCount = 1;
+    normalMapBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
     VkDescriptorSetLayoutBinding uboBinding{};
-    uboBinding.binding = 1;
+    uboBinding.binding = 2;
     uboBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     uboBinding.descriptorCount = 1;
     uboBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    VkDescriptorSetLayoutBinding bindings[] = {textureBinding, uboBinding};
+    VkDescriptorSetLayoutBinding bindings[] = {baseColorBinding, normalMapBinding, uboBinding};
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 2;
+    layoutInfo.bindingCount = 3;
     layoutInfo.pBindings = bindings;
 
     if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &DescriptorSetLayout) != VK_SUCCESS) {
@@ -188,14 +194,15 @@ void FMaterial::BuildPipeline(const std::string& vertPath, const std::string& fr
 
     VkVertexInputBindingDescription bindingDescription{};
     bindingDescription.binding = 0;
-    bindingDescription.stride = 8 * sizeof(float);
+    bindingDescription.stride = 11 * sizeof(float);
     bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
     std::vector<VkVertexInputAttributeDescription> attributeDescriptions = {
         {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0},
         {1, 0, VK_FORMAT_R32G32B32_SFLOAT, 3 * sizeof(float)},
-        {2, 0, VK_FORMAT_R32G32_SFLOAT, 6 * sizeof(float)}
-    };
+        {2, 0, VK_FORMAT_R32G32B32_SFLOAT, 6 * sizeof(float)},
+        {3, 0, VK_FORMAT_R32G32_SFLOAT, 9 * sizeof(float)}
+        };
 
     builder.VertexInputInfo.vertexBindingDescriptionCount = 1;
     builder.VertexInputInfo.pVertexBindingDescriptions = &bindingDescription;

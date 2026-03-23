@@ -26,9 +26,10 @@ FMesh FMesh::CreatePlane(const float width, const float height, const uint32_t s
 {
     FMesh plane;
 
-    // 定义顶点布局
+    // 定义顶点布局 (现在包含 Tangent)
     plane.VertexLayout.AddElement(EVertexAttribute::Position, sizeof(float) * 3);
     plane.VertexLayout.AddElement(EVertexAttribute::Normal, sizeof(float) * 3);
+    plane.VertexLayout.AddElement(EVertexAttribute::Tangent, sizeof(float) * 3);
     plane.VertexLayout.AddElement(EVertexAttribute::UV0, sizeof(float) * 2);
 
     const uint32_t vertexCountX = subdivisionsWidth + 1;
@@ -44,11 +45,12 @@ FMesh FMesh::CreatePlane(const float width, const float height, const uint32_t s
     {
         glm::vec3 Position;
         glm::vec3 Normal;
+        glm::vec3 Tangent;
         glm::vec2 UV;
     };
     #pragma pack(pop)
 
-    static_assert(sizeof(FTempVertex) == sizeof(glm::vec3) * 2 + sizeof(glm::vec2), "FTempVertex size mismatch");
+    static_assert(sizeof(FTempVertex) == sizeof(glm::vec3) * 3 + sizeof(glm::vec2), "FTempVertex size mismatch");
 
     auto tempPtr = reinterpret_cast<FTempVertex*>(plane.RawVertexData.data());
 
@@ -63,10 +65,11 @@ FMesh FMesh::CreatePlane(const float width, const float height, const uint32_t s
             const float u = float(x) / subdivisionsWidth;
             const float v = float(y) / subdivisionsHeight;
 
-            auto& [Position, Normal, UV] = tempPtr[y * vertexCountX + x];
-            Position = glm::vec3(posX, posY, posZ);
-            Normal = glm::vec3(0.0f, 1.0f, 0.0f);
-            UV = glm::vec2(u, v);
+            auto& vertex = tempPtr[y * vertexCountX + x];
+            vertex.Position = glm::vec3(posX, posY, posZ);
+            vertex.Normal = glm::vec3(0.0f, 1.0f, 0.0f);
+            vertex.Tangent = glm::vec3(1.0f, 0.0f, 0.0f);
+            vertex.UV = glm::vec2(u, v);
         }
     }
 
@@ -111,11 +114,12 @@ FMesh FMesh::LoadFromOBJ(const std::string& filePath)
     }
 
     // --------------------------------------------------------
-    // 2. 准备输出 Mesh，布局与 CreatePlane 完全一致
+    // 2. 准备输出 Mesh，布局现在包含 Tangent
     // --------------------------------------------------------
     FMesh mesh;
     mesh.VertexLayout.AddElement(EVertexAttribute::Position, sizeof(float) * 3);
     mesh.VertexLayout.AddElement(EVertexAttribute::Normal,   sizeof(float) * 3);
+    mesh.VertexLayout.AddElement(EVertexAttribute::Tangent,  sizeof(float) * 3);
     mesh.VertexLayout.AddElement(EVertexAttribute::UV0,      sizeof(float) * 2);
 
     #pragma pack(push, 1)
@@ -123,6 +127,7 @@ FMesh FMesh::LoadFromOBJ(const std::string& filePath)
     {
         glm::vec3 Position;
         glm::vec3 Normal;
+        glm::vec3 Tangent;
         glm::vec2 UV;
 
         bool operator==(const FTempVertex& o) const
@@ -137,10 +142,9 @@ FMesh FMesh::LoadFromOBJ(const std::string& filePath)
     {
         size_t operator()(const FTempVertex& v) const
         {
-            // 把 8 个 float 拼成哈希（简单但够用）
             size_t seed = 0;
             const float* data = &v.Position.x;
-            for (int i = 0; i < 8; ++i)
+            for (int i = 0; i < 11; ++i)
             {
                 uint32_t bits;
                 memcpy(&bits, data + i, sizeof(uint32_t));
@@ -151,10 +155,12 @@ FMesh FMesh::LoadFromOBJ(const std::string& filePath)
     };
 
     std::vector<FTempVertex> tempVertices;
+    std::vector<glm::vec3> tempTangents;
     std::unordered_map<FTempVertex, uint32_t, FTempVertexHash> uniqueVertices;
+    std::vector<uint32_t> indexMapping;
 
     // --------------------------------------------------------
-    // 3. 遍历所有 Shape 的所有 Face，展开顶点并去重
+    // 3. 遍历所有 Shape 的所有 Face，先展开顶点去重并收集索引
     // --------------------------------------------------------
     for (const auto& shape : shapes)
     {
@@ -182,13 +188,14 @@ FMesh FMesh::LoadFromOBJ(const std::string& filePath)
             {
                 vertex.Normal = glm::vec3(0.0f, 1.0f, 0.0f); // 备用向上法线
             }
+            
+            vertex.Tangent = glm::vec3(0.0f);
 
             // UV（OBJ 可能没有 UV，此时 texcoord_index == -1）
             if (index.texcoord_index >= 0)
             {
                 vertex.UV = {
                     attrib.texcoords[2 * index.texcoord_index + 0],
-                    // OBJ 的 V 轴与 Vulkan/DirectX 相反，翻转修正
                     1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
                 };
             }
@@ -198,18 +205,69 @@ FMesh FMesh::LoadFromOBJ(const std::string& filePath)
             }
 
             // 去重：如果这个顶点出现过，直接复用其索引
+            uint32_t finalIndex;
             if (uniqueVertices.find(vertex) == uniqueVertices.end())
             {
-                uniqueVertices[vertex] = static_cast<uint32_t>(tempVertices.size());
+                finalIndex = static_cast<uint32_t>(tempVertices.size());
+                uniqueVertices[vertex] = finalIndex;
                 tempVertices.push_back(vertex);
+                tempTangents.push_back(glm::vec3(0.0f));
+            }
+            else
+            {
+                finalIndex = uniqueVertices[vertex];
             }
 
-            mesh.Indices.push_back(uniqueVertices[vertex]);
+            mesh.Indices.push_back(finalIndex);
+            indexMapping.push_back(finalIndex);
         }
     }
 
     // --------------------------------------------------------
-    // 4. 把去重后的顶点写入裸字节流
+    // 4. 计算切线空间 (Tangent Space) - 按三角形计算
+    // --------------------------------------------------------
+    for (size_t i = 0; i < mesh.Indices.size(); i += 3)
+    {
+        uint32_t i0 = mesh.Indices[i + 0];
+        uint32_t i1 = mesh.Indices[i + 1];
+        uint32_t i2 = mesh.Indices[i + 2];
+
+        const glm::vec3& v0 = tempVertices[i0].Position;
+        const glm::vec3& v1 = tempVertices[i1].Position;
+        const glm::vec3& v2 = tempVertices[i2].Position;
+
+        const glm::vec2& uv0 = tempVertices[i0].UV;
+        const glm::vec2& uv1 = tempVertices[i1].UV;
+        const glm::vec2& uv2 = tempVertices[i2].UV;
+
+        glm::vec3 deltaPos1 = v1 - v0;
+        glm::vec3 deltaPos2 = v2 - v0;
+
+        glm::vec2 deltaUV1 = uv1 - uv0;
+        glm::vec2 deltaUV2 = uv2 - uv0;
+
+        float r = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x);
+        glm::vec3 tangent = (deltaPos1 * deltaUV2.y - deltaPos2 * deltaUV1.y) * r;
+
+        tempTangents[i0] += tangent;
+        tempTangents[i1] += tangent;
+        tempTangents[i2] += tangent;
+    }
+
+    // --------------------------------------------------------
+    // 5. 正交化并归一化切线
+    // --------------------------------------------------------
+    for (size_t i = 0; i < tempVertices.size(); ++i)
+    {
+        glm::vec3& n = tempVertices[i].Normal;
+        glm::vec3& t = tempTangents[i];
+
+        t = glm::normalize(t - n * glm::dot(n, t));
+        tempVertices[i].Tangent = t;
+    }
+
+    // --------------------------------------------------------
+    // 6. 把去重后的顶点写入裸字节流
     // --------------------------------------------------------
     mesh.RawVertexData.resize(tempVertices.size() * mesh.VertexLayout.Stride);
     memcpy(mesh.RawVertexData.data(), tempVertices.data(), mesh.RawVertexData.size());

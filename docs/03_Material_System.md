@@ -22,7 +22,44 @@
 ## 3. Shader 中的映射
 在 Vulkan GLSL 中：
 - `Push Constants`（全局通用）通常用来传递快速变化的矩阵（`ModelMatrix`）。
-- `Binding 0` 被约定为所有的贴图。
-- `Binding 1` 被约定为包含所有 PBR 参数的 `Uniform Buffer` (`FMaterialUBO` 与这里进行强绑定)。
+- **Set 0, Binding 0**: 全局场景数据 (ViewProj, CameraPos, LightPos 等)
+- **Set 1, Binding 0**: BaseColorMap (基础颜色贴图)
+- **Set 1, Binding 1**: NormalMap (法线贴图)
+- **Set 1, Binding 2**: Material UBO (包含所有 PBR 参数的 Uniform Buffer)
 
-在没有给出自定义贴图时，`FMaterialInstance` 巧妙地通过反向查询 `AssetManager->GetOrLoadTexture("DefaultWhite")`，使用单张极其细小的纯白图来填充，以保证 Vulkan 指针校验不会崩溃，同时兼顾了纯颜色染色的工作流。
+## 4. 材质参数 API
+
+### 纹理参数
+```cpp
+// 设置基础颜色贴图
+matInstance->SetTexture("BaseColorMap", baseColorTexture);
+
+// 设置法线贴图
+matInstance->SetTexture("NormalMap", normalMapTexture);
+```
+
+### 数值参数
+```cpp
+// 设置基础颜色染色
+matInstance->SetVector("BaseColorTint", glm::vec4(1.0f, 0.5f, 0.5f, 1.0f));
+
+// 设置粗糙度 (0.0 ~ 1.0)
+matInstance->SetFloat("Roughness", 0.3f);
+
+// 设置金属度 (0.0 ~ 1.0)
+matInstance->SetFloat("Metallic", 1.0f);
+
+// 设置法线贴图强度 (0.0 ~ 2.0, 默认 1.0)
+matInstance->SetFloat("NormalMapStrength", 1.5f);
+
+// 应用所有更改到 GPU
+matInstance->ApplyChanges();
+```
+
+## 5. Fallback 机制
+
+在没有给出自定义贴图时，`FMaterialInstance` 巧妙地通过反向查询 `AssetManager->GetOrLoadTexture("DefaultWhite")`，使用单张极其细小的纯白图来填充：
+- **BaseColorMap**: 使用白色贴图，配合 `BaseColorTint` 实现纯颜色
+- **NormalMap**: 使用白色贴图，Shader 会检测并自动回退到几何法线
+
+这保证了 Vulkan 指针校验不会崩溃，同时兼顾了纯颜色染色的工作流。
