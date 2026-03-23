@@ -1,6 +1,6 @@
 # 🚀 Tumbler Engine 开发路线图 (Roadmap)
 
-**当前状态**：✅ **优先级 1 完成！Bug 修复与材质系统改进**
+**当前状态**：✅ **优先级 1 完成！法线贴图与示例应用完善**
 
 经过阶段 1~10 的打磨和最近的 Bug 修复，Tumbler 引擎已具备：
 ✅ 基于实体-组件 (ECS雏形) 的逻辑架构
@@ -14,6 +14,10 @@
 ✅ **完整的文档体系** (快速入门、架构文档、故障排除指南)
 ✅ **双面光照支持** (TwoSided 材质选项，使用 faceforward 确保法线朝向相机)
 ✅ **平面几何修复** (修正索引环绕顺序为顺时针)
+✅ **Bug 修复完成** (AD方向修复、Double Tick BUG修复、Dead Code清理)
+✅ **法线贴图完整实现** (切线计算、TBN矩阵、法线采样与转换)
+✅ **新示例应用** (TinyRendererModels，渲染所有 tiny-renderer-obj 模型)
+✅ **完整贴图支持** (Diffuse + Normal Map 为所有模型加载)
 
 **优先级 1 (基础设施补全) 已 100% 完成！** 🎉
 
@@ -46,6 +50,7 @@
   - ✅ 在 `CFirstPersonCamera` 中优化数学计算，直接使用 `CTransform` 的方向向量
   - ✅ 在 `InputManager` 中添加鼠标锁定功能，实现 Editor Camera 无尽拖拽体验
   - ✅ 在 `AppLogic` 中添加 `Scene->Tick()` 调用，确保完整的场景生命周期
+  - ✅ 创建 TinyRendererModels 示例应用，完整展示法线贴图效果
 - [x] **2.2 双面光照与材质 TwoSided 选项** ✅ 已完成
   - ✅ 修复平面索引环绕顺序为正确的顺时针
   - ✅ 在 pbr.frag 中使用 `faceforward` 函数确保法线始终朝向相机
