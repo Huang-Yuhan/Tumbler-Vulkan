@@ -19,6 +19,9 @@ layout(set = 0, binding = 0) uniform SceneData {
 
 layout(set = 1, binding = 0) uniform sampler2D BaseColorMap;
 layout(set = 1, binding = 1) uniform sampler2D NormalMap;
+layout(set = 1, binding = 3) uniform samplerCube IrradianceMap;
+layout(set = 1, binding = 4) uniform samplerCube PrefilterMap;
+layout(set = 1, binding = 5) uniform sampler2D BRDFLUT;
 
 layout(set = 1, binding = 2) uniform MaterialParams {
     vec4  BaseColorTint;
@@ -69,6 +72,10 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
 
 vec3 fresnelSchlick(float cosTheta, vec3 F0) {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) {
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
 // =====================================================================
@@ -127,8 +134,39 @@ void main() {
 
     // --- 结束 Cook-Torrance BRDF ---
 
-    // 5. 加上极弱的环境光
-    vec3 ambient = vec3(0.03) * albedo;
+    // 5. IBL 环境光照
+    vec3 F = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
+    
+    vec3 kS = F;
+    vec3 kD = 1.0 - kS;
+    kD *= 1.0 - metallic;
+
+    // 检查是否使用默认贴图（白色），如果是则回退到简单环境光
+    vec3 testIrrad = texture(IrradianceMap, vec3(1.0, 0.0, 0.0)).rgb;
+    bool hasIBL = !(length(testIrrad - vec3(1.0)) < 0.01);
+    
+    vec3 ambient;
+    if (hasIBL) {
+        // 有 IBL 贴图，使用完整 IBL
+        // 采样漫反射环境光 (Irradiance Map)
+        vec3 irradiance = texture(IrradianceMap, N).rgb;
+        vec3 diffuse = irradiance * albedo;
+
+        // 采样镜面反射环境光 (Prefilter Map)
+        vec3 R = reflect(-V, N);
+        const float MAX_REFLECTION_LOD = 4.0;
+        vec3 prefilteredColor = textureLod(PrefilterMap, R, roughness * MAX_REFLECTION_LOD).rgb;
+
+        // 采样 BRDF LUT
+        vec2 brdf = texture(BRDFLUT, vec2(max(dot(N, V), 0.0), roughness)).rg;
+        vec3 specular = prefilteredColor * (F * brdf.x + brdf.y);
+
+        ambient = (kD * diffuse + specular);
+    } else {
+        // 没有 IBL 贴图，使用简单环境光
+        ambient = vec3(0.03) * albedo;
+    }
+    
     vec3 color = ambient + Lo;
 
     // 6. HDR 色调映射

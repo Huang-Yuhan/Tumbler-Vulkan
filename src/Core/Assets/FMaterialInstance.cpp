@@ -112,6 +112,81 @@ void FMaterialInstance::ApplyChanges() {
     uboWrite.pBufferInfo = &bufferInfo;
     descriptorWrites.push_back(uboWrite);
 
+    // --- (D) 配置 IrradianceMap (Binding 3) ---
+    std::shared_ptr<FTexture> irradianceMapTex = nullptr;
+    if (Textures.find("IrradianceMap") != Textures.end()) {
+        irradianceMapTex = Textures["IrradianceMap"];
+    } else {
+        irradianceMapTex = AssetManager->GetOrLoadTexture("DefaultWhite", "assets/textures/white.png");
+    }
+
+    if (irradianceMapTex) {
+        VkDescriptorImageInfo imageInfo{};
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.imageView = irradianceMapTex->GetImageView();
+        imageInfo.sampler = irradianceMapTex->GetSampler();
+
+        VkWriteDescriptorSet texWrite{};
+        texWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        texWrite.dstSet = DescriptorSet;
+        texWrite.dstBinding = 3;
+        texWrite.dstArrayElement = 0;
+        texWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        texWrite.descriptorCount = 1;
+        texWrite.pImageInfo = &imageInfo;
+        descriptorWrites.push_back(texWrite);
+    }
+
+    // --- (E) 配置 PrefilterMap (Binding 4) ---
+    std::shared_ptr<FTexture> prefilterMapTex = nullptr;
+    if (Textures.find("PrefilterMap") != Textures.end()) {
+        prefilterMapTex = Textures["PrefilterMap"];
+    } else {
+        prefilterMapTex = AssetManager->GetOrLoadTexture("DefaultWhite", "assets/textures/white.png");
+    }
+
+    if (prefilterMapTex) {
+        VkDescriptorImageInfo imageInfo{};
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.imageView = prefilterMapTex->GetImageView();
+        imageInfo.sampler = prefilterMapTex->GetSampler();
+
+        VkWriteDescriptorSet texWrite{};
+        texWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        texWrite.dstSet = DescriptorSet;
+        texWrite.dstBinding = 4;
+        texWrite.dstArrayElement = 0;
+        texWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        texWrite.descriptorCount = 1;
+        texWrite.pImageInfo = &imageInfo;
+        descriptorWrites.push_back(texWrite);
+    }
+
+    // --- (F) 配置 BRDFLUT (Binding 5) ---
+    std::shared_ptr<FTexture> brdfLUTTex = nullptr;
+    if (Textures.find("BRDFLUT") != Textures.end()) {
+        brdfLUTTex = Textures["BRDFLUT"];
+    } else {
+        brdfLUTTex = AssetManager->GetOrLoadTexture("DefaultWhite", "assets/textures/white.png");
+    }
+
+    if (brdfLUTTex) {
+        VkDescriptorImageInfo imageInfo{};
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.imageView = brdfLUTTex->GetImageView();
+        imageInfo.sampler = brdfLUTTex->GetSampler();
+
+        VkWriteDescriptorSet texWrite{};
+        texWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        texWrite.dstSet = DescriptorSet;
+        texWrite.dstBinding = 5;
+        texWrite.dstArrayElement = 0;
+        texWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        texWrite.descriptorCount = 1;
+        texWrite.pImageInfo = &imageInfo;
+        descriptorWrites.push_back(texWrite);
+    }
+
     // 3. 提交给显卡
     if (!descriptorWrites.empty()) {
         vkUpdateDescriptorSets(Renderer->GetDevice(), static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);

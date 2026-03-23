@@ -26,6 +26,9 @@
 - **Set 1, Binding 0**: BaseColorMap (基础颜色贴图)
 - **Set 1, Binding 1**: NormalMap (法线贴图)
 - **Set 1, Binding 2**: Material UBO (包含所有 PBR 参数的 Uniform Buffer)
+- **Set 1, Binding 3**: IrradianceMap (漫反射环境光，Cube Map)
+- **Set 1, Binding 4**: PrefilterMap (镜面反射环境光，带 Mipmap 的 Cube Map)
+- **Set 1, Binding 5**: BRDFLUT (BRDF 查找表，2D 贴图)
 
 ## 4. 材质参数 API
 
@@ -36,6 +39,16 @@ matInstance->SetTexture("BaseColorMap", baseColorTexture);
 
 // 设置法线贴图
 matInstance->SetTexture("NormalMap", normalMapTexture);
+
+// --- IBL 相关纹理 ---
+// 设置 Irradiance Map (漫反射环境光)
+matInstance->SetTexture("IrradianceMap", irradianceMap);
+
+// 设置 Prefilter Map (镜面反射环境光)
+matInstance->SetTexture("PrefilterMap", prefilterMap);
+
+// 设置 BRDF LUT (查找表)
+matInstance->SetTexture("BRDFLUT", brdfLUT);
 ```
 
 ### 数值参数
