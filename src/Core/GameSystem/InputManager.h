@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <string>
 #include <unordered_map>
 #include <glm/glm.hpp>
@@ -52,11 +52,13 @@ private:
     std::unordered_map<std::string, AxisBinding> AxisBindings;
     std::unordered_map<std::string, EKeyCode> ActionBindings;
 
-    // 为了实现 IsActionJustPressed，我们需要极度轻量级的状态缓存 (只有几百个字节)
-    bool CurrentKeys[350] = {false};  // GLFW_KEY_LAST 大约是 348
-    bool PreviousKeys[350] = {false};
+    // 利用 EKeyCode::MaxKeys 自动管理内存大小，避免魔法数字
+    static constexpr size_t MAX_KEY_COUNT = static_cast<size_t>(EKeyCode::MaxKeys);
+    bool CurrentKeys[MAX_KEY_COUNT] = {false};
+    bool PreviousKeys[MAX_KEY_COUNT] = {false};
 
     glm::vec2 LastMousePos{0.0f};
     glm::vec2 MouseDelta{0.0f};
     bool bFirstMouse = true;
+    bool bCursorLocked = false;
 };

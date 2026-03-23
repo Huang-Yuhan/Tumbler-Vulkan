@@ -1,4 +1,4 @@
-﻿#include "AppLogic.h"
+#include "AppLogic.h"
 #include <glm/vec3.hpp>
 
 #include "Core/GameSystem/Components/CFirstPersonCamera.h"
@@ -147,5 +147,7 @@ void AppLogic::Tick(float deltaTime) {
         MainCamera->Update(deltaTime);
     }
 
-    // 场景中其它组件的 Tick 目前手动或后续交给 FScene::Tick
+    if (Scene) {
+        Scene->Tick(deltaTime);
+    }
 }

@@ -1,4 +1,4 @@
-﻿#include "InputManager.h"
+#include "InputManager.h"
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 
@@ -53,27 +53,41 @@ void InputManager::Init(GLFWwindow* window) {
 void InputManager::Tick()
 {
     // 1. 缓存上一帧的键盘状态，并读取当前帧状态
-    // for (int i = 32; i < 350; ++i) { // GLFW 的按键宏从 32 开始
-    //     PreviousKeys[i] = CurrentKeys[i];
-    //     CurrentKeys[i] = glfwGetKey(WindowHandle, i) == GLFW_PRESS;
-    // }
-
-    for (uint16_t i=static_cast<uint16_t>(EKeyCode::Unknown)+1; i<static_cast<uint16_t>(EKeyCode::MaxKeys); i++)
+    for (uint16_t i = static_cast<uint16_t>(EKeyCode::Unknown) + 1; i < static_cast<uint16_t>(EKeyCode::MaxKeys); i++)
     {
         auto glfwKey = TranslateToGLFWKey(static_cast<EKeyCode>(i));
-// Handle mouse
         if (glfwKey == GLFW_KEY_UNKNOWN) continue;
-        PreviousKeys[i]=CurrentKeys[i];
-        CurrentKeys[i]=glfwGetKey(WindowHandle, glfwKey) == GLFW_PRESS;
+        PreviousKeys[i] = CurrentKeys[i];
+        CurrentKeys[i] = glfwGetKey(WindowHandle, glfwKey) == GLFW_PRESS;
     }
 
-    // 2. 处理鼠标和 UI 穿透
+    // 2. 处理鼠标锁定逻辑 (Editor Camera 体验优化)
+    bool bMouseRightPressed = CurrentKeys[static_cast<uint16_t>(EKeyCode::MouseRight)];
+    bool bMouseRightJustPressed = CurrentKeys[static_cast<uint16_t>(EKeyCode::MouseRight)] && !PreviousKeys[static_cast<uint16_t>(EKeyCode::MouseRight)];
+    bool bMouseRightJustReleased = !CurrentKeys[static_cast<uint16_t>(EKeyCode::MouseRight)] && PreviousKeys[static_cast<uint16_t>(EKeyCode::MouseRight)];
+
+    if (bMouseRightJustPressed && !IsUIFocused()) {
+        glfwSetInputMode(WindowHandle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        bCursorLocked = true;
+        bFirstMouse = true;
+    }
+    else if (bMouseRightJustReleased) {
+        glfwSetInputMode(WindowHandle, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        bCursorLocked = false;
+    }
+
+    // 3. 处理鼠标和 UI 穿透
     if (IsUIFocused()) {
         MouseDelta = glm::vec2(0.0f);
-        bFirstMouse = true; // 防止鼠标离开 UI 界面时视角发生剧烈跳跃
+        bFirstMouse = true;
+        if (bCursorLocked) {
+            glfwSetInputMode(WindowHandle, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            bCursorLocked = false;
+        }
         return;
     }
 
+    // 4. 处理鼠标移动
     double xpos, ypos;
     glfwGetCursorPos(WindowHandle, &xpos, &ypos);
 
