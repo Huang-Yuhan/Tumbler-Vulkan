@@ -72,6 +72,40 @@ void AppLogic::LoadTinyRendererModels() const
     africanHead->AddComponent<CMeshRenderer>()->SetMesh(africanHeadMesh);
     africanHead->GetComponent<CMeshRenderer>()->SetMaterial(africanHeadMat);
 
+    auto africanEyeInnerMat = pbrMaterial->CreateInstance();
+    africanEyeInnerMat->SetVector("BaseColorTint", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    africanEyeInnerMat->SetFloat("Roughness", 0.2f);
+    africanEyeInnerMat->SetFloat("Metallic", 0.0f);
+    auto africanEyeInnerDiffuse = AssetMgr->GetOrLoadTexture("AfricanEyeInner_Diffuse", "assets/models/tiny-renderer-obj/african_head/african_head_eye_inner_diffuse.tga");
+    africanEyeInnerMat->SetTexture("BaseColorMap", africanEyeInnerDiffuse);
+    auto africanEyeInnerNormal = AssetMgr->GetOrLoadTexture("AfricanEyeInner_Normal", "assets/models/tiny-renderer-obj/african_head/african_head_eye_inner_nm_tangent.tga");
+    africanEyeInnerMat->SetTexture("NormalMap", africanEyeInnerNormal);
+    africanEyeInnerMat->ApplyChanges();
+
+    auto africanEyeInnerMesh = AssetMgr->GetOrLoadMesh("AfricanEyeInner", "assets/models/tiny-renderer-obj/african_head/african_head_eye_inner.obj");
+    FActor* africanEyeInner = Scene->CreateActor("AfricanEyeInner");
+    africanEyeInner->Transform.SetPosition(glm::vec3(-3.0f, 0.0f, 0.0f));
+    africanEyeInner->Transform.SetScale(glm::vec3(1.0f, 1.0f, 1.0f));
+    africanEyeInner->AddComponent<CMeshRenderer>()->SetMesh(africanEyeInnerMesh);
+    africanEyeInner->GetComponent<CMeshRenderer>()->SetMaterial(africanEyeInnerMat);
+
+    auto africanEyeOuterMat = pbrMaterial->CreateInstance();
+    africanEyeOuterMat->SetVector("BaseColorTint", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    africanEyeOuterMat->SetFloat("Roughness", 0.1f);
+    africanEyeOuterMat->SetFloat("Metallic", 0.0f);
+    auto africanEyeOuterDiffuse = AssetMgr->GetOrLoadTexture("AfricanEyeOuter_Diffuse", "assets/models/tiny-renderer-obj/african_head/african_head_eye_outer_diffuse.tga");
+    africanEyeOuterMat->SetTexture("BaseColorMap", africanEyeOuterDiffuse);
+    auto africanEyeOuterNormal = AssetMgr->GetOrLoadTexture("AfricanEyeOuter_Normal", "assets/models/tiny-renderer-obj/african_head/african_head_eye_outer_nm_tangent.tga");
+    africanEyeOuterMat->SetTexture("NormalMap", africanEyeOuterNormal);
+    africanEyeOuterMat->ApplyChanges();
+
+    auto africanEyeOuterMesh = AssetMgr->GetOrLoadMesh("AfricanEyeOuter", "assets/models/tiny-renderer-obj/african_head/african_head_eye_outer.obj");
+    FActor* africanEyeOuter = Scene->CreateActor("AfricanEyeOuter");
+    africanEyeOuter->Transform.SetPosition(glm::vec3(-3.0f, 0.0f, 0.0f));
+    africanEyeOuter->Transform.SetScale(glm::vec3(1.0f, 1.0f, 1.0f));
+    africanEyeOuter->AddComponent<CMeshRenderer>()->SetMesh(africanEyeOuterMesh);
+    africanEyeOuter->GetComponent<CMeshRenderer>()->SetMaterial(africanEyeOuterMat);
+
     auto boggieHeadMat = pbrMaterial->CreateInstance();
     boggieHeadMat->SetVector("BaseColorTint", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
     boggieHeadMat->SetFloat("Roughness", 0.6f);
