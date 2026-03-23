@@ -118,29 +118,11 @@ void FMaterial::BuildPipeline(const std::string& vertPath, const std::string& fr
     uboBinding.descriptorCount = 1;
     uboBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    VkDescriptorSetLayoutBinding irradianceMapBinding{};
-    irradianceMapBinding.binding = 3;
-    irradianceMapBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    irradianceMapBinding.descriptorCount = 1;
-    irradianceMapBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    VkDescriptorSetLayoutBinding prefilterMapBinding{};
-    prefilterMapBinding.binding = 4;
-    prefilterMapBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    prefilterMapBinding.descriptorCount = 1;
-    prefilterMapBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    VkDescriptorSetLayoutBinding brdfLUTBinding{};
-    brdfLUTBinding.binding = 5;
-    brdfLUTBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    brdfLUTBinding.descriptorCount = 1;
-    brdfLUTBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    VkDescriptorSetLayoutBinding bindings[] = {baseColorBinding, normalMapBinding, uboBinding, irradianceMapBinding, prefilterMapBinding, brdfLUTBinding};
+    VkDescriptorSetLayoutBinding bindings[] = {baseColorBinding, normalMapBinding, uboBinding};
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 6;
+    layoutInfo.bindingCount = 3;
     layoutInfo.pBindings = bindings;
 
     if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &DescriptorSetLayout) != VK_SUCCESS) {

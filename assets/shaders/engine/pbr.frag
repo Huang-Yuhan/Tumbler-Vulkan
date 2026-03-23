@@ -19,9 +19,6 @@ layout(set = 0, binding = 0) uniform SceneData {
 
 layout(set = 1, binding = 0) uniform sampler2D BaseColorMap;
 layout(set = 1, binding = 1) uniform sampler2D NormalMap;
-layout(set = 1, binding = 3) uniform samplerCube IrradianceMap;
-layout(set = 1, binding = 4) uniform samplerCube PrefilterMap;
-layout(set = 1, binding = 5) uniform sampler2D BRDFLUT;
 
 layout(set = 1, binding = 2) uniform MaterialParams {
     vec4  BaseColorTint;
@@ -134,39 +131,8 @@ void main() {
 
     // --- 结束 Cook-Torrance BRDF ---
 
-    // 5. IBL 环境光照
-    vec3 F_ibl = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
-    
-    vec3 kS_ibl = F_ibl;
-    vec3 kD_ibl = 1.0 - kS_ibl;
-    kD_ibl *= 1.0 - metallic;
-
-    // 检查是否使用默认贴图（白色），如果是则回退到简单环境光
-    vec3 testIrrad = texture(IrradianceMap, vec3(1.0, 0.0, 0.0)).rgb;
-    bool hasIBL = !(length(testIrrad - vec3(1.0)) < 0.01);
-    
-    vec3 ambient;
-    if (hasIBL) {
-        // 有 IBL 贴图，使用完整 IBL
-        // 采样漫反射环境光 (Irradiance Map)
-        vec3 irradiance = texture(IrradianceMap, N).rgb;
-        vec3 diffuse = irradiance * albedo;
-
-        // 采样镜面反射环境光 (Prefilter Map)
-        vec3 R = reflect(-V, N);
-        const float MAX_REFLECTION_LOD = 4.0;
-        vec3 prefilteredColor = textureLod(PrefilterMap, R, roughness * MAX_REFLECTION_LOD).rgb;
-
-        // 采样 BRDF LUT
-        vec2 brdf = texture(BRDFLUT, vec2(max(dot(N, V), 0.0), roughness)).rg;
-        vec3 specular = prefilteredColor * (F_ibl * brdf.x + brdf.y);
-
-        ambient = (kD_ibl * diffuse + specular);
-    } else {
-        // 没有 IBL 贴图，使用简单环境光
-        ambient = vec3(0.03) * albedo;
-    }
-    
+    // 5. 简单环境光
+    vec3 ambient = vec3(0.03) * albedo;
     vec3 color = ambient + Lo;
 
     // 6. HDR 色调映射
