@@ -75,34 +75,19 @@ int main() {
             // 更新游戏逻辑 (相机漫游等)
             logic.Tick(frameTime);
 
-            // --- A. 游戏 UI 与交互逻辑 ---
-            ui_manager.BeginFrame();
-            ImGui::Begin("PBR Debug Engine");
-
-            if (FActor* mainLight = logic.GetScene()->FindActorByName("MainLight")) {
-                if (auto* pl = mainLight->GetComponent<CPointLight>()) {
-                    // 控制光源的 Transform
-                    glm::vec3 pos = mainLight->Transform.GetPosition();
-                    if (ImGui::DragFloat3("Light Pos", &pos.x, 0.1f, -10.0f, 10.0f)) {
-                        mainLight->Transform.SetPosition(pos);
-                    }
-                    // 控制光源的组件属性
-                    ImGui::ColorEdit3("Light Color", &pl->Color.x);
-                    ImGui::SliderFloat("Light Power", &pl->Intensity, 0.0f, 200.0f);
-                }
-            } else {
-                ImGui::Text("MainLight not found");
-            }
-
-            ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-            ImGui::End();
-            ui_manager.EndFrame();
-
-            // --- B. 数据打包装车 ---
+            // --- B. 数据打包装车 (先提取数据，用于性能统计) ---
 
             // 1. 提取客观物体数据 (RenderPackets)
             std::vector<RenderPacket> renderPackets;
             logic.GetScene()->ExtractRenderPackets(renderPackets);
+
+            // --- A. 游戏 UI 与交互逻辑 ---
+            ui_manager.BeginFrame();
+            
+            logic.UpdatePerformanceStats(frameTime, static_cast<int>(renderPackets.size()));
+            logic.DrawEditorUI();
+            
+            ui_manager.EndFrame();
 
             // 2. 提取当前观察者的视图与环境数据 (SceneViewData)
             VkExtent2D swapchainExtent = renderer.GetSwapchainExtent();

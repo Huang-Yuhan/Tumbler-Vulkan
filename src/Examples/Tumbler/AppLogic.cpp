@@ -1,5 +1,6 @@
 #include "AppLogic.h"
 #include <glm/vec3.hpp>
+#include <imgui.h>
 
 #include "Core/GameSystem/Components/CFirstPersonCamera.h"
 #include "Core/GameSystem/InputManager.h"
@@ -149,4 +150,97 @@ void AppLogic::Tick(float deltaTime) {
     if (Scene) {
         Scene->Tick(deltaTime);
     }
+}
+
+void AppLogic::UpdatePerformanceStats(float frameTime, int drawCallCount) {
+    Stats.FrameTimeMs = frameTime * 1000.0f;
+    Stats.FPS = 1.0f / frameTime;
+    Stats.DrawCallCount = drawCallCount;
+    
+    Stats.FrameTimeHistory[Stats.HistoryIndex] = Stats.FrameTimeMs;
+    Stats.HistoryIndex = (Stats.HistoryIndex + 1) % FRAME_TIME_HISTORY_SIZE;
+}
+
+void AppLogic::DrawPerformancePanel() {
+    ImGui::Begin("Performance");
+    
+    ImGui::Text("FPS: %.1f", Stats.FPS);
+    ImGui::Text("Frame Time: %.2f ms", Stats.FrameTimeMs);
+    ImGui::Text("Draw Calls: %d", Stats.DrawCallCount);
+    
+    ImGui::Separator();
+    
+    ImGui::Text("Frame Time Graph:");
+    ImGui::PlotLines("##FrameTime", Stats.FrameTimeHistory, FRAME_TIME_HISTORY_SIZE, Stats.HistoryIndex, nullptr, 0.0f, 33.3f, ImVec2(0, 80));
+    
+    ImGui::End();
+}
+
+void AppLogic::DrawLightPanel() {
+    ImGui::Begin("Light Settings");
+    
+    if (FActor* mainLight = Scene->FindActorByName("MainLight")) {
+        if (auto* pl = mainLight->GetComponent<CPointLight>()) {
+            ImGui::Text("Main Light");
+            ImGui::Separator();
+            
+            glm::vec3 pos = mainLight->Transform.GetPosition();
+            if (ImGui::DragFloat3("Position", &pos.x, 0.1f, -20.0f, 20.0f)) {
+                mainLight->Transform.SetPosition(pos);
+            }
+            
+            ImGui::ColorEdit3("Color", &pl->Color.x);
+            ImGui::SliderFloat("Intensity", &pl->Intensity, 0.0f, 200.0f);
+        }
+    } else {
+        ImGui::Text("MainLight not found");
+    }
+    
+    ImGui::End();
+}
+
+void AppLogic::DrawCameraPanel() {
+    ImGui::Begin("Camera");
+    
+    if (MainCamera) {
+        FActor* cameraActor = MainCamera->GetOwner();
+        
+        ImGui::Text("Camera Settings");
+        ImGui::Separator();
+        
+        glm::vec3 pos = cameraActor->Transform.GetPosition();
+        if (ImGui::DragFloat3("Position", &pos.x, 0.1f, -50.0f, 50.0f)) {
+            cameraActor->Transform.SetPosition(pos);
+        }
+        
+        glm::vec3 rot = cameraActor->Transform.GetEulerAngles();
+        if (ImGui::DragFloat3("Rotation", &rot.x, 1.0f, -180.0f, 180.0f)) {
+            cameraActor->Transform.SetRotation(rot);
+        }
+        
+        ImGui::Separator();
+        
+        ImGui::SliderFloat("FOV", &MainCamera->Fov, 30.0f, 120.0f);
+        ImGui::SliderFloat("Move Speed", &MainCamera->MoveSpeed, 1.0f, 50.0f);
+        ImGui::SliderFloat("Mouse Sensitivity", &MainCamera->MouseSensitivity, 0.1f, 5.0f);
+    }
+    
+    ImGui::End();
+}
+
+void AppLogic::DrawMaterialPanel() {
+    ImGui::Begin("Material Editor");
+    
+    ImGui::Text("Material Editor (WIP)");
+    ImGui::Separator();
+    ImGui::Text("Select an object to edit its material");
+    
+    ImGui::End();
+}
+
+void AppLogic::DrawEditorUI() {
+    DrawPerformancePanel();
+    DrawLightPanel();
+    DrawCameraPanel();
+    DrawMaterialPanel();
 }
