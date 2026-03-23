@@ -76,3 +76,57 @@ matInstance->ApplyChanges();
 - **NormalMap**: 使用白色贴图，Shader 会检测并自动回退到几何法线
 
 这保证了 Vulkan 指针校验不会崩溃，同时兼顾了纯颜色染色的工作流。
+
+## 6. UpdateUBO() vs ApplyChanges()
+
+Tumbler 引擎提供了两种更新材质的方法，根据使用场景选择合适的方法：
+
+### 6.1 UpdateUBO() - 快速更新（推荐用于编辑器）
+
+```cpp
+// 只更新 UBO 数据，不重新绑定描述符
+matInstance->SetFloat("Roughness", 0.5f);
+matInstance->UpdateUBO();
+```
+
+**特点：**
+- ✅ 仅将 CPU 数据拷贝到持久映射的 UBO 内存
+- ✅ 不调用 `vkUpdateDescriptorSets()`
+- ✅ 性能更好，适合频繁调整
+- ✅ 避免 Vulkan 验证错误（描述符集在使用中时不会被更新）
+
+**适用场景：**
+- 编辑器中实时调整材质参数
+- 每帧都可能变化的参数
+- 不需要切换纹理时
+
+### 6.2 ApplyChanges() - 完整更新
+
+```cpp
+// 完整更新，包括重新绑定描述符
+matInstance->SetTexture("BaseColorMap", newTexture);
+matInstance->ApplyChanges();
+```
+
+**特点：**
+- ✅ 更新 UBO 数据
+- ✅ 重新绑定所有纹理描述符
+- ✅ 调用 `vkUpdateDescriptorSets()`
+- ⚠️ 可能导致 Vulkan 验证错误（如果描述符集正在被 GPU 使用）
+
+**适用场景：**
+- 初始化材质时
+- 需要切换纹理时
+- 描述符集布局改变时
+
+### 6.3 最佳实践
+
+| 操作 | 推荐方法 |
+|------|----------|
+| 调整 Roughness/Metallic/BaseColor | `UpdateUBO()` |
+| 调整 NormalStrength/TwoSided | `UpdateUBO()` |
+| 切换 BaseColorMap/NormalMap | `ApplyChanges()` |
+| 初始化新材质实例 | `ApplyChanges()` |
+| 编辑器中实时预览 | `UpdateUBO()` |
+
+**重要提示：** 在编辑器中使用 `UpdateUBO()` 可以避免 Vulkan 验证层报错！详见 [编辑器与调试工具](08_Editor_and_Debugging.md) 文档。

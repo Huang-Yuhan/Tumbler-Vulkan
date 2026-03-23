@@ -113,16 +113,29 @@
 掌握 ImGui 调试和编辑器工具的使用。
 
 **内容包括：**
+- 内置编辑器面板（性能统计、光源、相机、场景层级、材质编辑器）
+- AppLogic 编辑器架构
 - ImGui 简介
 - UIManager 类使用
 - 常用 ImGui 控件
 - 实际示例
 - 性能分析
 - 调试技巧
+- UpdateUBO() vs ApplyChanges()
 
 ---
 
 ## 🔧 参考文档
+
+### [代码导航指南 (12_Code_Navigation_Guide.md)](12_Code_Navigation_Guide.md)
+**新！** 帮助你快速理解代码结构，找到需要阅读的代码。
+
+**内容包括：**
+- 目录结构概览
+- 按功能查找代码（渲染、游戏系统、材质、编辑器、Vulkan）
+- 关键代码位置速查
+- 推荐阅读顺序
+- 阅读技巧
 
 ### [故障排除指南 (10_Troubleshooting_Guide.md)](10_Troubleshooting_Guide.md)
 遇到问题？在这里寻找解决方案。
@@ -146,14 +159,15 @@
 
 1. **[快速入门指南](00_Getting_Started.md)** - 先跑起来！
 2. **[架构概览](01_Architecture_Overview.md)** - 了解整体设计
-3. **[游戏系统架构](06_Game_System_Architecture.md)** - 学习如何组织游戏世界
-4. **[Vulkan 核心概念](05_Vulkan_Core_Concepts.md)** - 掌握底层渲染基础
-5. **[材质系统](03_Material_System.md)** - 理解 PBR 材质
-6. **[基于物理的渲染](04_PBR_Theory_and_Practice.md)** - 深入 PBR 理论
-7. **[输入系统](07_Input_System.md)** - 添加交互
-8. **[编辑器与调试工具](08_Editor_and_Debugging.md)** - 学会调试
-9. **[渲染管线深度解析](09_Rendering_Pipeline_Deep_Dive.md)** - 精通渲染流程
-10. **[故障排除指南](10_Troubleshooting_Guide.md)** - 遇到问题时查阅
+3. **[代码导航指南](12_Code_Navigation_Guide.md)** - **新！** 知道去哪里找代码
+4. **[游戏系统架构](06_Game_System_Architecture.md)** - 学习如何组织游戏世界
+5. **[Vulkan 核心概念](05_Vulkan_Core_Concepts.md)** - 掌握底层渲染基础
+6. **[材质系统](03_Material_System.md)** - 理解 PBR 材质
+7. **[基于物理的渲染](04_PBR_Theory_and_Practice.md)** - 深入 PBR 理论
+8. **[输入系统](07_Input_System.md)** - 添加交互
+9. **[编辑器与调试工具](08_Editor_and_Debugging.md)** - 学会调试
+10. **[渲染管线深度解析](09_Rendering_Pipeline_Deep_Dive.md)** - 精通渲染流程
+11. **[故障排除指南](10_Troubleshooting_Guide.md)** - 遇到问题时查阅
 
 ---
 
