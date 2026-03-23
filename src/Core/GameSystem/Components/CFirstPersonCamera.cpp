@@ -30,7 +30,7 @@ void CFirstPersonCamera::Update(float deltaTime) {
     
     glm::vec3 pos = Owner->Transform.GetPosition();
     pos += front * forwardInput * MoveSpeed * deltaTime;
-    pos += right * rightInput * MoveSpeed * deltaTime;
+    pos += right * (-rightInput) * MoveSpeed * deltaTime;
     pos += glm::vec3(0.0f, 1.0f, 0.0f) * upInput * MoveSpeed * deltaTime;
     
     Owner->Transform.SetPosition(pos);
