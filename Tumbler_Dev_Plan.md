@@ -1,8 +1,8 @@
 # 🚀 Tumbler Engine 开发路线图 (Roadmap)
 
-**当前状态**：✅ **优先级 1 完成！准备进入视觉效果升级期**
+**当前状态**：✅ **优先级 1 完成！Bug 修复与材质系统改进**
 
-经过阶段 1~10 的打磨，Tumbler 引擎已具备：
+经过阶段 1~10 的打磨和最近的 Bug 修复，Tumbler 引擎已具备：
 ✅ 基于实体-组件 (ECS雏形) 的逻辑架构
 ✅ 严格物理隔离的 `SceneViewData` 与 `RenderPacket` 数据流
 ✅ 基于资源缓存与依赖注入的 `FAssetManager`
@@ -12,6 +12,8 @@
 ✅ **窗口重置处理** (Swapchain Recreation，支持调整窗口大小)
 ✅ **真实的 DeltaTime 计时系统** (`std::chrono`)
 ✅ **完整的文档体系** (快速入门、架构文档、故障排除指南)
+✅ **双面光照支持** (TwoSided 材质选项，使用 faceforward 确保法线朝向相机)
+✅ **平面几何修复** (修正索引环绕顺序为顺时针)
 
 **优先级 1 (基础设施补全) 已 100% 完成！** 🎉
 
@@ -44,7 +46,13 @@
   - ✅ 在 `CFirstPersonCamera` 中优化数学计算，直接使用 `CTransform` 的方向向量
   - ✅ 在 `InputManager` 中添加鼠标锁定功能，实现 Editor Camera 无尽拖拽体验
   - ✅ 在 `AppLogic` 中添加 `Scene->Tick()` 调用，确保完整的场景生命周期
-- [ ] **2.2 基于图像的光照 (IBL - Image Based Lighting)**
+- [x] **2.2 双面光照与材质 TwoSided 选项** ✅ 已完成
+  - ✅ 修复平面索引环绕顺序为正确的顺时针
+  - ✅ 在 pbr.frag 中使用 `faceforward` 函数确保法线始终朝向相机
+  - ✅ 在 FMaterialInstance 中添加 `SetTwoSided(bool)` 方法
+  - ✅ 在 FMaterialUBO 中添加 TwoSided 标志，通过 UBO 传递到着色器
+  - ✅ 为墙壁材质设置 TwoSided=true，从任意角度都能正确接收光照
+- [ ] **2.3 基于图像的光照 (IBL - Image Based Lighting)**
   - 加载 `.hdr` 全景天空盒资源。
   - 预计算 Irradiance Map (用于 Diffuse 环境光) 替代现在的硬编码纯色。
   - 预计算 Prefilter Map 与 BRDF LUT (用于 Specular 环境反射)，使金属拥有真实的倒影。
