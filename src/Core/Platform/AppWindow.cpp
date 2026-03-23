@@ -44,6 +44,8 @@ void AppWindow::Init()
     }
 
     glfwSetWindowUserPointer(Handle, this);
+    
+    glfwSetFramebufferSizeCallback(Handle, FramebufferResizeCallback);
 
     LOG_INFO("Created window: {} ({}x{})", WindowConfig.Title, WindowConfig.Width, WindowConfig.Height);
 
@@ -80,4 +82,12 @@ VkSurfaceKHR AppWindow::CreateSurface(VkInstance instance)
 
     VK_CHECK(glfwCreateWindowSurface(instance, Handle, nullptr, &surface));
     return surface;
+}
+
+void AppWindow::FramebufferResizeCallback(GLFWwindow* window, int width, int height) {
+    auto appWindow = reinterpret_cast<AppWindow*>(glfwGetWindowUserPointer(window));
+    if (appWindow) {
+        appWindow->bFramebufferResized = true;
+        LOG_INFO("Framebuffer resized to {}x{}", width, height);
+    }
 }

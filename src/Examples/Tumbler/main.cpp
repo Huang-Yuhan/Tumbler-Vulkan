@@ -63,6 +63,12 @@ int main() {
             float frameTime = std::chrono::duration<float, std::chrono::seconds::period>(newTime - currentTime).count();
             currentTime = newTime;
 
+            // 检查是否需要重建 Swapchain（窗口大小改变）
+            if (window.IsFramebufferResized()) {
+                window.ClearResizedFlag();
+                LOG_INFO("Window resized, recreating swapchain...");
+            }
+
             // 更新输入系统
             inputManager.Tick();
 

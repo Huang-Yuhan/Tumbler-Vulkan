@@ -52,7 +52,14 @@ public:
 private:
     GLFWwindow* Handle = nullptr;
     AppWindowConfig WindowConfig;
+    bool bFramebufferResized = false;
 
     void Init();
     void Shutdown();
+    
+    static void FramebufferResizeCallback(GLFWwindow* window, int width, int height);
+
+public:
+    [[nodiscard]] bool IsFramebufferResized() const { return bFramebufferResized; }
+    void ClearResizedFlag() { bFramebufferResized = false; }
 };

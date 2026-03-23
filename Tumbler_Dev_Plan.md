@@ -1,6 +1,6 @@
 # 🚀 Tumbler Engine 开发路线图 (Roadmap)
 
-**当前状态**：🚧 **稳固地基期 (架构重构与 PBR 基础完成)**
+**当前状态**：✅ **优先级 1 完成！准备进入视觉效果升级期**
 
 经过阶段 1~10 的打磨，Tumbler 引擎已具备：
 ✅ 基于实体-组件 (ECS雏形) 的逻辑架构
@@ -8,23 +8,31 @@
 ✅ 基于资源缓存与依赖注入的 `FAssetManager`
 ✅ 高效的 Vulkan PBR 材质母体/实例管线绑定模型
 ✅ 包含环境采样、GGX微表面、Schlick菲涅尔的 Cook-Torrance BRDF Shader
+✅ **完整的输入系统与漫游相机** (`InputManager` + `CFirstPersonCamera`)
+✅ **窗口重置处理** (Swapchain Recreation，支持调整窗口大小)
+✅ **真实的 DeltaTime 计时系统** (`std::chrono`)
+✅ **完整的文档体系** (快速入门、架构文档、故障排除指南)
+
+**优先级 1 (基础设施补全) 已 100% 完成！** 🎉
 
 站在这个坚实的地基上，未来的开发计划按照由近及远、由基础设施到高级渲染，划分为 4 个优先级：
 
 ---
 
-## 🔴 优先级 1：引擎基础设施补全 (Engine Hygiene)
-*完善引擎的基础卫生，越早做后续开发越顺畅。*
+## 🔴 优先级 1：引擎基础设施补全 (Engine Hygiene) ✅ 已完成
+*完善引擎的基础卫生，越早做后续开发越顺畅。*  **【全部完成！】**
 
-- [ ] **1.1 输入系统与漫游相机 (Camera Controller)**
-  - 封装 GLFW 键盘/鼠标输入。
-  - 实现 `CFirstPersonCamera` 或 `COrbitCamera` 组件，摆脱写死的相机坐标，实现 3D 漫游 (WASD + 鼠标转动)。
-- [ ] **1.2 窗口重置处理 (Swapchain Recreation)**
-  - 捕获 GLFW 的 Resize 事件。
-  - 在调整窗口大小时暂停渲染，销毁旧的 Swapchain 及其附属附件（DepthBuffer、Framebuffer 等）并基于新尺寸重建，避免 `VK_ERROR_OUT_OF_DATE_KHR` 崩溃。
-- [ ] **1.3 真实的 DeltaTime (dt)**
-  - 在主循环中接入 `std::chrono` 计算两帧真实的时间差。
-  - 传入 `Tick(float deltaTime)`，使相机的移动与旋转跟帧率解绑。
+- [x] **1.1 输入系统与漫游相机 (Camera Controller)**
+  - ✅ 封装 GLFW 键盘/鼠标输入 (`InputManager`)
+  - ✅ 实现 `CFirstPersonCamera` 组件，支持 3D 漫游 (WASD + 鼠标转动)
+- [x] **1.2 窗口重置处理 (Swapchain Recreation)**
+  - ✅ `RecreateSwapchain()` 方法已完整实现
+  - ✅ 在 `AppWindow` 中添加了 GLFW Resize 事件回调
+  - ✅ 在主循环中检测窗口大小变化
+  - ✅ 自动处理 `VK_ERROR_OUT_OF_DATE_KHR` 和 `VK_SUBOPTIMAL_KHR`，安全重建 Swapchain崩溃
+- [x] **1.3 真实的 DeltaTime (dt)**
+  - ✅ 在主循环中接入 `std::chrono` 计算两帧真实的时间差
+  - ✅ 传入 `Tick(float deltaTime)`，使相机的移动与旋转跟帧率解绑
 
 ## 🟡 优先级 2：PBR 与视觉效果的究极进化 (Visuals First)
 *让引擎画面从“不错”迈向“惊艳”的核心步骤。*
