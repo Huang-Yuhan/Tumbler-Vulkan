@@ -114,19 +114,25 @@ void main() {
 
     // --- 开始组装 Cook-Torrance BRDF ---
 
-    float NDF = DistributionGGX(N, H, roughness);
-    float G   = GeometrySmith(N, V, L, roughness);
+    // 如果光源在背面，翻转法线以获得双面光照
+    vec3 N_fixed = N;
+    if (dot(N, L) < 0.0) {
+        N_fixed = -N;
+    }
+
+    float NDF = DistributionGGX(N_fixed, H, roughness);
+    float G   = GeometrySmith(N_fixed, V, L, roughness);
     vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);
 
     vec3 numerator    = NDF * G * F;
-    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+    float denominator = 4.0 * max(dot(N_fixed, V), 0.0) * max(dot(N_fixed, L), 0.0) + 0.0001;
     vec3 specular     = numerator / denominator;
 
     vec3 kS = F;
     vec3 kD = vec3(1.0) - kS;
     kD *= 1.0 - metallic;
 
-    float NdotL = max(dot(N, L), 0.0);
+    float NdotL = max(dot(N_fixed, L), 0.0);
     vec3 Lo = (kD * albedo / PI + specular) * radiance * NdotL;
 
     // --- 结束 Cook-Torrance BRDF ---
