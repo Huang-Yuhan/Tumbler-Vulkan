@@ -73,7 +73,7 @@ FMesh FMesh::CreatePlane(const float width, const float height, const uint32_t s
         }
     }
 
-    // 填充索引
+    // 填充索引 (顺时针环绕顺序)
     for (uint32_t y = 0; y < subdivisionsHeight; ++y)
     {
         for (uint32_t x = 0; x < subdivisionsWidth; ++x)
@@ -83,13 +83,15 @@ FMesh FMesh::CreatePlane(const float width, const float height, const uint32_t s
             uint32_t bottomLeft = (y + 1) * vertexCountX + x;
             uint32_t bottomRight = bottomLeft + 1;
 
+            // 第一个三角形
             plane.Indices.push_back(topLeft);
-            plane.Indices.push_back(bottomLeft);
             plane.Indices.push_back(topRight);
+            plane.Indices.push_back(bottomLeft);
 
+            // 第二个三角形
             plane.Indices.push_back(topRight);
-            plane.Indices.push_back(bottomLeft);
             plane.Indices.push_back(bottomRight);
+            plane.Indices.push_back(bottomLeft);
         }
     }
 

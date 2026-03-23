@@ -114,11 +114,8 @@ void main() {
 
     // --- 开始组装 Cook-Torrance BRDF ---
 
-    // 如果光源在背面，翻转法线以获得双面光照
-    vec3 N_fixed = N;
-    if (dot(N, L) < 0.0) {
-        N_fixed = -N;
-    }
+    // 确保法线朝向相机 (双面光照)
+    vec3 N_fixed = faceforward(N, -V, N);
 
     float NDF = DistributionGGX(N_fixed, H, roughness);
     float G   = GeometrySmith(N_fixed, V, L, roughness);
