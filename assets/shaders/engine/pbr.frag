@@ -135,11 +135,11 @@ void main() {
     // --- 结束 Cook-Torrance BRDF ---
 
     // 5. IBL 环境光照
-    vec3 F = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
+    vec3 F_ibl = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
     
-    vec3 kS = F;
-    vec3 kD = 1.0 - kS;
-    kD *= 1.0 - metallic;
+    vec3 kS_ibl = F_ibl;
+    vec3 kD_ibl = 1.0 - kS_ibl;
+    kD_ibl *= 1.0 - metallic;
 
     // 检查是否使用默认贴图（白色），如果是则回退到简单环境光
     vec3 testIrrad = texture(IrradianceMap, vec3(1.0, 0.0, 0.0)).rgb;
@@ -159,9 +159,9 @@ void main() {
 
         // 采样 BRDF LUT
         vec2 brdf = texture(BRDFLUT, vec2(max(dot(N, V), 0.0), roughness)).rg;
-        vec3 specular = prefilteredColor * (F * brdf.x + brdf.y);
+        vec3 specular = prefilteredColor * (F_ibl * brdf.x + brdf.y);
 
-        ambient = (kD * diffuse + specular);
+        ambient = (kD_ibl * diffuse + specular);
     } else {
         // 没有 IBL 贴图，使用简单环境光
         ambient = vec3(0.03) * albedo;
