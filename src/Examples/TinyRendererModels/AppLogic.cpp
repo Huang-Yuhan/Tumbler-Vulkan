@@ -21,53 +21,107 @@ void AppLogic::LoadTinyRendererModels() const
 {
     auto pbrMaterial = AssetMgr->GetOrLoadMaterial("PBR_Base", "assets/shaders/engine/pbr.vert.spv", "assets/shaders/engine/pbr.frag.spv");
 
-    auto defaultMat = pbrMaterial->CreateInstance();
-    defaultMat->SetVector("BaseColorTint", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
-    defaultMat->SetFloat("Roughness", 0.5f);
-    defaultMat->SetFloat("Metallic", 0.0f);
-    defaultMat->ApplyChanges();
+    auto floorMat = pbrMaterial->CreateInstance();
+    floorMat->SetVector("BaseColorTint", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    floorMat->SetFloat("Roughness", 0.8f);
+    floorMat->SetFloat("Metallic", 0.0f);
+    auto floorDiffuse = AssetMgr->GetOrLoadTexture("Floor_Diffuse", "assets/models/tiny-renderer-obj/floor_diffuse.tga");
+    floorMat->SetTexture("BaseColorMap", floorDiffuse);
+    auto floorNormal = AssetMgr->GetOrLoadTexture("Floor_Normal", "assets/models/tiny-renderer-obj/floor_nm_tangent.tga");
+    floorMat->SetTexture("NormalMap", floorNormal);
+    floorMat->ApplyChanges();
 
     auto floorMesh = AssetMgr->GetOrLoadMesh("Floor", "assets/models/tiny-renderer-obj/floor.obj");
     FActor* floor = Scene->CreateActor("Floor");
     floor->Transform.SetPosition(glm::vec3(0.0f, -1.0f, 0.0f));
     floor->Transform.SetScale(glm::vec3(1.0f, 1.0f, 1.0f));
     floor->AddComponent<CMeshRenderer>()->SetMesh(floorMesh);
-    floor->GetComponent<CMeshRenderer>()->SetMaterial(defaultMat);
+    floor->GetComponent<CMeshRenderer>()->SetMaterial(floorMat);
+
+    auto diabloMat = pbrMaterial->CreateInstance();
+    diabloMat->SetVector("BaseColorTint", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    diabloMat->SetFloat("Roughness", 0.4f);
+    diabloMat->SetFloat("Metallic", 0.3f);
+    auto diabloDiffuse = AssetMgr->GetOrLoadTexture("Diablo_Diffuse", "assets/models/tiny-renderer-obj/diablo3_pose/diablo3_pose_diffuse.tga");
+    diabloMat->SetTexture("BaseColorMap", diabloDiffuse);
+    auto diabloNormal = AssetMgr->GetOrLoadTexture("Diablo_Normal", "assets/models/tiny-renderer-obj/diablo3_pose/diablo3_pose_nm_tangent.tga");
+    diabloMat->SetTexture("NormalMap", diabloNormal);
+    diabloMat->ApplyChanges();
 
     auto diabloMesh = AssetMgr->GetOrLoadMesh("Diablo", "assets/models/tiny-renderer-obj/diablo3_pose/diablo3_pose.obj");
     FActor* diablo = Scene->CreateActor("Diablo");
     diablo->Transform.SetPosition(glm::vec3(0.0f, 0.0f, 0.0f));
     diablo->Transform.SetScale(glm::vec3(1.0f, 1.0f, 1.0f));
     diablo->AddComponent<CMeshRenderer>()->SetMesh(diabloMesh);
-    diablo->GetComponent<CMeshRenderer>()->SetMaterial(defaultMat);
+    diablo->GetComponent<CMeshRenderer>()->SetMaterial(diabloMat);
+
+    auto africanHeadMat = pbrMaterial->CreateInstance();
+    africanHeadMat->SetVector("BaseColorTint", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    africanHeadMat->SetFloat("Roughness", 0.5f);
+    africanHeadMat->SetFloat("Metallic", 0.0f);
+    auto africanDiffuse = AssetMgr->GetOrLoadTexture("African_Diffuse", "assets/models/tiny-renderer-obj/african_head/african_head_diffuse.tga");
+    africanHeadMat->SetTexture("BaseColorMap", africanDiffuse);
+    auto africanNormal = AssetMgr->GetOrLoadTexture("African_Normal", "assets/models/tiny-renderer-obj/african_head/african_head_nm_tangent.tga");
+    africanHeadMat->SetTexture("NormalMap", africanNormal);
+    africanHeadMat->ApplyChanges();
 
     auto africanHeadMesh = AssetMgr->GetOrLoadMesh("AfricanHead", "assets/models/tiny-renderer-obj/african_head/african_head.obj");
     FActor* africanHead = Scene->CreateActor("AfricanHead");
     africanHead->Transform.SetPosition(glm::vec3(-3.0f, 0.0f, 0.0f));
     africanHead->Transform.SetScale(glm::vec3(1.0f, 1.0f, 1.0f));
     africanHead->AddComponent<CMeshRenderer>()->SetMesh(africanHeadMesh);
-    africanHead->GetComponent<CMeshRenderer>()->SetMaterial(defaultMat);
+    africanHead->GetComponent<CMeshRenderer>()->SetMaterial(africanHeadMat);
+
+    auto boggieHeadMat = pbrMaterial->CreateInstance();
+    boggieHeadMat->SetVector("BaseColorTint", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    boggieHeadMat->SetFloat("Roughness", 0.6f);
+    boggieHeadMat->SetFloat("Metallic", 0.0f);
+    auto boggieHeadDiffuse = AssetMgr->GetOrLoadTexture("BoggieHead_Diffuse", "assets/models/tiny-renderer-obj/boggie/head_diffuse.tga");
+    boggieHeadMat->SetTexture("BaseColorMap", boggieHeadDiffuse);
+    auto boggieHeadNormal = AssetMgr->GetOrLoadTexture("BoggieHead_Normal", "assets/models/tiny-renderer-obj/boggie/head_nm_tangent.tga");
+    boggieHeadMat->SetTexture("NormalMap", boggieHeadNormal);
+    boggieHeadMat->ApplyChanges();
 
     auto boggieHeadMesh = AssetMgr->GetOrLoadMesh("BoggieHead", "assets/models/tiny-renderer-obj/boggie/head.obj");
     FActor* boggieHead = Scene->CreateActor("BoggieHead");
     boggieHead->Transform.SetPosition(glm::vec3(3.0f, 0.0f, 0.0f));
     boggieHead->Transform.SetScale(glm::vec3(1.0f, 1.0f, 1.0f));
     boggieHead->AddComponent<CMeshRenderer>()->SetMesh(boggieHeadMesh);
-    boggieHead->GetComponent<CMeshRenderer>()->SetMaterial(defaultMat);
+    boggieHead->GetComponent<CMeshRenderer>()->SetMaterial(boggieHeadMat);
+
+    auto boggieBodyMat = pbrMaterial->CreateInstance();
+    boggieBodyMat->SetVector("BaseColorTint", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    boggieBodyMat->SetFloat("Roughness", 0.7f);
+    boggieBodyMat->SetFloat("Metallic", 0.0f);
+    auto boggieBodyDiffuse = AssetMgr->GetOrLoadTexture("BoggieBody_Diffuse", "assets/models/tiny-renderer-obj/boggie/body_diffuse.tga");
+    boggieBodyMat->SetTexture("BaseColorMap", boggieBodyDiffuse);
+    auto boggieBodyNormal = AssetMgr->GetOrLoadTexture("BoggieBody_Normal", "assets/models/tiny-renderer-obj/boggie/body_nm_tangent.tga");
+    boggieBodyMat->SetTexture("NormalMap", boggieBodyNormal);
+    boggieBodyMat->ApplyChanges();
 
     auto boggieBodyMesh = AssetMgr->GetOrLoadMesh("BoggieBody", "assets/models/tiny-renderer-obj/boggie/body.obj");
     FActor* boggieBody = Scene->CreateActor("BoggieBody");
     boggieBody->Transform.SetPosition(glm::vec3(3.0f, 0.0f, 0.0f));
     boggieBody->Transform.SetScale(glm::vec3(1.0f, 1.0f, 1.0f));
     boggieBody->AddComponent<CMeshRenderer>()->SetMesh(boggieBodyMesh);
-    boggieBody->GetComponent<CMeshRenderer>()->SetMaterial(defaultMat);
+    boggieBody->GetComponent<CMeshRenderer>()->SetMaterial(boggieBodyMat);
+
+    auto boggieEyesMat = pbrMaterial->CreateInstance();
+    boggieEyesMat->SetVector("BaseColorTint", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    boggieEyesMat->SetFloat("Roughness", 0.3f);
+    boggieEyesMat->SetFloat("Metallic", 0.0f);
+    auto boggieEyesDiffuse = AssetMgr->GetOrLoadTexture("BoggieEyes_Diffuse", "assets/models/tiny-renderer-obj/boggie/eyes_diffuse.tga");
+    boggieEyesMat->SetTexture("BaseColorMap", boggieEyesDiffuse);
+    auto boggieEyesNormal = AssetMgr->GetOrLoadTexture("BoggieEyes_Normal", "assets/models/tiny-renderer-obj/boggie/eyes_nm_tangent.tga");
+    boggieEyesMat->SetTexture("NormalMap", boggieEyesNormal);
+    boggieEyesMat->ApplyChanges();
 
     auto boggieEyesMesh = AssetMgr->GetOrLoadMesh("BoggieEyes", "assets/models/tiny-renderer-obj/boggie/eyes.obj");
     FActor* boggieEyes = Scene->CreateActor("BoggieEyes");
     boggieEyes->Transform.SetPosition(glm::vec3(3.0f, 0.0f, 0.0f));
     boggieEyes->Transform.SetScale(glm::vec3(1.0f, 1.0f, 1.0f));
     boggieEyes->AddComponent<CMeshRenderer>()->SetMesh(boggieEyesMesh);
-    boggieEyes->GetComponent<CMeshRenderer>()->SetMaterial(defaultMat);
+    boggieEyes->GetComponent<CMeshRenderer>()->SetMaterial(boggieEyesMat);
 
     FActor* lightActor = Scene->CreateActor("MainLight");
     lightActor->Transform.SetPosition(glm::vec3(0.0f, 5.0f, 5.0f));
