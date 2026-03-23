@@ -46,20 +46,18 @@ void UIManager::Init(AppWindow* window, VulkanRenderer* renderer) {
     
     // 注意：这里需要 VulkanRenderer 开放 GetContext() 方法，如果没有的话，稍后在 Renderer 里补一个
     ImGui_ImplVulkan_InitInfo init_info{};
+    init_info.ApiVersion = VK_API_VERSION_1_3;
     init_info.Instance = renderer->GetContext().GetInstance();
     init_info.PhysicalDevice = renderer->GetContext().GetPhysicalDevice();
     init_info.Device = device;
     init_info.QueueFamily = renderer->GetContext().GetGraphicsQueueFamily();
     init_info.Queue = renderer->GetContext().GetGraphicsQueue();
     init_info.DescriptorPool = ImGuiPool;
-    init_info.RenderPass = renderer->GetRenderPass();
+    init_info.PipelineInfoMain.RenderPass = renderer->GetRenderPass();
+    init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
     init_info.MinImageCount = renderer->GetSwapchainImageCount();
     init_info.ImageCount = renderer->GetSwapchainImageCount();
-    init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
     ImGui_ImplVulkan_Init(&init_info);
-
-    // 4. 上传字体纹理
-    ImGui_ImplVulkan_CreateFontsTexture();
 }
 
 void UIManager::Cleanup(VkDevice device) {
