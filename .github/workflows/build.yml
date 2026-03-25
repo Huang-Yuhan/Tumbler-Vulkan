@@ -1,0 +1,78 @@
+name: Build Tumbler Engine
+
+# 触发条件：推送到 main 分支或发起 PR
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    # 动态命名，例如 "Ubuntu-22.04 Build" 或 "Windows-latest Build"
+    name: ${{ matrix.os }} Build
+    runs-on: ${{ matrix.os }}
+
+    # 矩阵策略配置
+    strategy:
+      fail-fast: false # 即使其中一个系统编译失败，另一个系统也会继续编译完
+      matrix:
+        os: [ubuntu-22.04, windows-latest]
+        # 为不同操作系统定义专用的 vcpkg triplet（目标平台描述）
+        include:
+          - os: ubuntu-22.04
+            vcpkg_triplet: x64-linux
+          - os: windows-latest
+            vcpkg_triplet: x64-windows
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # ================= 依赖安装阶段 =================
+
+      # [Linux 专属] 安装 X11/Wayland 依赖及 Vulkan 开发包
+      - name: Install System Dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build \
+               libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev \
+               libxi-dev libxext-dev libwayland-dev libxkbcommon-dev \
+               libvulkan-dev vulkan-tools vulkan-validationlayers-dev spirv-tools
+
+      # [Windows 专属] 安装 Vulkan SDK
+      # windows-latest 镜像自带了 MSVC 编译器、Windows SDK 和 CMake，只需额外装 Vulkan
+      - name: Setup Vulkan SDK (Windows)
+        if: runner.os == 'Windows'
+        uses: humblehacker/setup-vulkan-sdk@v1.2.0
+        with:
+          vulkan-query-version: latest # 自动拉取最新版 Vulkan SDK
+          vulkan-components: Vulkan-Headers, Vulkan-Loader
+
+      # [跨平台] 配置 vcpkg 环境（自动处理双平台的缓存，大幅加速构建）
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgDirectory: ${{ github.workspace }}/vcpkg
+
+      # ================= 编译阶段 =================
+
+      # 配置 CMake
+      # 注意：这里去掉了 -G Ninja，让 Windows 自动使用 MSVC/Visual Studio 生成器，Linux 自动使用默认生成器
+      - name: Configure CMake
+        run: >
+          cmake -B ${{ github.workspace }}/build 
+          -S ${{ github.workspace }} 
+          -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} 
+          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake 
+          -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_triplet }}
+
+      # 编译项目
+      - name: Build
+        run: cmake --build ${{ github.workspace }}/build --config ${{ env.BUILD_TYPE }}
