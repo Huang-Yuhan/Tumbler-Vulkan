@@ -48,6 +48,8 @@ jobs:
           # List vulkan-related files
           ls -la /usr/bin | grep glslc || echo "No glslc in /usr/bin"
           ls -la /usr/local/bin | grep glslc || echo "No glslc in /usr/local/bin"
+          # List all vulkan tools
+          ls -la /usr/bin | grep vulkan
 
       # [Windows 专属] 安装 Vulkan SDK
       - name: Setup Vulkan SDK (Windows)
