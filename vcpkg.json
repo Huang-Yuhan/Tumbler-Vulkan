@@ -19,5 +19,6 @@
         "vulkan-binding"
       ]
     }
-  ]
+  ],
+  "builtin-baseline": "ff8f729804f07747ee5dae7d40a4a885066f9204"
 }
