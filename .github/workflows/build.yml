@@ -42,7 +42,8 @@ jobs:
             libx11-dev libxrandr-dev libxinerama-dev \
             libxcursor-dev libxi-dev libxext-dev libwayland-dev \
             libxkbcommon-dev libvulkan-dev vulkan-tools \
-            vulkan-validationlayers-dev spirv-tools
+            vulkan-validationlayers-dev spirv-tools \
+            libgl1-mesa-dev
 
       # [Windows 专属] 安装 Vulkan SDK
       - name: Setup Vulkan SDK (Windows)
