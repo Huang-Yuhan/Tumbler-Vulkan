@@ -41,6 +41,8 @@ jobs:
             libxkbcommon-dev libvulkan-dev vulkan-tools \
             vulkan-validationlayers-dev spirv-tools \
             libgl1-mesa-dev
+          # Set VULKAN_SDK environment variable
+          echo "VULKAN_SDK=/usr" >> $GITHUB_ENV
 
       # [Windows 专属] 安装 Vulkan SDK
       - name: Setup Vulkan SDK (Windows)
