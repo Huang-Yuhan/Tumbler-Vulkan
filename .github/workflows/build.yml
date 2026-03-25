@@ -33,15 +33,16 @@ jobs:
         with:
           submodules: recursive
 
-      # [Linux 专属] 仅安装图形和 Vulkan 运行库依赖 (剔除了 cmake 和编译器，使用系统预装版)
+      # [Linux 专属] 安装基础编译工具、图形和 Vulkan 运行库依赖
       - name: Install System Dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libx11-dev libxrandr-dev libxinerama-dev \
-               libxcursor-dev libxi-dev libxext-dev libwayland-dev \
-               libxkbcommon-dev libvulkan-dev vulkan-tools \
-               vulkan-validationlayers-dev spirv-tools
+          sudo apt-get install -y build-essential cmake ninja-build \
+            libx11-dev libxrandr-dev libxinerama-dev \
+            libxcursor-dev libxi-dev libxext-dev libwayland-dev \
+            libxkbcommon-dev libvulkan-dev vulkan-tools \
+            vulkan-validationlayers-dev spirv-tools
 
       # [Windows 专属] 安装 Vulkan SDK
       - name: Setup Vulkan SDK (Windows)
