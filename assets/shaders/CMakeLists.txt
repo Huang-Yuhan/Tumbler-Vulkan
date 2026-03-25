@@ -3,7 +3,8 @@
 # 1. 查找编译器 (修改为更灵活的查找方式)
 find_program(GLSLC_EXECUTABLE NAMES glslc HINTS "$ENV{VULKAN_SDK}/bin" "/usr/bin" "/usr/local/bin")
 if(NOT GLSLC_EXECUTABLE)
-    message(FATAL_ERROR "Could not find glslc shader compiler!")
+    message(WARNING "Could not find glslc shader compiler! Shaders will not be compiled.")
+    return()
 endif()
 
 # =========================================================
