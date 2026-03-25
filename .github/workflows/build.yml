@@ -50,7 +50,7 @@ jobs:
       # windows-latest 镜像自带了 MSVC 编译器、Windows SDK 和 CMake，只需额外装 Vulkan
       - name: Setup Vulkan SDK (Windows)
         if: runner.os == 'Windows'
-        uses: humblehacker/setup-vulkan-sdk@v1.2.0
+        uses: humbletim/setup-vulkan-sdk@v1.2.1
         with:
           vulkan-query-version: latest # 自动拉取最新版 Vulkan SDK
           vulkan-components: Vulkan-Headers, Vulkan-Loader
