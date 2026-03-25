@@ -57,6 +57,8 @@ jobs:
         uses: lukka/run-vcpkg@v11
         with:
           vcpkgDirectory: ${{ github.workspace }}/vcpkg
+          vcpkgGitCommitId: 2024.05.15
+          runVcpkgInstall: true
 
       # 配置 CMake (动态读取矩阵里的 generator)
       - name: Configure CMake
