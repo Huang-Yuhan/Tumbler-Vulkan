@@ -43,6 +43,11 @@ jobs:
             libgl1-mesa-dev
           # Set VULKAN_SDK environment variable
           echo "VULKAN_SDK=/usr" >> $GITHUB_ENV
+          # Check if glslc is available
+          which glslc || echo "glslc not found!"
+          # List vulkan-related files
+          ls -la /usr/bin | grep glslc || echo "No glslc in /usr/bin"
+          ls -la /usr/local/bin | grep glslc || echo "No glslc in /usr/local/bin"
 
       # [Windows 专属] 安装 Vulkan SDK
       - name: Setup Vulkan SDK (Windows)
