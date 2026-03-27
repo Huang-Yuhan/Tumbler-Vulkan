@@ -60,28 +60,13 @@ int main() {
             inputManager.Tick();
             logic.Tick(frameTime);
 
-            ui_manager.BeginFrame();
-            ImGui::Begin("Tiny Renderer Models Debug");
-
-            if (FActor* mainLight = logic.GetScene()->FindActorByName("MainLight")) {
-                if (auto* pl = mainLight->GetComponent<CPointLight>()) {
-                    glm::vec3 pos = mainLight->Transform.GetPosition();
-                    if (ImGui::DragFloat3("Light Pos", &pos.x, 0.1f, -20.0f, 20.0f)) {
-                        mainLight->Transform.SetPosition(pos);
-                    }
-                    ImGui::ColorEdit3("Light Color", &pl->Color.x);
-                    ImGui::SliderFloat("Light Power", &pl->Intensity, 0.0f, 500.0f);
-                }
-            } else {
-                ImGui::Text("MainLight not found");
-            }
-
-            ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-            ImGui::End();
-            ui_manager.EndFrame();
-
             std::vector<RenderPacket> renderPackets;
             logic.GetScene()->ExtractRenderPackets(renderPackets);
+
+            ui_manager.BeginFrame();
+            logic.UpdatePerformanceStats(frameTime, static_cast<int>(renderPackets.size()));
+            logic.DrawEditorUI();
+            ui_manager.EndFrame();
 
             VkExtent2D swapchainExtent = renderer.GetSwapchainExtent();
             float aspectRatio = swapchainExtent.height == 0

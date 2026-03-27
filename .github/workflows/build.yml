@@ -46,12 +46,11 @@ jobs:
              libxcursor-dev libxi-dev libxext-dev libwayland-dev \
              libxkbcommon-dev
 
-    # 3. [跨平台] 安装官方 Vulkan SDK (Windows 和 Linux 统一使用该插件，确保包含 glslc 编译器)
+    # 3. [跨平台] 安装官方 Vulkan SDK (确保包含 glslc 编译器)
     - name: Setup Vulkan SDK
       uses: humbletim/setup-vulkan-sdk@v1.2.1
       with:
         vulkan-query-version: latest
-        vulkan-components: Vulkan-Headers, Vulkan-Loader
 
     # 4. [跨平台] 配置 vcpkg 环境 (自带缓存机制)
     - name: Setup vcpkg

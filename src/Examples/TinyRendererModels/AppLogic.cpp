@@ -1,5 +1,6 @@
 #include "AppLogic.h"
 #include <glm/vec3.hpp>
+#include <imgui.h>
 
 #include "Core/GameSystem/Components/CFirstPersonCamera.h"
 #include "Core/GameSystem/InputManager.h"
@@ -186,4 +187,181 @@ void AppLogic::Tick(float deltaTime) {
     if (Scene) {
         Scene->Tick(deltaTime);
     }
+}
+
+void AppLogic::UpdatePerformanceStats(float frameTime, int drawCallCount) {
+    Stats.FrameTimeMs = frameTime * 1000.0f;
+    Stats.FPS = 1.0f / frameTime;
+    Stats.DrawCallCount = drawCallCount;
+    
+    Stats.FrameTimeHistory[Stats.HistoryIndex] = Stats.FrameTimeMs;
+    Stats.HistoryIndex = (Stats.HistoryIndex + 1) % FRAME_TIME_HISTORY_SIZE;
+}
+
+void AppLogic::DrawPerformancePanel() {
+    ImGui::Begin("Performance");
+    
+    ImGui::Text("FPS: %.1f", Stats.FPS);
+    ImGui::Text("Frame Time: %.2f ms", Stats.FrameTimeMs);
+    ImGui::Text("Draw Calls: %d", Stats.DrawCallCount);
+    
+    ImGui::Separator();
+    
+    ImGui::Text("Frame Time Graph:");
+    ImGui::PlotLines("##FrameTime", Stats.FrameTimeHistory, FRAME_TIME_HISTORY_SIZE, Stats.HistoryIndex, nullptr, 0.0f, 33.3f, ImVec2(0, 80));
+    
+    ImGui::End();
+}
+
+void AppLogic::DrawLightPanel() {
+    ImGui::Begin("Light Settings");
+    
+    if (FActor* mainLight = Scene->FindActorByName("MainLight")) {
+        if (auto* pl = mainLight->GetComponent<CPointLight>()) {
+            ImGui::Text("Main Light");
+            ImGui::Separator();
+            
+            glm::vec3 pos = mainLight->Transform.GetPosition();
+            if (ImGui::DragFloat3("Position", &pos.x, 0.1f, -20.0f, 20.0f)) {
+                mainLight->Transform.SetPosition(pos);
+            }
+            
+            ImGui::ColorEdit3("Color", &pl->Color.x);
+            ImGui::SliderFloat("Intensity", &pl->Intensity, 0.0f, 500.0f);
+        }
+    } else {
+        ImGui::Text("MainLight not found");
+    }
+    
+    ImGui::End();
+}
+
+void AppLogic::DrawCameraPanel() {
+    ImGui::Begin("Camera");
+    
+    if (MainCamera) {
+        FActor* cameraActor = MainCamera->GetOwner();
+        
+        ImGui::Text("Camera Settings");
+        ImGui::Separator();
+        
+        glm::vec3 pos = cameraActor->Transform.GetPosition();
+        if (ImGui::DragFloat3("Position", &pos.x, 0.1f, -50.0f, 50.0f)) {
+            cameraActor->Transform.SetPosition(pos);
+        }
+        
+        glm::vec3 rot = cameraActor->Transform.GetEulerAngles();
+        if (ImGui::DragFloat3("Rotation", &rot.x, 1.0f, -180.0f, 180.0f)) {
+            cameraActor->Transform.SetRotation(rot);
+        }
+        
+        ImGui::Separator();
+        
+        ImGui::SliderFloat("FOV", &MainCamera->Fov, 30.0f, 120.0f);
+        ImGui::SliderFloat("Move Speed", &MainCamera->MoveSpeed, 1.0f, 50.0f);
+        ImGui::SliderFloat("Mouse Sensitivity", &MainCamera->MouseSensitivity, 0.1f, 5.0f);
+    }
+    
+    ImGui::End();
+}
+
+void AppLogic::DrawSceneHierarchyPanel() {
+    ImGui::Begin("Scene Hierarchy");
+    
+    if (Scene) {
+        const auto& actors = Scene->GetAllActors();
+        
+        for (const auto& actor : actors) {
+            bool isSelected = (SelectedActor == actor.get());
+            
+            if (ImGui::Selectable(actor->Name.c_str(), isSelected)) {
+                SelectedActor = actor.get();
+            }
+            
+            if (isSelected) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+    }
+    
+    ImGui::End();
+}
+
+void AppLogic::DrawMaterialPanel() {
+    ImGui::Begin("Material Editor");
+    
+    if (!SelectedActor) {
+        ImGui::Text("Select an object in the Scene Hierarchy");
+        ImGui::End();
+        return;
+    }
+    
+    CMeshRenderer* meshRenderer = SelectedActor->GetComponent<CMeshRenderer>();
+    if (!meshRenderer) {
+        ImGui::Text("Selected object has no MeshRenderer component");
+        ImGui::End();
+        return;
+    }
+    
+    auto material = meshRenderer->GetMaterial();
+    if (!material) {
+        ImGui::Text("Selected object has no material");
+        ImGui::End();
+        return;
+    }
+    
+    ImGui::Text("Actor: %s", SelectedActor->Name.c_str());
+    ImGui::Separator();
+    
+    bool materialChanged = false;
+    
+    glm::vec4 baseColor = material->GetBaseColorTint();
+    float roughness = material->GetRoughness();
+    float metallic = material->GetMetallic();
+    float normalStrength = material->GetNormalMapStrength();
+    bool twoSided = material->IsTwoSided();
+    
+    ImGui::Text("Material Parameters");
+    ImGui::Separator();
+    
+    if (ImGui::ColorEdit4("Base Color", &baseColor.x)) {
+        material->SetVector("BaseColorTint", baseColor);
+        materialChanged = true;
+    }
+    
+    if (ImGui::SliderFloat("Roughness", &roughness, 0.0f, 1.0f)) {
+        material->SetFloat("Roughness", roughness);
+        materialChanged = true;
+    }
+    
+    if (ImGui::SliderFloat("Metallic", &metallic, 0.0f, 1.0f)) {
+        material->SetFloat("Metallic", metallic);
+        materialChanged = true;
+    }
+    
+    if (ImGui::SliderFloat("Normal Strength", &normalStrength, 0.0f, 2.0f)) {
+        material->SetFloat("NormalMapStrength", normalStrength);
+        materialChanged = true;
+    }
+    
+    if (ImGui::Checkbox("Two Sided", &twoSided)) {
+        material->SetTwoSided(twoSided);
+        materialChanged = true;
+    }
+    
+    ImGui::Separator();
+    
+    if (materialChanged) {
+        material->UpdateUBO();
+    }
+    
+    ImGui::End();
+}
+
+void AppLogic::DrawEditorUI() {
+    DrawPerformancePanel();
+    DrawLightPanel();
+    DrawCameraPanel();
+    DrawSceneHierarchyPanel();
+    DrawMaterialPanel();
 }
