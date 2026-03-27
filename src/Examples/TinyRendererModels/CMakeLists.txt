@@ -23,7 +23,9 @@ add_executable(App-TinyRendererModels
 # 3. 链接与依赖
 # =========================================================
 target_link_libraries(App-TinyRendererModels PRIVATE TumblerCore)
-add_dependencies(App-TinyRendererModels Shaders)
+if(TARGET Shaders)
+    add_dependencies(App-TinyRendererModels Shaders)
+endif()
 
 # =========================================================
 # 4. 资源拷贝
