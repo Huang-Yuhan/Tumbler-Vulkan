@@ -41,7 +41,7 @@ jobs:
       if: runner.os == 'Linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential cmake ninja-build \
+        sudo apt-get install -y build-essential \
              libx11-dev libxrandr-dev libxinerama-dev \
              libxcursor-dev libxi-dev libxext-dev libwayland-dev \
              libxkbcommon-dev
@@ -52,7 +52,11 @@ jobs:
       with:
         vulkan-query-version: latest
 
-    # 4. [跨平台] 配置 vcpkg 环境 (自带缓存机制)
+    # 4. 获取最新的 CMake 和 Ninja
+    - name: Get CMake and Ninja
+      uses: lukka/get-cmake@latest
+
+    # 5. [跨平台] 配置 vcpkg 环境 (自带缓存机制)
     - name: Setup vcpkg
       uses: lukka/run-vcpkg@v11
       with:
