@@ -17,9 +17,17 @@ struct AllocatedImage {
     VmaAllocation Allocation = VK_NULL_HANDLE;
 };
 
+#define MAX_SCENE_LIGHTS 8
+
+struct PointLightData {
+    glm::vec4 Position; // w is padding or radius
+    glm::vec4 Color;    // w is Intensity
+};
+
 struct SceneDataUBO {
     glm::mat4 ViewProjection;
     glm::vec4 CameraPosition;
-    glm::vec4 LightPosition;
-    glm::vec4 LightColor;
+    PointLightData Lights[MAX_SCENE_LIGHTS];
+    int LightCount;
+    int padding[3];
 };

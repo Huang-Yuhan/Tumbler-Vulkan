@@ -385,17 +385,21 @@ void VulkanRenderer::RecordCommandBuffer(
     vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 
     // 更新场景数据
-    SceneDataUBO sceneData;
+    SceneDataUBO sceneData{};
     sceneData.ViewProjection = viewData.ProjectionMatrix * viewData.ViewMatrix;
     sceneData.CameraPosition = glm::vec4(viewData.CameraPosition, 1.0f);
     
-    // 支持多光源，目前取第一个光源
-    if (!viewData.Lights.empty()) {
-        sceneData.LightPosition = glm::vec4(viewData.Lights[0].Position, 1.0f);
-        sceneData.LightColor = glm::vec4(viewData.Lights[0].Color, viewData.Lights[0].Intensity);
-    } else {
-        sceneData.LightPosition = glm::vec4(0.0f);
-        sceneData.LightColor = glm::vec4(0.0f);
+    // 支持多光源
+    int count = static_cast<int>(viewData.Lights.size());
+    sceneData.LightCount = count < MAX_SCENE_LIGHTS ? count : MAX_SCENE_LIGHTS;
+    
+    for (int i = 0; i < sceneData.LightCount; ++i) {
+        sceneData.Lights[i].Position = glm::vec4(viewData.Lights[i].Position, 1.0f);
+        sceneData.Lights[i].Color = glm::vec4(viewData.Lights[i].Color, viewData.Lights[i].Intensity);
+    }
+    for (int i = sceneData.LightCount; i < MAX_SCENE_LIGHTS; ++i) {
+        sceneData.Lights[i].Position = glm::vec4(0.0f);
+        sceneData.Lights[i].Color = glm::vec4(0.0f);
     }
     
     memcpy(SceneParameterBuffer.Info.pMappedData, &sceneData, sizeof(SceneDataUBO));

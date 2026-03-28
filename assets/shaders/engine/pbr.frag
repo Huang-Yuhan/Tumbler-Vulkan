@@ -10,11 +10,16 @@ layout(location = 0) out vec4 outFragColor;
 // ==========================================
 // 绑定数据
 // ==========================================
+struct PointLightData {
+    vec4 Position;
+    vec4 Color;
+};
+
 layout(set = 0, binding = 0) uniform SceneData {
     mat4 ViewProj;
     vec4 CameraPos;
-    vec4 LightPos;
-    vec4 LightColor;
+    PointLightData Lights[8];
+    int LightCount;
 } scene;
 
 layout(set = 1, binding = 0) uniform sampler2D BaseColorMap;
@@ -100,19 +105,10 @@ void main() {
     }
 
     vec3 V = normalize(scene.CameraPos.xyz - inWorldPos);
-    vec3 L = normalize(scene.LightPos.xyz - inWorldPos);
-    vec3 H = normalize(V + L);
 
     // 3. 计算基础反射率 F0
     vec3 F0 = vec3(0.04);
     F0 = mix(F0, albedo, metallic);
-
-    // 4. 计算光线辐射度与平方反比衰减
-    float distance = length(scene.LightPos.xyz - inWorldPos);
-    float attenuation = 1.0 / (distance * distance);
-    vec3 radiance = scene.LightColor.rgb * scene.LightColor.a * attenuation;
-
-    // --- 开始组装 Cook-Torrance BRDF ---
 
     // 根据TwoSided选项决定是否使用双面光照
     vec3 N_fixed = N;
@@ -120,22 +116,34 @@ void main() {
         N_fixed = faceforward(N, -V, N);
     }
 
-    float NDF = DistributionGGX(N_fixed, H, roughness);
-    float G   = GeometrySmith(N_fixed, V, L, roughness);
-    vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);
+    vec3 Lo = vec3(0.0);
 
-    vec3 numerator    = NDF * G * F;
-    float denominator = 4.0 * max(dot(N_fixed, V), 0.0) * max(dot(N_fixed, L), 0.0) + 0.0001;
-    vec3 specular     = numerator / denominator;
+    for (int i = 0; i < scene.LightCount; i++) {
+        vec3 L = normalize(scene.Lights[i].Position.xyz - inWorldPos);
+        vec3 H = normalize(V + L);
 
-    vec3 kS = F;
-    vec3 kD = vec3(1.0) - kS;
-    kD *= 1.0 - metallic;
+        // 4. 计算光线辐射度与平方反比衰减
+        float dist = length(scene.Lights[i].Position.xyz - inWorldPos);
+        float attenuation = 1.0 / (dist * dist);
+        vec3 radiance = scene.Lights[i].Color.rgb * scene.Lights[i].Color.a * attenuation;
 
-    float NdotL = max(dot(N_fixed, L), 0.0);
-    vec3 Lo = (kD * albedo / PI + specular) * radiance * NdotL;
+        // --- 开始组装 Cook-Torrance BRDF ---
+        float NDF = DistributionGGX(N_fixed, H, roughness);
+        float G   = GeometrySmith(N_fixed, V, L, roughness);
+        vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);
 
-    // --- 结束 Cook-Torrance BRDF ---
+        vec3 numerator    = NDF * G * F;
+        float denominator = 4.0 * max(dot(N_fixed, V), 0.0) * max(dot(N_fixed, L), 0.0) + 0.0001;
+        vec3 specular     = numerator / denominator;
+
+        vec3 kS = F;
+        vec3 kD = vec3(1.0) - kS;
+        kD *= 1.0 - metallic;
+
+        float NdotL = max(dot(N_fixed, L), 0.0);
+        Lo += (kD * albedo / PI + specular) * radiance * NdotL;
+        // --- 结束 Cook-Torrance BRDF ---
+    }
 
     // 5. 简单环境光
     vec3 ambient = vec3(0.03) * albedo;

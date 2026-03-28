@@ -41,7 +41,7 @@ private:
     void DrawPerformancePanel();
     void DrawLightPanel();
     void DrawCameraPanel();
-    void DrawMaterialPanel();
+    void DrawInspectorPanel();
     void DrawSceneHierarchyPanel();
 
 public:

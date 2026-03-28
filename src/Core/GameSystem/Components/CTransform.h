@@ -11,36 +11,56 @@ private:
     glm::vec3 Scale{1.0f, 1.0f, 1.0f};
     FQuaternion Rotation;
 
-    // [优化] 缓存矩阵，避免每帧重复计算
-    mutable glm::mat4 CachedLocalToWorldMatrix{1.0f};
-    mutable bool bIsDirty = true; // 初始设为 dirty，确保第一次获取时会计算
+    CTransform* Parent = nullptr;
+    std::vector<CTransform*> Children;
+
+    mutable glm::mat4 CachedLocalMatrix{1.0f};
+    mutable glm::mat4 CachedWorldMatrix{1.0f};
+    mutable bool bIsLocalDirty = true;
+    mutable bool bIsWorldDirty = true;
 
 public:
     // ==========================================
-    // Setters (必须设置 Dirty 标记)
+    // 层级管理 (Implemented in CTransform.cpp)
+    // ==========================================
+    void SetParent(CTransform* newParent, bool bStayWorldPos = true);
+    CTransform* GetParent() const { return Parent; }
+    const std::vector<CTransform*>& GetChildren() const { return Children; }
+    void AddChild(CTransform* child);
+    void RemoveChild(CTransform* child);
+
+    // 级联脏标记函数
+    void MarkWorldDirty();
+
+    // ==========================================
+    // Setters (设置自身 Dirty 及级联子节点 Dirty)
     // ==========================================
     void SetRotation(const FQuaternion& rotation)
     {
         Rotation = rotation;
-        bIsDirty = true; // 标记数据已变脏
+        bIsLocalDirty = true;
+        MarkWorldDirty();
     }
 
     void SetRotation(const glm::vec3& eulerDegrees)
     {
         Rotation = FQuaternion(eulerDegrees);
-        bIsDirty = true;
+        bIsLocalDirty = true;
+        MarkWorldDirty();
     }
 
     void SetPosition(const glm::vec3& position)
     {
         Position = position;
-        bIsDirty = true;
+        bIsLocalDirty = true;
+        MarkWorldDirty();
     }
 
     void SetScale(const glm::vec3& scale)
     {
         Scale = scale;
-        bIsDirty = true;
+        bIsLocalDirty = true;
+        MarkWorldDirty();
     }
 
     // ==========================================
@@ -50,28 +70,13 @@ public:
     glm::vec3 GetScale() const { return Scale; }
     FQuaternion GetRotation() const { return Rotation; }
 
-    // 获取欧拉角通常只用于编辑器显示，不需要缓存
     glm::vec3 GetEulerAngles() const { return Rotation.ToEuler(); }
 
     // ==========================================
-    // 核心矩阵获取 (带缓存优化)
+    // 核心矩阵获取 (Implemented in CTransform.cpp)
     // ==========================================
-    const glm::mat4& GetLocalToWorldMatrix() const
-    {
-        if (bIsDirty)
-        {
-            // 重新计算矩阵
-            glm::mat4 translationMatrix = glm::translate(glm::mat4(1.0f), Position);
-            glm::mat4 rotationMatrix = Rotation.ToMatrix();
-            glm::mat4 scaleMatrix = glm::scale(glm::mat4(1.0f), Scale);
-
-            // T * R * S
-            CachedLocalToWorldMatrix = translationMatrix * rotationMatrix * scaleMatrix;
-
-            bIsDirty = false; // 清除脏标记
-        }
-        return CachedLocalToWorldMatrix;
-    }
+    const glm::mat4& GetLocalMatrix() const;
+    const glm::mat4& GetLocalToWorldMatrix() const;
 
     // ==========================================
     // 辅助计算
@@ -82,16 +87,11 @@ public:
 
     glm::vec3 TransformDirection(const glm::vec3& localDirection) const
     {
-        // Direction w=0，忽略位移
-        // 注意：这里会包含 Scale 的影响。如果只想旋转，应该直接用 Rotation * localDirection
         return glm::vec3(GetLocalToWorldMatrix() * glm::vec4(localDirection, 0.0f));
     }
 
     glm::vec3 TransformPoint(const glm::vec3& localPoint) const
     {
-        // [优化] 对于仿射变换 (Model Matrix)，底行总是 (0,0,0,1)。
-        // 变换后的 w 分量永远是 1.0，所以不需要做透视除法 (/w)。
-        // 透视除法只有在经过 Projection Matrix 后才需要。
         return glm::vec3(GetLocalToWorldMatrix() * glm::vec4(localPoint, 1.0f));
     }
 };

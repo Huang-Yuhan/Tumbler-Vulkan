@@ -144,9 +144,28 @@ void AppLogic::Init(VulkanRenderer* renderer, FAssetManager* assetMgr, InputMana
     auto* pl = lightActor->AddComponent<CPointLight>();
     pl->Color = glm::vec3(1.0f, 1.0f, 1.0f);
     pl->Intensity = 50.0f;
+
+    // ==========================================
+    // 8. 创建副光源 (蓝色) 检查多光源系统与层级系统
+    // ==========================================
+    FActor* lightActor2 = Scene->CreateActor("SecondLight_Blue");
+    lightActor2->Transform.SetPosition(glm::vec3(4.0f, 0.0f, 0.0f));
+    auto* pl2 = lightActor2->AddComponent<CPointLight>();
+    pl2->Color = glm::vec3(0.1f, 0.3f, 1.0f);
+    pl2->Intensity = 80.0f;
+
+    // 挂载到剑身上，保持世界绝对坐标属性 (现在会跟着剑一起旋转)
+    lightActor2->Transform.SetParent(&sword->Transform, true);
 }
 
 void AppLogic::Tick(float deltaTime) {
+    if (FActor* sword = Scene->FindActorByName("StingSword")) {
+        // [修复] 切勿使用 ToEuler() 获取再倒装，因为每帧欧拉角-四元数互转极其容易造成万向节死锁或符号翻转(导致疯狂抽搐)
+        // 应该直接在已有四元数基础上累加一个旋转四元数:
+        FQuaternion deltaRot = FQuaternion::FromAxisAngle(glm::vec3(0.0f, 1.0f, 0.0f), 90.0f * deltaTime);
+        sword->Transform.SetRotation(sword->Transform.GetRotation() * deltaRot);
+    }
+
     if (Scene) {
         Scene->Tick(deltaTime);
     }
@@ -228,21 +247,39 @@ void AppLogic::DrawCameraPanel() {
     ImGui::End();
 }
 
+static void DrawActorNode(FActor* actor, FActor*& selectedActor) {
+    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
+    if (selectedActor == actor) {
+        flags |= ImGuiTreeNodeFlags_Selected;
+    }
+    
+    const auto& children = actor->Transform.GetChildren();
+    if (children.empty()) {
+        flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+    }
+    
+    bool nodeOpen = ImGui::TreeNodeEx((void*)actor, flags, "%s", actor->Name.c_str());
+    
+    if (ImGui::IsItemClicked()) {
+        selectedActor = actor;
+    }
+    
+    if (nodeOpen && !children.empty()) {
+        for (auto* childTransform : children) {
+            DrawActorNode(childTransform->GetOwner(), selectedActor);
+        }
+        ImGui::TreePop();
+    }
+}
+
 void AppLogic::DrawSceneHierarchyPanel() {
     ImGui::Begin("Scene Hierarchy");
     
     if (Scene) {
         const auto& actors = Scene->GetAllActors();
-        
         for (const auto& actor : actors) {
-            bool isSelected = (SelectedActor == actor.get());
-            
-            if (ImGui::Selectable(actor->Name.c_str(), isSelected)) {
-                SelectedActor = actor.get();
-            }
-            
-            if (isSelected) {
-                ImGui::SetItemDefaultFocus();
+            if (actor->Transform.GetParent() == nullptr) {
+                DrawActorNode(actor.get(), SelectedActor);
             }
         }
     }
@@ -250,8 +287,8 @@ void AppLogic::DrawSceneHierarchyPanel() {
     ImGui::End();
 }
 
-void AppLogic::DrawMaterialPanel() {
-    ImGui::Begin("Material Editor");
+void AppLogic::DrawInspectorPanel() {
+    ImGui::Begin("Inspector");
     
     if (!SelectedActor) {
         ImGui::Text("Select an object in the Scene Hierarchy");
@@ -259,63 +296,70 @@ void AppLogic::DrawMaterialPanel() {
         return;
     }
     
-    CMeshRenderer* meshRenderer = SelectedActor->GetComponent<CMeshRenderer>();
-    if (!meshRenderer) {
-        ImGui::Text("Selected object has no MeshRenderer component");
-        ImGui::End();
-        return;
-    }
-    
-    auto material = meshRenderer->GetMaterial();
-    if (!material) {
-        ImGui::Text("Selected object has no material");
-        ImGui::End();
-        return;
-    }
-    
     ImGui::Text("Actor: %s", SelectedActor->Name.c_str());
     ImGui::Separator();
     
-    bool materialChanged = false;
-    
-    glm::vec4 baseColor = material->GetBaseColorTint();
-    float roughness = material->GetRoughness();
-    float metallic = material->GetMetallic();
-    float normalStrength = material->GetNormalMapStrength();
-    bool twoSided = material->IsTwoSided();
-    
-    ImGui::Text("Material Parameters");
-    ImGui::Separator();
-    
-    if (ImGui::ColorEdit4("Base Color", &baseColor.x)) {
-        material->SetVector("BaseColorTint", baseColor);
-        materialChanged = true;
+    if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
+        glm::vec3 pos = SelectedActor->Transform.GetPosition();
+        if (ImGui::DragFloat3("Position", &pos.x, 0.1f)) {
+            SelectedActor->Transform.SetPosition(pos);
+        }
+
+        glm::vec3 rot = SelectedActor->Transform.GetEulerAngles();
+        if (ImGui::DragFloat3("Rotation", &rot.x, 1.0f)) {
+            SelectedActor->Transform.SetRotation(rot);
+        }
+
+        glm::vec3 scale = SelectedActor->Transform.GetScale();
+        if (ImGui::DragFloat3("Scale", &scale.x, 0.1f)) {
+            SelectedActor->Transform.SetScale(scale);
+        }
     }
     
-    if (ImGui::SliderFloat("Roughness", &roughness, 0.0f, 1.0f)) {
-        material->SetFloat("Roughness", roughness);
-        materialChanged = true;
+    if (CMeshRenderer* meshRenderer = SelectedActor->GetComponent<CMeshRenderer>()) {
+        if (ImGui::CollapsingHeader("Mesh Renderer", ImGuiTreeNodeFlags_DefaultOpen)) {
+            if (auto material = meshRenderer->GetMaterial()) {
+                bool materialChanged = false;
+                
+                glm::vec4 baseColor = material->GetBaseColorTint();
+                float roughness = material->GetRoughness();
+                float metallic = material->GetMetallic();
+                float normalStrength = material->GetNormalMapStrength();
+                bool twoSided = material->IsTwoSided();
+                
+                ImGui::Text("Material Parameters");
+                if (ImGui::ColorEdit4("Base Color", &baseColor.x)) {
+                    material->SetVector("BaseColorTint", baseColor);
+                    materialChanged = true;
+                }
+                if (ImGui::SliderFloat("Roughness", &roughness, 0.0f, 1.0f)) {
+                    material->SetFloat("Roughness", roughness);
+                    materialChanged = true;
+                }
+                if (ImGui::SliderFloat("Metallic", &metallic, 0.0f, 1.0f)) {
+                    material->SetFloat("Metallic", metallic);
+                    materialChanged = true;
+                }
+                if (ImGui::SliderFloat("Normal Strength", &normalStrength, 0.0f, 2.0f)) {
+                    material->SetFloat("NormalMapStrength", normalStrength);
+                    materialChanged = true;
+                }
+                if (ImGui::Checkbox("Two Sided", &twoSided)) {
+                    material->SetTwoSided(twoSided);
+                    materialChanged = true;
+                }
+                if (materialChanged) {
+                    material->UpdateUBO();
+                }
+            }
+        }
     }
     
-    if (ImGui::SliderFloat("Metallic", &metallic, 0.0f, 1.0f)) {
-        material->SetFloat("Metallic", metallic);
-        materialChanged = true;
-    }
-    
-    if (ImGui::SliderFloat("Normal Strength", &normalStrength, 0.0f, 2.0f)) {
-        material->SetFloat("NormalMapStrength", normalStrength);
-        materialChanged = true;
-    }
-    
-    if (ImGui::Checkbox("Two Sided", &twoSided)) {
-        material->SetTwoSided(twoSided);
-        materialChanged = true;
-    }
-    
-    ImGui::Separator();
-    
-    if (materialChanged) {
-        material->UpdateUBO();
+    if (CPointLight* pointLight = SelectedActor->GetComponent<CPointLight>()) {
+        if (ImGui::CollapsingHeader("Point Light", ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::ColorEdit3("Light Color", &pointLight->Color.x);
+            ImGui::DragFloat("Intensity", &pointLight->Intensity, 1.0f, 0.0f, 1000.0f);
+        }
     }
     
     ImGui::End();
@@ -323,8 +367,7 @@ void AppLogic::DrawMaterialPanel() {
 
 void AppLogic::DrawEditorUI() {
     DrawPerformancePanel();
-    DrawLightPanel();
     DrawCameraPanel();
     DrawSceneHierarchyPanel();
-    DrawMaterialPanel();
+    DrawInspectorPanel();
 }
