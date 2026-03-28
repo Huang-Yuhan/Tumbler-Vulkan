@@ -1,5 +1,6 @@
 #include "CTransform.h"
 #include <algorithm>
+#include <imgui.h>
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/matrix_decompose.hpp>
@@ -109,4 +110,24 @@ const glm::mat4& CTransform::GetLocalToWorldMatrix() const
         bIsWorldDirty = false;
     }
     return CachedWorldMatrix;
+}
+
+void CTransform::OnDrawUI()
+{
+    if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
+        glm::vec3 pos = GetPosition();
+        if (ImGui::DragFloat3("Position", &pos.x, 0.1f)) {
+            SetPosition(pos);
+        }
+
+        glm::vec3 rot = GetEulerAngles();
+        if (ImGui::DragFloat3("Rotation", &rot.x, 1.0f)) {
+            SetRotation(rot);
+        }
+
+        glm::vec3 scale = GetScale();
+        if (ImGui::DragFloat3("Scale", &scale.x, 0.1f)) {
+            SetScale(scale);
+        }
+    }
 }

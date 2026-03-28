@@ -57,4 +57,8 @@ public:
     [[nodiscard]] FScene* GetScene();
     [[nodiscard]] const FScene* GetScene() const;
     [[nodiscard]] CFirstPersonCamera* GetMainCamera() const { return MainCamera; }
+
+    // 全局渲染管线控制
+    ERenderPath CurrentRenderPath = ERenderPath::Forward;
+    [[nodiscard]] ERenderPath GetCurrentRenderPath() const { return CurrentRenderPath; }
 };

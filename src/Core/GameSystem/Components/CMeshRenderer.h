@@ -25,4 +25,6 @@ public:
 
     [[nodiscard]] bool IsVisible() const { return bIsVisible; }
     void SetVisible(const bool bInIsVisible) { bIsVisible = bInIsVisible; }
+
+    void OnDrawUI() override;
 };

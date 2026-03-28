@@ -242,6 +242,14 @@ void AppLogic::DrawCameraPanel() {
         ImGui::SliderFloat("FOV", &MainCamera->Fov, 30.0f, 120.0f);
         ImGui::SliderFloat("Move Speed", &MainCamera->MoveSpeed, 1.0f, 50.0f);
         ImGui::SliderFloat("Mouse Sensitivity", &MainCamera->MouseSensitivity, 0.1f, 5.0f);
+        
+        ImGui::Separator();
+        ImGui::Text("Global Render Pipeline:");
+        const char* pipelines[] = { "Forward Rendering", "Deferred Rendering", "GPU Driven (WIP)" };
+        int currentItem = static_cast<int>(CurrentRenderPath);
+        if (ImGui::Combo("Pipeline Strategy", &currentItem, pipelines, IM_ARRAYSIZE(pipelines))) {
+            CurrentRenderPath = static_cast<ERenderPath>(currentItem);
+        }
     }
     
     ImGui::End();
@@ -299,67 +307,10 @@ void AppLogic::DrawInspectorPanel() {
     ImGui::Text("Actor: %s", SelectedActor->Name.c_str());
     ImGui::Separator();
     
-    if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
-        glm::vec3 pos = SelectedActor->Transform.GetPosition();
-        if (ImGui::DragFloat3("Position", &pos.x, 0.1f)) {
-            SelectedActor->Transform.SetPosition(pos);
-        }
-
-        glm::vec3 rot = SelectedActor->Transform.GetEulerAngles();
-        if (ImGui::DragFloat3("Rotation", &rot.x, 1.0f)) {
-            SelectedActor->Transform.SetRotation(rot);
-        }
-
-        glm::vec3 scale = SelectedActor->Transform.GetScale();
-        if (ImGui::DragFloat3("Scale", &scale.x, 0.1f)) {
-            SelectedActor->Transform.SetScale(scale);
-        }
-    }
-    
-    if (CMeshRenderer* meshRenderer = SelectedActor->GetComponent<CMeshRenderer>()) {
-        if (ImGui::CollapsingHeader("Mesh Renderer", ImGuiTreeNodeFlags_DefaultOpen)) {
-            if (auto material = meshRenderer->GetMaterial()) {
-                bool materialChanged = false;
-                
-                glm::vec4 baseColor = material->GetBaseColorTint();
-                float roughness = material->GetRoughness();
-                float metallic = material->GetMetallic();
-                float normalStrength = material->GetNormalMapStrength();
-                bool twoSided = material->IsTwoSided();
-                
-                ImGui::Text("Material Parameters");
-                if (ImGui::ColorEdit4("Base Color", &baseColor.x)) {
-                    material->SetVector("BaseColorTint", baseColor);
-                    materialChanged = true;
-                }
-                if (ImGui::SliderFloat("Roughness", &roughness, 0.0f, 1.0f)) {
-                    material->SetFloat("Roughness", roughness);
-                    materialChanged = true;
-                }
-                if (ImGui::SliderFloat("Metallic", &metallic, 0.0f, 1.0f)) {
-                    material->SetFloat("Metallic", metallic);
-                    materialChanged = true;
-                }
-                if (ImGui::SliderFloat("Normal Strength", &normalStrength, 0.0f, 2.0f)) {
-                    material->SetFloat("NormalMapStrength", normalStrength);
-                    materialChanged = true;
-                }
-                if (ImGui::Checkbox("Two Sided", &twoSided)) {
-                    material->SetTwoSided(twoSided);
-                    materialChanged = true;
-                }
-                if (materialChanged) {
-                    material->UpdateUBO();
-                }
-            }
-        }
-    }
-    
-    if (CPointLight* pointLight = SelectedActor->GetComponent<CPointLight>()) {
-        if (ImGui::CollapsingHeader("Point Light", ImGuiTreeNodeFlags_DefaultOpen)) {
-            ImGui::ColorEdit3("Light Color", &pointLight->Color.x);
-            ImGui::DragFloat("Intensity", &pointLight->Intensity, 1.0f, 0.0f, 1000.0f);
-        }
+    // 【架构重构：基于组件的动态 UI 渲染】
+    SelectedActor->Transform.OnDrawUI();
+    for (auto& comp : SelectedActor->Components) {
+        comp->OnDrawUI();
     }
     
     ImGui::End();

@@ -21,4 +21,6 @@ class CPointLight final : public Component
 public:
     glm::vec3 Color     = glm::vec3(1.0f, 1.0f, 1.0f); // 光源颜色 (Linear 空间)
     float     Intensity = 50.0f;                         // 光源强度 (对应 LightColor.w)
+
+    void OnDrawUI() override;
 };

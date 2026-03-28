@@ -29,6 +29,8 @@ public:
     void AddChild(CTransform* child);
     void RemoveChild(CTransform* child);
 
+    void OnDrawUI() override;
+
     // 级联脏标记函数
     void MarkWorldDirty();
 

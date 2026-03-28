@@ -17,6 +17,9 @@ public:
     void SetOwner(FActor* InOwner);
     virtual FActor* GetOwner();
 
+    // Component ECS UI Rendering Virtual
+    virtual void OnDrawUI() {}
+    
     // Update 也可以放进 cpp，保持整洁
     virtual void Update(float DeltaTime);
 };

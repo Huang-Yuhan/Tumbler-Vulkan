@@ -29,9 +29,9 @@
 ### 阶段二：Transform 层级树构建 (Priority: High)
 *目标：建立完善的场景节点图，支持父子层级联动，为后续复杂场景打基础。*
 
-- [ ] **数据结构升级**
+- [x] **数据结构升级**
   - 在 `CTransform` 组件中引入 `CTransform* Parent` 和 `std::vector<CTransform*> Children`。
-- [ ] **矩阵分离与级联更新**
+- [x] **矩阵分离与级联更新**
   - 分离 `LocalMatrix` 和 `WorldMatrix`。
   - 实现层级变换逻辑：`WorldMatrix = Parent->WorldMatrix * LocalMatrix`。
   - 引入 `isDirty` 标记，避免每帧无意义的矩阵重算。
