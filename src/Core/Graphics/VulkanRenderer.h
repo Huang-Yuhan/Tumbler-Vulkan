@@ -12,10 +12,12 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <glm/glm.hpp>
 
 #include "SceneViewData.h"
 #include "Core/Graphics/RenderPacket.h"
+#include "Core/Graphics/IRenderPipeline.h"
 
 class FTexture;
 class AppWindow;
@@ -90,13 +92,19 @@ public:
     [[nodiscard]] FAssetManager* GetAssetManager() const { return AssetManager; }
 
     // ==========================================
-    // 供 FMaterial / FMaterialInstance 使用的接口
+    // 供 FMaterial / 渲染管线 使用的接口
     // ==========================================
 
-    [[nodiscard]] VkRenderPass GetRenderPass() const { return RenderPass; }
+    [[nodiscard]] VkFormat GetSwapchainImageFormat() const { return SwapChain.GetImageFormat(); }
+    [[nodiscard]] VkFormat GetSwapchainDepthFormat() const { return SwapChain.GetDepthFormat(); }
+    [[nodiscard]] const std::vector<VkImageView>& GetSwapchainImageViews() const { return SwapChain.GetImageViews(); }
+    [[nodiscard]] VkImageView GetSwapchainDepthImageView() const { return SwapChain.GetDepthImageView(); }
+
+    [[nodiscard]] VkRenderPass GetRenderPass(ERenderPath path = ERenderPath::Forward) const;
     [[nodiscard]] VkExtent2D GetSwapchainExtent() const { return SwapChain.GetExtent(); }
     [[nodiscard]] uint32_t GetSwapchainImageCount() const { return static_cast<uint32_t>(SwapChain.GetImageCount()); }
     [[nodiscard]] VkDescriptorPool GetDescriptorPool() const { return DescriptorPool; }
+    [[nodiscard]] VkDescriptorSet GetGlobalDescriptorSet() const { return GlobalDescriptorSet; }
 
     /**
      * @brief 分配描述符集
@@ -128,11 +136,10 @@ private:
     class ResourceUploadManager TheResourceUploadManager;
 
     // ==========================================
-    // 渲染状态
+    // 渲染管线策略 (Pipelines)
     // ==========================================
 
-    VkRenderPass RenderPass = VK_NULL_HANDLE;
-    std::vector<VkFramebuffer> Framebuffers;
+    std::unordered_map<ERenderPath, std::unique_ptr<IRenderPipeline>> Pipelines;
 
     // ==========================================
     // 同步对象
@@ -161,8 +168,7 @@ private:
     // 内部初始化方法
     // ==========================================
 
-    void InitRenderPass();
-    void InitFramebuffers();
+    void InitPipelines();
     void InitSyncStructures();
     void InitDescriptors();
 
@@ -179,5 +185,4 @@ private:
     );
 
     bool RecreateSwapchain();
-    void DestroyFramebuffers();
 };

@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan.h>
 #include <vector>
+#include <functional>
 #include "SceneViewData.h"
 #include "RenderPacket.h"
 
@@ -39,5 +40,6 @@ public:
         uint32_t imageIndex,
         VulkanRenderer* renderer,
         const SceneViewData& viewData,
-        const std::vector<RenderPacket>& renderPackets) = 0;
+        const std::vector<RenderPacket>& renderPackets,
+        std::function<void(VkCommandBuffer)> onUIRender) = 0;
 };

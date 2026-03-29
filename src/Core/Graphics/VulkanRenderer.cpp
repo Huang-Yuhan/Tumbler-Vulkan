@@ -7,7 +7,9 @@
 #include "Core/Utils/VulkanUtils.h"
 #include "Core/Assets/FTexture.h"
 #include "Core/Assets/FAssetManager.h"
+#include "Core/Assets/FAssetManager.h"
 #include "Core/Graphics/LightData.h"
+#include "Core/Graphics/Pipelines/FForwardPipeline.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -38,8 +40,7 @@ void VulkanRenderer::Init(AppWindow* window) {
     SwapChain.Init(&Context, width, height);
 
     // 4. 初始化渲染状态
-    InitRenderPass();
-    InitFramebuffers();
+    InitPipelines();
     InitSyncStructures();
     InitDescriptors();
 
@@ -64,11 +65,11 @@ void VulkanRenderer::Cleanup() {
         vkDestroyDescriptorPool(device, std::exchange(DescriptorPool, VK_NULL_HANDLE), nullptr);
     }
 
-    // 2. 清理帧缓冲区和渲染通道
-    DestroyFramebuffers();
-    if (RenderPass != VK_NULL_HANDLE) {
-        vkDestroyRenderPass(device, std::exchange(RenderPass, VK_NULL_HANDLE), nullptr);
+    // 2. 清理渲染管线策略 (Pipelines & Framebuffers)
+    for (auto& [path, pipeline] : Pipelines) {
+        if (pipeline) pipeline->Cleanup(this);
     }
+    Pipelines.clear();
 
     // 3. 清理同步对象
     if (RenderFence != VK_NULL_HANDLE) {
@@ -94,99 +95,21 @@ void VulkanRenderer::Cleanup() {
     MainCommandBuffer = VK_NULL_HANDLE;
 }
 
-void VulkanRenderer::InitRenderPass() {
-    // 1. 颜色附件
-    VkAttachmentDescription colorAttachment{};
-    colorAttachment.format = SwapChain.GetImageFormat();
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    VkAttachmentReference colorAttachmentRef{};
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    // 2. 深度附件
-    VkAttachmentDescription depthAttachment{};
-    depthAttachment.format = SwapChain.GetDepthFormat();
-    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentReference depthAttachmentRef{};
-    depthAttachmentRef.attachment = 1;
-    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    // 3. Subpass
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
-    subpass.pDepthStencilAttachment = &depthAttachmentRef;
-
-    // 4. 依赖
-    VkSubpassDependency dependency{};
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    dependency.srcAccessMask = 0;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-
-    // 5. 创建 RenderPass
-    std::array<VkAttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
-
-    VkRenderPassCreateInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-    renderPassInfo.pAttachments = attachments.data();
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpass;
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &dependency;
-
-    VK_CHECK(vkCreateRenderPass(Context.GetDevice(), &renderPassInfo, nullptr, &RenderPass));
+void VulkanRenderer::InitPipelines() {
+    auto forwardPipeline = std::make_unique<FForwardPipeline>();
+    forwardPipeline->Init(this);
+    Pipelines[ERenderPath::Forward] = std::move(forwardPipeline);
+    
+    // Future: Pipelines[ERenderPath::Deferred] = ...
 }
 
-void VulkanRenderer::InitFramebuffers() {
-    const auto& imageViews = SwapChain.GetImageViews();
-    VkExtent2D extent = SwapChain.GetExtent();
-
-    Framebuffers.resize(imageViews.size());
-
-    for (size_t i = 0; i < imageViews.size(); i++) {
-        std::array<VkImageView, 2> attachments = {
-            imageViews[i],
-            SwapChain.GetDepthImageView()
-        };
-
-        VkFramebufferCreateInfo framebufferInfo{};
-        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = RenderPass;
-        framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-        framebufferInfo.pAttachments = attachments.data();
-        framebufferInfo.width = extent.width;
-        framebufferInfo.height = extent.height;
-        framebufferInfo.layers = 1;
-
-        VK_CHECK(vkCreateFramebuffer(Context.GetDevice(), &framebufferInfo, nullptr, &Framebuffers[i]));
+VkRenderPass VulkanRenderer::GetRenderPass(ERenderPath path) const {
+    auto it = Pipelines.find(path);
+    if (it != Pipelines.end() && it->second) {
+        // Warning: safely assume it's FForwardPipeline for now since Deferred uses subpasses differently.
+        return static_cast<FForwardPipeline*>(it->second.get())->GetRenderPass();
     }
-}
-
-void VulkanRenderer::DestroyFramebuffers() {
-    VkDevice device = Context.GetDevice();
-    for (const auto& framebuffer : Framebuffers) {
-        vkDestroyFramebuffer(device, framebuffer, nullptr);
-    }
-    Framebuffers.clear();
+    return VK_NULL_HANDLE;
 }
 
 bool VulkanRenderer::RecreateSwapchain() {
@@ -204,15 +127,12 @@ bool VulkanRenderer::RecreateSwapchain() {
     VkDevice device = Context.GetDevice();
     vkDeviceWaitIdle(device);
 
-    DestroyFramebuffers();
-    if (RenderPass != VK_NULL_HANDLE) {
-        vkDestroyRenderPass(device, std::exchange(RenderPass, VK_NULL_HANDLE), nullptr);
-    }
-
     SwapChain.Cleanup();
     SwapChain.Init(&Context, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
-    InitRenderPass();
-    InitFramebuffers();
+    
+    for (auto& [path, pipeline] : Pipelines) {
+        pipeline->RecreateResources(this);
+    }
 
     // 重置命令缓冲区以适应新的交换链
     VK_CHECK(vkResetCommandBuffer(MainCommandBuffer, 0));
@@ -351,45 +271,11 @@ void VulkanRenderer::RecordCommandBuffer(
     const std::vector<RenderPacket>& renderPackets,
     std::function<void(VkCommandBuffer)> onUIRender) {
 
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    vkBeginCommandBuffer(cmdBuffer, &beginInfo);
-
-    VkRenderPassBeginInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = RenderPass;
-    renderPassInfo.framebuffer = Framebuffers[imageIndex];
-    renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent = SwapChain.GetExtent();
-
-    std::array<VkClearValue, 2> clearValues{};
-    clearValues[0].color = {{0.1f, 0.1f, 0.1f, 1.0f}};
-    clearValues[1].depthStencil = {1.0f, 0};
-    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-    renderPassInfo.pClearValues = clearValues.data();
-
-    vkCmdBeginRenderPass(cmdBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = static_cast<float>(renderPassInfo.renderArea.extent.width);
-    viewport.height = static_cast<float>(renderPassInfo.renderArea.extent.height);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
-
-    VkRect2D scissor{};
-    scissor.offset = {0, 0};
-    scissor.extent = renderPassInfo.renderArea.extent;
-    vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
-
-    // 更新场景数据
+    // 首先更新全局场景参数 UBO (由于它是共用的，放外部更新比放管道更合理)
     SceneDataUBO sceneData{};
     sceneData.ViewProjection = viewData.ProjectionMatrix * viewData.ViewMatrix;
     sceneData.CameraPosition = glm::vec4(viewData.CameraPosition, 1.0f);
     
-    // 支持多光源
     int count = static_cast<int>(viewData.Lights.size());
     sceneData.LightCount = count < MAX_SCENE_LIGHTS ? count : MAX_SCENE_LIGHTS;
     
@@ -404,44 +290,13 @@ void VulkanRenderer::RecordCommandBuffer(
     
     memcpy(SceneParameterBuffer.Info.pMappedData, &sceneData, sizeof(SceneDataUBO));
 
-    // 渲染所有对象
-    for (const auto& packet : renderPackets) {
-        auto parentMaterial = packet.Material->GetParent();
-
-        vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, parentMaterial->Pipeline);
-
-        VkDescriptorSet descSet[] = {GlobalDescriptorSet, packet.Material->GetDescriptorSet()};
-        vkCmdBindDescriptorSets(
-            cmdBuffer,
-            VK_PIPELINE_BIND_POINT_GRAPHICS,
-            parentMaterial->PipelineLayout,
-            0, 2, descSet,
-            0, nullptr
-        );
-
-        vkCmdPushConstants(
-            cmdBuffer,
-            parentMaterial->PipelineLayout,
-            VK_SHADER_STAGE_VERTEX_BIT,
-            0, sizeof(glm::mat4),
-            &packet.TransformMatrix
-        );
-
-        FVulkanMesh& gpuMesh = UploadMesh(packet.Mesh);
-        VkBuffer vertexBuffers[] = {gpuMesh.VertexBuffer.Buffer};
-        VkDeviceSize offsets[] = {0};
-        vkCmdBindVertexBuffers(cmdBuffer, 0, 1, vertexBuffers, offsets);
-        vkCmdBindIndexBuffer(cmdBuffer, gpuMesh.IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
-
-        vkCmdDrawIndexed(cmdBuffer, gpuMesh.IndexCount, 1, 0, 0, 0);
+    // 执行当前选中管线的具体命令录制
+    auto it = Pipelines.find(viewData.RenderPath);
+    if (it != Pipelines.end() && it->second) {
+        it->second->RecordCommands(cmdBuffer, imageIndex, this, viewData, renderPackets, onUIRender);
+    } else {
+        LOG_CRITICAL("Selected RenderPath mapped to no active pipeline!");
     }
-
-    if (onUIRender) {
-        onUIRender(cmdBuffer);
-    }
-
-    vkCmdEndRenderPass(cmdBuffer);
-    vkEndCommandBuffer(cmdBuffer);
 }
 
 // ==========================================
