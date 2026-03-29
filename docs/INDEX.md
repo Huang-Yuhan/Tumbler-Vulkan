@@ -81,17 +81,31 @@
 - 命令池与命令缓冲
 - 同步机制
 
-### [渲染管线深度解析 (09_Rendering_Pipeline_Deep_Dive.md)](09_Rendering_Pipeline_Deep_Dive.md)
-从数据准备到像素输出的完整流程剖析。
+### [渲染架构概述 (RenderingArchitecture.md)](RenderingArchitecture.md)
+Tumbler 渲染系统高层设计文档，描述双管线策略模式、G-Buffer 优化与 UI 解耦架构。
 
 **内容包括：**
-- 数据准备阶段（RenderPacket、SceneViewData）
-- 渲染循环详解
-- 命令缓冲录制
-- 描述符集设计
-- 着色器流程
+- 双管线策略模式（Forward / Deferred）
+- Deferred G-Buffer 内存与带宽优化
+- Subpass 依赖与 Input Attachment
+- 动态材质双编译
+- 命令缓冲生命周期
+- UI 渲染解耦回调模式
+
+### [渲染管线深度解析 (09_Rendering_Pipeline_Deep_Dive.md)](09_Rendering_Pipeline_Deep_Dive.md)
+从数据准备到像素输出的完整流程剖析（包含实际代码与接口细节）。
+
+**内容包括：**
+- 数据准备阶段（RenderPacket、SceneViewData、ERenderPath）
+- IRenderPipeline 策略接口
+- 完整帧循环详解
+- Forward / Deferred 管线录制流程
+- G-Buffer 设计与 Subpass 依赖链
+- 全局 SceneDataUBO 与 VMA 持久映射
+- UI 回调时序
 - 同步机制详解
 - 性能优化策略
+- Swapchain 重建流程
 
 ---
 
@@ -166,8 +180,9 @@
 7. **[基于物理的渲染](04_PBR_Theory_and_Practice.md)** - 深入 PBR 理论
 8. **[输入系统](07_Input_System.md)** - 添加交互
 9. **[编辑器与调试工具](08_Editor_and_Debugging.md)** - 学会调试
-10. **[渲染管线深度解析](09_Rendering_Pipeline_Deep_Dive.md)** - 精通渲染流程
-11. **[故障排除指南](10_Troubleshooting_Guide.md)** - 遇到问题时查阅
+10. **[渲染架构概述](RenderingArchitecture.md)** - 理解双管线设计与 Deferred 优化策略
+11. **[渲染管线深度解析](09_Rendering_Pipeline_Deep_Dive.md)** - 精通渲染实现细节
+12. **[故障排除指南](10_Troubleshooting_Guide.md)** - 遇到问题时查阅
 
 ---
 

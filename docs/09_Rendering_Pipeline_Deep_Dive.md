@@ -1,536 +1,405 @@
 # 渲染管线深度解析 (Rendering Pipeline Deep Dive)
 
 本文档深入剖析 Tumbler 引擎的 Vulkan 渲染管线，从数据准备到最终像素输出的完整流程。
+文档对应当前实现的**双管线策略模式 (Dual-Pipeline Strategy Pattern)** 架构。
+
+---
 
 ## 1. 渲染架构概览
 
-Tumbler 引擎的渲染系统采用严格的分层设计：
+Tumbler 引擎的渲染系统采用严格的分层 + 策略模式设计：
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    应用层 (AppLogic)                     │
-│  - 场景管理 (FScene)                                    │
-│  - 输入处理                                              │
-│  - 游戏逻辑                                              │
-└────────────────────┬────────────────────────────────────┘
-                     │ 数据
-                     ▼
-┌─────────────────────────────────────────────────────────┐
-│              数据打包层 (Data Collection)                │
-│  - ExtractRenderPackets()                                │
-│  - GenerateSceneView()                                   │
-│  - RenderPacket + SceneViewData                          │
-└────────────────────┬────────────────────────────────────┘
-                     │ 纯净数据
-                     ▼
-┌─────────────────────────────────────────────────────────┐
-│               渲染层 (VulkanRenderer)                    │
-│  - 命令缓冲录制                                          │
-│  - 管线绑定                                              │
-│  - 绘制调用                                              │
-└────────────────────┬────────────────────────────────────┘
-                     │ Vulkan 命令
-                     ▼
-┌─────────────────────────────────────────────────────────┐
-│                   驱动与 GPU                             │
-│  - 执行命令缓冲                                          │
-│  - 光栅化                                                │
-│  - 像素着色                                              │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                    应用层 (AppLogic)                          │
+│  - 场景管理 (FScene)                                          │
+│  - 输入处理 / 游戏逻辑                                        │
+│  - 选择 ERenderPath (Forward / Deferred)                      │
+└───────────────────────────┬──────────────────────────────────┘
+                            │ SceneViewData + RenderPackets
+                            ▼
+┌──────────────────────────────────────────────────────────────┐
+│               渲染协调层 (VulkanRenderer)                     │
+│  - 管理帧同步 (Fence / Semaphore)                             │
+│  - 更新全局 UBO (SceneDataUBO)                                │
+│  - 将命令录制工作委派给 IRenderPipeline                       │
+│  - 在管线完成后执行 UI 回调 (onUIRender)                      │
+│  - 统一调用 vkEndCommandBuffer                                │
+└────────────┬──────────────────────────┬──────────────────────┘
+             │                          │
+             ▼                          ▼
+┌────────────────────┐    ┌─────────────────────────────────┐
+│  FForwardPipeline  │    │       FDeferredPipeline          │
+│  - 单 Subpass      │    │  - 2 Subpasses (MRT G-Buffer)   │
+│  - pbr.vert/frag   │    │  - deferred_geometry.vert/frag  │
+│                    │    │  - deferred_lighting.vert/frag   │
+└────────────────────┘    └─────────────────────────────────┘
+             │                          │
+             └──────────┬───────────────┘
+                        │ Vulkan 命令
+                        ▼
+         ┌──────────────────────────┐
+         │        驱动与 GPU         │
+         └──────────────────────────┘
 ```
+
+---
 
 ## 2. 数据准备阶段
 
 ### 2.1 RenderPacket (渲染包)
 
-`RenderPacket` 是从场景中提取的纯净渲染数据，不包含任何游戏逻辑：
+`RenderPacket` 是从场景中提取的纯净渲染数据：
 
 ```cpp
 struct RenderPacket {
     FMesh* Mesh;                    // 几何体
-    FMaterialInstance* Material;    // 材质实例
-    glm::mat4 ModelMatrix;          // 模型矩阵
+    FMaterialInstance* Material;    // 材质实例（携带描述符集）
+    glm::mat4 TransformMatrix;      // 模型矩阵 (Push Constants)
 };
 ```
 
 ### 2.2 SceneViewData (场景视图数据)
 
-`SceneViewData` 代表特定相机视角下的环境信息：
+`SceneViewData` 代表特定相机视角下的环境信息，并携带**渲染路径选择**：
 
 ```cpp
+enum class ERenderPath {
+    Forward,
+    Deferred,
+    GPUDriven  // 预留
+};
+
 struct SceneViewData {
-    glm::mat4 View;           // 视图矩阵
-    glm::mat4 Proj;           // 投影矩阵
-    glm::mat4 ViewProj;       // 视图投影矩阵
-    glm::vec3 CameraPosition; // 相机位置
-    std::vector<LightData> Lights; // 可见光源列表
+    glm::mat4 ViewMatrix;
+    glm::mat4 ProjectionMatrix;
+    glm::vec3 CameraPosition;
+    std::vector<LightData> Lights;
+
+    ERenderPath RenderPath = ERenderPath::Forward;  // 控制选用哪条管线
 };
 ```
 
-### 2.3 数据提取流程
+`ERenderPath` 字段是 VulkanRenderer 在 `RecordCommandBuffer` 内分发到对应 `IRenderPipeline` 的唯一键。
+
+---
+
+## 3. IRenderPipeline — 策略接口
+
+所有渲染管线实现一个统一的 `IRenderPipeline` 接口，实现策略模式 (Strategy Pattern)：
 
 ```cpp
-// 1. 从场景中提取所有可渲染物体
-std::vector<RenderPacket> renderPackets;
-Scene->ExtractRenderPackets(renderPackets);
+class IRenderPipeline {
+public:
+    virtual void Init(VulkanRenderer* renderer) = 0;
+    virtual void Cleanup(VulkanRenderer* renderer) = 0;
+    virtual void RecreateResources(VulkanRenderer* renderer) = 0;  // Swapchain 重建触发
 
-// 2. 为特定相机生成视图数据
-SceneViewData viewData = Scene->GenerateSceneView(
-    camera,
-    &camera->GetOwner()->Transform,
-    aspectRatio
-);
+    virtual void RecordCommands(
+        VkCommandBuffer cmd,
+        uint32_t imageIndex,
+        VulkanRenderer* renderer,
+        const SceneViewData& viewData,
+        const std::vector<RenderPacket>& renderPackets,
+        std::function<void(VkCommandBuffer)> onUIRender
+    ) = 0;
 
-// ExtractRenderPackets 内部实现：
-void FScene::ExtractRenderPackets(std::vector<RenderPacket>& outPackets) const {
-    for (const auto& actor : Actors) {
-        if (auto* renderer = actor->GetComponent<CMeshRenderer>()) {
-            RenderPacket packet;
-            packet.Mesh = renderer->GetMesh();
-            packet.Material = renderer->GetMaterial();
-            packet.ModelMatrix = actor->Transform.GetMatrix();
-            outPackets.push_back(packet);
-        }
-    }
-}
+    virtual VkRenderPass GetRenderPass() const = 0;
+};
 ```
 
-## 3. 渲染循环详解
-
-### 3.1 完整帧流程
+`VulkanRenderer` 内部用 `unordered_map` 持有所有管线：
 
 ```cpp
-void VulkanRenderer::Render(
-    const SceneViewData& viewData,
-    const std::vector<RenderPacket>& renderPackets,
-    std::function<void(VkCommandBuffer)> onUIRender
-) {
-    // ==========================================
-    // 阶段 1: 等待上一帧完成
-    // ==========================================
-    vkWaitForFences(GetDevice(), 1, &RenderFence, VK_TRUE, UINT64_MAX);
-    vkResetFences(GetDevice(), 1, &RenderFence);
+std::unordered_map<ERenderPath, std::unique_ptr<IRenderPipeline>> Pipelines;
+```
 
-    // ==========================================
-    // 阶段 2: 获取交换链图像
-    // ==========================================
-    uint32_t imageIndex;
-    VkResult result = vkAcquireNextImageKHR(
-        GetDevice(),
-        SwapChain.GetSwapchain(),
-        UINT64_MAX,
-        ImageAvailableSemaphore,
-        VK_NULL_HANDLE,
-        &imageIndex
-    );
+在 `Init()` 时，Forward 和 Deferred 管线**同时初始化**，在运行时通过 `SceneViewData::RenderPath` 动态选择。
 
-    // 处理窗口重置
-    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        RecreateSwapchain();
-        return;
-    }
+---
 
-    // ==========================================
-    // 阶段 3: 重置命令缓冲
-    // ==========================================
-    vkResetCommandBuffer(MainCommandBuffer, 0);
+## 4. 完整帧循环 (VulkanRenderer::Render)
 
-    // ==========================================
-    // 阶段 4: 录制命令
-    // ==========================================
-    RecordCommandBuffer(
-        MainCommandBuffer,
-        imageIndex,
-        viewData,
-        renderPackets,
-        onUIRender
-    );
+```
+① vkWaitForFences(RenderFence)          ← 等待上一帧 GPU 执行完毕
+② SwapChain.AcquireNextImage(...)       ← 获取交换链图像索引
+③ vkResetFences(RenderFence)
+④ vkResetCommandBuffer(MainCB)
+⑤ RecordCommandBuffer(...)
+   ├── 更新全局 SceneDataUBO (memcpy 到已映射缓冲)
+   ├── Pipelines[viewData.RenderPath]->RecordCommands(...) ← 委派给管线
+   ├── onUIRender(cmdBuffer, imageIndex)  ← 执行 ImGui UI 回调
+   └── vkEndCommandBuffer(MainCB)         ← 统一在这里关闭
+⑥ vkQueueSubmit(wait: ImageAvailable, signal: RenderFinished, fence: RenderFence)
+⑦ SwapChain.PresentImage(wait: RenderFinished)
+```
 
-    // ==========================================
-    // 阶段 5: 提交命令队列
-    // ==========================================
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    
-    VkSemaphore waitSemaphores[] = { ImageAvailableSemaphore };
-    VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = waitSemaphores;
-    submitInfo.pWaitDstStageMask = waitStages;
-    
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &MainCommandBuffer;
-    
-    VkSemaphore signalSemaphores[] = { RenderFinishedSemaphore };
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = signalSemaphores;
-    
-    vkQueueSubmit(GetGraphicsQueue(), 1, &submitInfo, RenderFence);
+> **关键设计**：`vkEndCommandBuffer` 始终在 `VulkanRenderer::RecordCommandBuffer` 尾部统一调用，
+> 各 `IRenderPipeline::RecordCommands` 实现**不得**自行结束命令缓冲，仅负责 `vkBeginCommandBuffer` 到
+> `vkCmdEndRenderPass`。
 
-    // ==========================================
-    // 阶段 6: 呈现图像
-    // ==========================================
-    VkPresentInfoKHR presentInfo{};
-    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = signalSemaphores;
-    
-    VkSwapchainKHR swapChains[] = { SwapChain.GetSwapchain() };
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = swapChains;
-    presentInfo.pImageIndices = &imageIndex;
-    
-    vkQueuePresentKHR(GetGraphicsQueue(), &presentInfo);
+---
+
+## 5. Forward 渲染管线 (FForwardPipeline)
+
+`FForwardPipeline` 是经典的单 RenderPass / 单 Subpass 正向渲染。
+
+### 5.1 RenderPass 结构
+
+| 附件 | 格式 | finalLayout |
+|------|------|-------------|
+| Color | Swapchain 格式 | `VK_IMAGE_LAYOUT_PRESENT_SRC_KHR` |
+| Depth | Swapchain Depth 格式 | `VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL` |
+
+### 5.2 录制流程
+
+```
+vkBeginCommandBuffer
+vkCmdBeginRenderPass (Subpass 0)
+  vkCmdSetViewport / vkCmdSetScissor
+  for each RenderPacket:
+    vkCmdBindPipeline (Forward 变体)
+    vkCmdBindDescriptorSets (Set0: GlobalUBO, Set1: MaterialUBO)
+    vkCmdPushConstants (Model 矩阵)
+    vkCmdBindVertexBuffers / vkCmdBindIndexBuffer
+    vkCmdDrawIndexed
+vkCmdEndRenderPass
+← 返回，VulkanRenderer 紧接着调 vkEndCommandBuffer
+```
+
+渲染采用 **Cook-Torrance BRDF (PBR)** 直接在 `pbr.frag` 中同时执行光照计算。
+
+---
+
+## 6. Deferred 渲染管线 (FDeferredPipeline)
+
+`FDeferredPipeline` 是本引擎的核心特性，采用精简的 **2 Subpass G-Buffer 方案**。
+
+### 6.1 G-Buffer 设计
+
+仅分配 **2 个** 显式 G-Buffer（+ 复用 Swapchain Depth）：
+
+| 索引 | 资源 | 格式 | 内容 |
+|------|------|----|------|
+| 0 | Final Color (Swapchain) | Swapchain 格式 | 最终输出 |
+| 1 | Albedo G-Buffer | `R8G8B8A8_UNORM` | RGB=BaseColor, A=Metallic |
+| 2 | Normal G-Buffer | `R16G16B16A16_SFLOAT` | RGB=世界法线, A=Roughness |
+| 3 | Depth | Swapchain Depth (`D32_SFLOAT_S8_UINT`) | 深度（供 Lighting Pass 重投影） |
+
+> **世界坐标不显式存储**，Lighting Pass 通过 `InvViewProj × 深度` 数学重建，节省约 12 字节/像素带宽。
+
+### 6.2 Attachment 布局（RenderPass 视角）
+
+```
+Attachment[0]: Final Color   (loadOp=CLEAR, storeOp=STORE, finalLayout=PRESENT_SRC_KHR)
+Attachment[1]: Albedo        (loadOp=CLEAR, storeOp=DONT_CARE, finalLayout=COLOR_ATTACHMENT_OPTIMAL)
+Attachment[2]: Normal        (loadOp=CLEAR, storeOp=DONT_CARE, finalLayout=COLOR_ATTACHMENT_OPTIMAL)
+Attachment[3]: Depth         (loadOp=CLEAR, storeOp=DONT_CARE, finalLayout=DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+```
+
+G-Buffer 的 `storeOp=DONT_CARE` 是刻意设计——在 TBDR GPU（Apple Silicon / Mobile）上，
+G-Buffer 可以完全保留在片上 SRAM 中，无需写回主存，极大节省带宽。
+
+### 6.3 Subpass 依赖链
+
+```
+EXTERNAL ──[dep0]──► Subpass 0 (Geometry) ──[dep1]──► Subpass 1 (Lighting) ──[dep2]──► EXTERNAL
+```
+
+**dep0** (EXTERNAL → Subpass 0):
+- src: `BOTTOM_OF_PIPE` / `MEMORY_READ`
+- dst: `COLOR_ATTACHMENT_OUTPUT | EARLY_FRAGMENT_TESTS` / `COLOR_ATTACHMENT_WRITE | DEPTH_WRITE`
+- flags: `BY_REGION`
+
+**dep1** (Subpass 0 → Subpass 1) ← *核心依赖*:
+- src: `COLOR_ATTACHMENT_OUTPUT | LATE_FRAGMENT_TESTS` / `COLOR_WRITE | DEPTH_WRITE`
+- dst: `FRAGMENT_SHADER` / `SHADER_READ`
+- flags: `BY_REGION` ← 启用 TBDR tile-local 优化
+
+**dep2** (Subpass 1 → EXTERNAL):
+- src: `COLOR_ATTACHMENT_OUTPUT` / `COLOR_READ | COLOR_WRITE`
+- dst: `BOTTOM_OF_PIPE` / `MEMORY_READ`
+
+### 6.4 Framebuffer 结构
+
+每个 Swapchain Image 对应一个 Framebuffer，共享同一对 G-Buffer Image：
+
+```
+Framebuffer[i] = {
+    SwapchainImageView[i],  // Attachment 0
+    AlbedoImageView,        // Attachment 1 (共享，全帧只有一个)
+    NormalImageView,        // Attachment 2 (同上)
+    DepthImageView          // Attachment 3 (Swapchain 统一深度)
 }
 ```
 
-## 4. 命令缓冲录制
+### 6.5 Lighting Pipeline 内部描述符布局
 
-### 4.1 录制流程详解
+Lighting Pass 使用两个描述符集：
+
+```
+Set 0 (全局): GlobalSetLayout — SceneDataUBO (ViewProj, InvViewProj, CameraPos, Lights[])
+Set 1 (光照): LightingSetLayout — 3x INPUT_ATTACHMENT
+  ├── binding 0: subpassInput (Albedo)   → Attachment[1]
+  ├── binding 1: subpassInput (Normal)   → Attachment[2]
+  └── binding 2: subpassInput (Depth)    → Attachment[3]
+```
+
+Lighting Pass 不绑定 VertexBuffer，直接 `vkCmdDraw(3, 1, 0, 0)` 产生一个全屏大三角形，
+在顶点着色器 (`deferred_lighting.vert`) 内程序化生成坐标。
+
+### 6.6 录制流程
+
+```
+vkBeginCommandBuffer
+vkCmdBeginRenderPass (含 4x clearValues)
+
+─── SUBPASS 0: GEOMETRY ───
+  vkCmdSetViewport / vkCmdSetScissor
+  for each RenderPacket:
+    vkCmdBindPipeline (Deferred Geometry 变体)
+    vkCmdBindDescriptorSets (Set0: GlobalUBO, Set1: MaterialSet)
+    vkCmdPushConstants (TransformMatrix)
+    vkCmdBindVertexBuffers / vkCmdBindIndexBuffer
+    vkCmdDrawIndexed
+
+─── SUBPASS 1: LIGHTING ───
+vkCmdNextSubpass
+  vkCmdBindPipeline (LightingPipeline)
+  vkCmdBindDescriptorSets (Set0: GlobalUBO, Set1: LightingDescriptorSet)
+  vkCmdDraw(3, 1, 0, 0)  ← 全屏三角形
+
+vkCmdEndRenderPass
+← 返回，VulkanRenderer 统一调 vkEndCommandBuffer
+```
+
+---
+
+## 7. 全局 SceneDataUBO
+
+两条管线共享同一个全局 UBO，由 `VulkanRenderer` 在 `RecordCommandBuffer` 开头更新：
 
 ```cpp
-void VulkanRenderer::RecordCommandBuffer(
-    VkCommandBuffer cmd,
-    uint32_t imageIndex,
-    const SceneViewData& viewData,
-    const std::vector<RenderPacket>& renderPackets,
-    std::function<void(VkCommandBuffer)> onUIRender
-) {
-    // ==========================================
-    // 步骤 1: 开始命令缓冲
-    // ==========================================
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    vkBeginCommandBuffer(cmd, &beginInfo);
-
-    // ==========================================
-    // 步骤 2: 更新全局数据
-    // ==========================================
-    UpdateSceneParameterBuffer(viewData);
-
-    // ==========================================
-    // 步骤 3: 开始渲染通道
-    // ==========================================
-    VkRenderPassBeginInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = RenderPass;
-    renderPassInfo.framebuffer = Framebuffers[imageIndex];
-    renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent = GetSwapchainExtent();
-    
-    VkClearValue clearValues[2];
-    clearValues[0].color = {{0.1f, 0.1f, 0.1f, 1.0f}};
-    clearValues[1].depthStencil = {1.0f, 0};
-    renderPassInfo.clearValueCount = 2;
-    renderPassInfo.pClearValues = clearValues;
-    
-    vkCmdBeginRenderPass(cmd, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-    // ==========================================
-    // 步骤 4: 设置视口和裁剪
-    // ==========================================
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = (float)GetSwapchainExtent().width;
-    viewport.height = (float)GetSwapchainExtent().height;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(cmd, 0, 1, &viewport);
-    
-    VkRect2D scissor{};
-    scissor.offset = {0, 0};
-    scissor.extent = GetSwapchainExtent();
-    vkCmdSetScissor(cmd, 0, 1, &scissor);
-
-    // ==========================================
-    // 步骤 5: 绑定全局描述符集 (Set 0)
-    // ==========================================
-    vkCmdBindDescriptorSets(
-        cmd,
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
-        pbrMaterial->GetPipelineLayout(),
-        0, 1, &GlobalDescriptorSet,
-        0, nullptr
-    );
-
-    // ==========================================
-    // 步骤 6: 绘制所有物体
-    // ==========================================
-    for (const auto& packet : renderPackets) {
-        DrawRenderPacket(cmd, packet);
-    }
-
-    // ==========================================
-    // 步骤 7: 绘制 UI
-    // ==========================================
-    if (onUIRender) {
-        onUIRender(cmd);
-    }
-
-    // ==========================================
-    // 步骤 8: 结束渲染通道和命令缓冲
-    // ==========================================
-    vkCmdEndRenderPass(cmd);
-    vkEndCommandBuffer(cmd);
-}
+struct SceneDataUBO {
+    glm::mat4 ViewProjection;       // VP 矩阵
+    glm::mat4 InvViewProj;          // 逆 VP（用于深度重投影）
+    glm::vec4 CameraPosition;       // w 分量未使用
+    LightDataGPU Lights[MAX_SCENE_LIGHTS];
+    int LightCount;
+    // padding...
+};
 ```
 
-### 4.2 单个物体绘制
+更新方式为 **VMA 持久映射** (Persistently Mapped Buffer via `VMA_MEMORY_USAGE_AUTO_PREFER_HOST`):
 
 ```cpp
-void VulkanRenderer::DrawRenderPacket(VkCommandBuffer cmd, const RenderPacket& packet) {
-    // 1. 获取 GPU 端网格
-    FVulkanMesh& vulkanMesh = UploadMesh(packet.Mesh);
-    
-    // 2. 绑定管线
-    FMaterial* material = packet.Material->GetParentMaterial();
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, material->GetPipeline());
-    
-    // 3. 绑定材质描述符集 (Set 1)
-    VkDescriptorSet matSet = packet.Material->GetDescriptorSet();
-    vkCmdBindDescriptorSets(
-        cmd,
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
-        material->GetPipelineLayout(),
-        1, 1, &matSet,
-        0, nullptr
-    );
-    
-    // 4. Push Constants (Model 矩阵)
-    vkCmdPushConstants(
-        cmd,
-        material->GetPipelineLayout(),
-        VK_SHADER_STAGE_VERTEX_BIT,
-        0, sizeof(glm::mat4),
-        &packet.ModelMatrix
-    );
-    
-    // 5. 绑定顶点/索引缓冲
-    VkBuffer vertexBuffers[] = { vulkanMesh.VertexBuffer.Buffer };
-    VkDeviceSize offsets[] = {0};
-    vkCmdBindVertexBuffers(cmd, 0, 1, vertexBuffers, offsets);
-    vkCmdBindIndexBuffer(cmd, vulkanMesh.IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
-    
-    // 6. 绘制!
-    vkCmdDrawIndexed(cmd, vulkanMesh.IndexCount, 1, 0, 0, 0);
-}
+// 无需 Map/Unmap，直接 memcpy 到已映射地址
+memcpy(SceneParameterBuffer.Info.pMappedData, &sceneData, sizeof(SceneDataUBO));
 ```
 
-## 5. 描述符集设计
+---
 
-### 5.1 描述符布局
+## 8. UI 渲染回调模式
 
-Tumbler 引擎采用双描述符集设计，按更新频率分组：
-
-```
-Set 0 (全局，每帧更新一次):
-├─ Binding 0: SceneData UBO
-│  ├─ ViewProj 矩阵
-│  ├─ CameraPosition
-│  └─ Lights[]
-└─ Binding 1: 天空盒纹理 (预留)
-
-Set 1 (材质，每材质切换时更新):
-├─ Binding 0: Albedo 纹理
-├─ Binding 1: Normal 纹理 (预留)
-├─ Binding 2: MaterialParams UBO
-│  ├─ BaseColorTint
-│  ├─ Roughness
-│  └─ Metallic
-└─ ... 更多纹理
-```
-
-### 5.2 全局描述符更新
-
-```cpp
-void VulkanRenderer::UpdateSceneParameterBuffer(const SceneViewData& viewData) {
-    // 将 SceneViewData 映射到 UBO 结构
-    struct SceneUBO {
-        glm::mat4 ViewProj;
-        glm::vec3 CameraPos;
-        // ... 光源数据
-    };
-    
-    SceneUBO ubo;
-    ubo.ViewProj = viewData.ViewProj;
-    ubo.CameraPos = viewData.CameraPosition;
-    
-    // 复制到 GPU
-    void* data;
-    vmaMapMemory(Allocator, SceneParameterBuffer.Allocation, &data);
-    memcpy(data, &ubo, sizeof(SceneUBO));
-    vmaUnmapMemory(Allocator, SceneParameterBuffer.Allocation);
-}
-```
-
-## 6. 着色器流程
-
-### 6.1 顶点着色器 (pbr.vert)
-
-```glsl
-#version 450
-
-// Push Constants (每一物体更新)
-layout(push_constant) uniform PushConstants {
-    mat4 Model;
-} pushConsts;
-
-// Set 0 (全局，每帧更新)
-layout(set = 0, binding = 0) uniform SceneUBO {
-    mat4 ViewProj;
-    vec3 CameraPos;
-} scene;
-
-// 顶点输入
-layout(location = 0) in vec3 inPosition;
-layout(location = 1) in vec3 inNormal;
-layout(location = 2) in vec2 inTexCoord;
-
-// 顶点输出
-layout(location = 0) out vec3 fragWorldPos;
-layout(location = 1) out vec3 fragNormal;
-layout(location = 2) out vec2 fragTexCoord;
-
-void main() {
-    // 计算世界坐标
-    vec4 worldPos = pushConsts.Model * vec4(inPosition, 1.0);
-    fragWorldPos = worldPos.xyz;
-    
-    // 变换法线 (法线矩阵)
-    fragNormal = mat3(transpose(inverse(pushConsts.Model))) * inNormal;
-    
-    // 传递纹理坐标
-    fragTexCoord = inTexCoord;
-    
-    // 最终裁剪空间坐标
-    gl_Position = scene.ViewProj * worldPos;
-}
-```
-
-### 6.2 片段着色器 (pbr.frag)
-
-```glsl
-#version 450
-
-// Set 0 (全局)
-layout(set = 0, binding = 0) uniform SceneUBO {
-    mat4 ViewProj;
-    vec3 CameraPos;
-    // ... 光源
-} scene;
-
-// Set 1 (材质)
-layout(set = 1, binding = 0) uniform sampler2D albedoTex;
-layout(set = 1, binding = 1) uniform MaterialUBO {
-    vec4 BaseColorTint;
-    float Roughness;
-    float Metallic;
-} mat;
-
-// 片段输入
-layout(location = 0) in vec3 fragWorldPos;
-layout(location = 1) in vec3 fragNormal;
-layout(location = 2) in vec2 fragTexCoord;
-
-// 片段输出
-layout(location = 0) out vec4 outColor;
-
-// PBR 函数 (Distribution GGX, Fresnel Schlick, Geometry Smith)
-// ... [详见 PBR 文档]
-
-void main() {
-    vec3 N = normalize(fragNormal);
-    vec3 V = normalize(scene.CameraPos - fragWorldPos);
-    
-    // 采样 Albedo
-    vec3 albedo = texture(albedoTex, fragTexCoord).rgb;
-    albedo *= mat.BaseColorTint.rgb;
-    
-    // 计算光照 (Cook-Torrance BRDF)
-    vec3 Lo = vec3(0.0);
-    // ... [对每个光源计算光照贡献]
-    
-    // 最终颜色 + Gamma 校正
-    vec3 color = Lo + vec3(0.03) * albedo; // 环境光
-    color = color / (color + vec3(1.0));    // Tone mapping
-    color = pow(color, vec3(1.0/2.2));      // Gamma correction
-    
-    outColor = vec4(color, 1.0);
-}
-```
-
-## 7. 同步机制详解
-
-### 7.1 信号量流程
+ImGui 的 UI 渲染通过回调注入，与管线渲染严格解耦：
 
 ```
-CPU Timeline:
-Frame N-1 ──────────────────────────────────────┐
-                                                  │
-Frame N:  vkWaitForFences ──┐                  │
-                              │                  │
-             vkAcquireNextImage(imageAvailable) │
-                              │                  │
-             RecordCommands   │                  │
-                              │                  │
-             vkQueueSubmit(  │                  │
-               wait: imageAvailable,            │
-               signal: renderFinished,          │
-               fence: renderFence)              │
-                              │                  │
-             vkQueuePresent(  │                  │
-               wait: renderFinished)            │
-                              │                  │
-                              └──────────────────┘
+VulkanRenderer::Render(viewData, packets, onUIRender)
+  └── RecordCommandBuffer(...)
+        ├── Pipelines[path]->RecordCommands(...)   ← vkCmdEndRenderPass 在此结束
+        ├── onUIRender(cmdBuffer, imageIndex)       ← UI 在此写入独立 RenderPass
+        └── vkEndCommandBuffer(cmdBuffer)           ← 统一结束
 ```
 
-### 7.2 Fence 与信号量的区别
+> **重要**：UI 回调在管线的 `vkCmdEndRenderPass` **之后**、`vkEndCommandBuffer` **之前**执行。
+> ImGui 使用自己独立的 `VkRenderPass` 和 `VkFramebuffer`（由 ImGui Vulkan 后端管理），
+> 不得混入 Forward/Deferred 的 RenderPass 中。
+
+---
+
+## 9. 描述符集设计总览
+
+| Set | 持有者 | 内容 | 更新频率 |
+|-----|--------|------|----------|
+| Set 0 | VulkanRenderer (GlobalDescriptorSet) | SceneDataUBO (VP, InvVP, Lights) | 每帧 |
+| Set 1 (Forward) | FMaterialInstance | Albedo Tex + MaterialParams UBO | 每材质切换 |
+| Set 1 (Deferred Lighting) | FDeferredPipeline (LightingDescriptorSet) | 3x Input Attachment | 初始化 / Swapchain 重建 |
+
+---
+
+## 10. 同步机制
+
+### 10.1 信号量与 Fence 流程
+
+```
+CPU:  vkWaitForFences(RenderFence) ──────────────────────────────► 阻塞直到上帧完成
+      AcquireNextImage(signal: ImageAvailable)
+      RecordCommandBuffer(...)
+      vkQueueSubmit(
+          wait:   ImageAvailable       ← GPU 等待图像就绪
+          signal: RenderFinished
+          fence:  RenderFence          ← GPU 完成后通知 CPU
+      )
+      vkQueuePresent(wait: RenderFinished)
+```
+
+### 10.2 Fence vs Semaphore
 
 | 特性 | Fence | Semaphore |
 |------|-------|-----------|
-| 同步范围 | CPU ↔ GPU | GPU ↔ GPU |
-| 信号方式 | 手动重置 | 自动消耗 |
-| 等待方式 | vkWaitForFences | vkQueueSubmit / vkQueuePresent |
-| 用途 | CPU 等待 GPU 完成 | 队列间操作同步 |
+| 同步范围 | CPU ↔ GPU | GPU 内部队列间 |
+| 重置 | 手动 (vkResetFences) | 自动消耗 |
+| 等待侧 | CPU (vkWaitForFences) | GPU Queue |
+| 本项目用途 | CPU 等待帧完成 | Image 可用 / 渲染完成通知 present |
 
-## 8. 性能优化策略
+---
 
-### 8.1 描述符集频率分组
+## 11. 性能优化策略
 
-| Set | 内容 | 更新频率 | 优势 |
-|-----|------|----------|------|
-| Set 0 | 摄像机、光源 | 每帧一次 | 只绑定一次 |
-| Set 1 | 材质参数、纹理 | 每材质一次 | 减少切换开销 |
+### 11.1 TBDR 感知带宽优化
 
-### 8.2 命令缓冲重用
+- G-Buffer 的 `storeOp=DONT_CARE` + `VK_DEPENDENCY_BY_REGION_BIT`
+- 在 Apple Silicon / Adreno / Mali 等 TBDR GPU 上，G-Buffer 永远不离开 tile-local memory
+- 有效将 G-Buffer 读写从主存带宽变为 On-Chip 操作（零带宽代价）
 
-- **不**: 每帧分配/释放命令缓冲
-- **是**: 初始化时分配，每帧重置重用
+### 11.2 Mesh 缓存
 
-### 8.3 Mesh 缓存
+`ResourceUploadManager` 内部维护 `unordered_map<FMesh*, FVulkanMesh>` 缓存，
+避免每帧重复上传同一 Mesh 到 GPU。
 
-```cpp
-class ResourceUploadManager {
-    std::unordered_map<FMesh*, FVulkanMesh> MeshCache;
-    
-    FVulkanMesh& UploadMesh(FMesh* cpuMesh) {
-        auto it = MeshCache.find(cpuMesh);
-        if (it != MeshCache.end()) {
-            return it->second; // 缓存命中，直接返回
-        }
-        
-        // 缓存未命中，上传新 Mesh
-        FVulkanMesh gpuMesh = UploadToGPU(cpuMesh);
-        MeshCache[cpuMesh] = std::move(gpuMesh);
-        return MeshCache[cpuMesh];
-    }
-};
+### 11.3 UBO 持久映射
+
+所有频繁更新的 Buffer（SceneDataUBO 等）使用 VMA 持久映射，
+每帧仅 `memcpy`，无需 `vkMapMemory/vkUnmapMemory` 开销。
+
+### 11.4 命令缓冲重用
+
+`MainCommandBuffer` 在初始化时分配一次，每帧通过 `vkResetCommandBuffer` 重置重用，
+避免分配/释放开销。
+
+---
+
+## 12. Swapchain 重建流程
+
+当窗口大小改变时：
+
+```
+SwapChain.Cleanup()
+SwapChain.Init(newWidth, newHeight)
+for each Pipeline:
+    pipeline->RecreateResources(renderer)
+        ├── vkDestroyFramebuffer (all)
+        ├── DestroyGBuffers (Deferred only)
+        ├── InitGBuffers (Deferred only) ← 按新尺寸重建
+        └── InitFramebuffers ← 引用新 SwapchainImageViews
+vkResetCommandBuffer(MainCommandBuffer)
 ```
 
-## 9. 调试与验证
+---
 
-### 9.1 启用 Vulkan 验证层
+## 13. 调试与验证
+
+### 13.1 启用 Vulkan 验证层
 
 在 Debug 模式下，确保验证层已启用：
 
@@ -540,10 +409,12 @@ const char* validationLayers[] = {
 };
 ```
 
-### 9.2 常见验证错误
+### 13.2 常见验证错误对照
 
-| 错误 | 原因 | 解决 |
-|------|------|------|
-| `VUID-vkFreeCommandBuffers-pCommandBuffers-00047` | 命令缓冲还在使用中 | 用 Fence 等待或重用 |
-| `VUID-vkCmdBindDescriptorSets-parameter` | 描述符集布局不匹配 | 确保 Pipeline 与 DescriptorSet 布局一致 |
-| `VUID-vkCmdDrawIndexed-indexBuffer-00497` | 索引缓冲未绑定 | 检查 `vkCmdBindIndexBuffer` |
+| 错误 VUID | 原因 | 解决 |
+|-----------|------|------|
+| `VUID-VkGraphicsPipelineCreateInfo-renderPass` | Pipeline 创建时的 RenderPass 与 RecordCommands 时不同 | 确保 Pipeline 绑定到其所属 Pipeline 对象的 RenderPass |
+| `VUID-vkCmdNextSubpass-commandBuffer-recording` | 在 Recording 状态以外调用 NextSubpass | 确认 vkBeginCommandBuffer 已调用且未提前 End |
+| `VUID-vkEndCommandBuffer-commandBuffer-recording` | CB 不在 Recording 状态时调 End | 检查是否有多处 vkEndCommandBuffer 调用（仅 VulkanRenderer 负责此调用） |
+| `VUID-vkCmdBindDescriptorSets-pDescriptorSets-00358` | 描述符集布局与 Pipeline Layout 不匹配 | 确认 Set0=GlobalSetLayout, Set1 与对应管线 Layout 一致 |
+| `VUID-vkCmdDrawIndexed-indexBuffer-00497` | 索引缓冲未绑定 | 检查 `vkCmdBindIndexBuffer` 调用 |
