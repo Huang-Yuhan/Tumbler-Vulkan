@@ -10,7 +10,7 @@ VulkanPipelineBuilder VulkanPipelineBuilder::Begin(VkPipelineLayout layout) {
     return builder;
 }
 
-VkPipeline VulkanPipelineBuilder::Build(VkDevice device, VkRenderPass renderPass) {
+VkPipeline VulkanPipelineBuilder::Build(VkDevice device, VkRenderPass renderPass, uint32_t subpass) {
     // 1. 组装视口状态 (Viewport State)
     // 虽然 Viewport 和 Scissor 已经在成员变量里了，但需要用这个结构体把它们包起来
     VkPipelineViewportStateCreateInfo viewportState{};
@@ -26,8 +26,8 @@ VkPipeline VulkanPipelineBuilder::Build(VkDevice device, VkRenderPass renderPass
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlending.logicOpEnable = VK_FALSE; // 不使用位运算混合
     colorBlending.logicOp = VK_LOGIC_OP_COPY;
-    colorBlending.attachmentCount = 1;
-    colorBlending.pAttachments = &ColorBlendAttachment;
+    colorBlending.attachmentCount = static_cast<uint32_t>(ColorBlendAttachments.size());
+    colorBlending.pAttachments = ColorBlendAttachments.data();
 
     VkPipelineDynamicStateCreateInfo dynamicStateInfo{};
     dynamicStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -55,7 +55,7 @@ VkPipeline VulkanPipelineBuilder::Build(VkDevice device, VkRenderPass renderPass
     // 链接布局和 RenderPass
     pipelineInfo.layout = PipelineLayout;
     pipelineInfo.renderPass = renderPass;
-    pipelineInfo.subpass = 0; // 这个管线用于 RenderPass 的第 0 个子流程
+    pipelineInfo.subpass = subpass; // 【修改】不再硬编码为 0
     
     // 允许管线派生 (优化创建速度)，这里暂时不用
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
@@ -151,24 +151,29 @@ VulkanPipelineBuilder& VulkanPipelineBuilder::SetMultisamplingNone() {
     return *this;
 }
 
-VulkanPipelineBuilder& VulkanPipelineBuilder::SetColorBlending(bool enableBlend) {
-    // 这里的 mask 决定了输出颜色的哪些通道会被写入 (RGBA 全写)
-    ColorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    
-    if (enableBlend) {
-        // 标准的 Alpha 混合公式：
-        // FinalColor = SrcColor * SrcAlpha + DstColor * (1 - SrcAlpha)
-        ColorBlendAttachment.blendEnable = VK_TRUE;
+VulkanPipelineBuilder& VulkanPipelineBuilder::SetColorBlending(bool enableBlend, uint32_t attachmentCount) {
+    ColorBlendAttachments.clear();
+    for (uint32_t i = 0; i < attachmentCount; i++) {
+        VkPipelineColorBlendAttachmentState blendAttachment{};
+        // 这里的 mask 决定了输出颜色的哪些通道会被写入 (RGBA 全写)
+        blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
         
-        ColorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-        ColorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-        ColorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-        
-        ColorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-        ColorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-        ColorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
-    } else {
-        ColorBlendAttachment.blendEnable = VK_FALSE;
+        if (enableBlend) {
+            // 标准的 Alpha 混合公式：
+            // FinalColor = SrcColor * SrcAlpha + DstColor * (1 - SrcAlpha)
+            blendAttachment.blendEnable = VK_TRUE;
+            
+            blendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+            blendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            blendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+            
+            blendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+            blendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+            blendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+        } else {
+            blendAttachment.blendEnable = VK_FALSE;
+        }
+        ColorBlendAttachments.push_back(blendAttachment);
     }
     return *this;
 }

@@ -42,9 +42,7 @@ void FForwardPipeline::InitRenderPass(VulkanRenderer* renderer)
 {
     // 1. Color Attachment
     VkAttachmentDescription colorAttachment{};
-    // Hard dependency on renderer methods, we might need to expose Swapchain queries securely.
-    // Assuming VulkanRenderer has GetSwapchainImageFormat() and GetSwapchainDepthFormat() or similar.
-    colorAttachment.format = VK_FORMAT_B8G8R8A8_UNORM; // Normally queried from swapchain
+    colorAttachment.format = renderer->GetSwapchainImageFormat();
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -177,7 +175,7 @@ void FForwardPipeline::RecordCommands(
     for (const auto& packet : renderPackets) {
         auto parentMaterial = packet.Material->GetParent();
 
-        vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, parentMaterial->Pipeline);
+        vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, parentMaterial->GetPipeline(ERenderPath::Forward));
 
         VkDescriptorSet descSet[] = {renderer->GetGlobalDescriptorSet(), packet.Material->GetDescriptorSet()};
         vkCmdBindDescriptorSets(
@@ -205,10 +203,6 @@ void FForwardPipeline::RecordCommands(
         vkCmdDrawIndexed(cmdBuffer, gpuMesh.IndexCount, 1, 0, 0, 0);
     }
 
-    if (onUIRender) {
-        onUIRender(cmdBuffer);
-    }
-
     vkCmdEndRenderPass(cmdBuffer);
-    vkEndCommandBuffer(cmdBuffer);
+    // Note: vkEndCommandBuffer is called by VulkanRenderer after the UI pass.
 }

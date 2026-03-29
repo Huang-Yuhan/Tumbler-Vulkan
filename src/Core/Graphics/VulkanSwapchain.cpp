@@ -206,8 +206,8 @@ void VulkanSwapchain::CreateDepthResources()
     // Tiling Optimal 意味着让显卡用它最喜欢的内存排列方式（此时 CPU 无法直接读写，但渲染极快）
     imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
     imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    // 用途：作为深度/模板附件
-    imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    // 用途：作为深度/模板附件，并允许作为 Input Attachment 在延迟渲染被读取
+    imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
     imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 

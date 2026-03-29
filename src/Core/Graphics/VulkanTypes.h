@@ -26,6 +26,7 @@ struct PointLightData {
 
 struct SceneDataUBO {
     glm::mat4 ViewProjection;
+    glm::mat4 InvViewProj;
     glm::vec4 CameraPosition;
     PointLightData Lights[MAX_SCENE_LIGHTS];
     int LightCount;

@@ -10,6 +10,7 @@
 #include "Core/Assets/FAssetManager.h"
 #include "Core/Graphics/LightData.h"
 #include "Core/Graphics/Pipelines/FForwardPipeline.h"
+#include "Core/Graphics/Pipelines/FDeferredPipeline.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -39,10 +40,12 @@ void VulkanRenderer::Init(AppWindow* window) {
     window->GetFramebufferSize(width, height);
     SwapChain.Init(&Context, width, height);
 
-    // 4. 初始化渲染状态
-    InitPipelines();
-    InitSyncStructures();
+    // 4. 初始化描述符与同步机制
     InitDescriptors();
+    InitSyncStructures();
+
+    // 5. 初始化渲染管线策略 (必须在 DescriptorLayout 创建后)
+    InitPipelines();
 
     // 5. 初始化主命令缓冲区
     MainCommandBuffer = TheCommandBufferManager.AllocatePrimaryCommandBuffer();
@@ -100,14 +103,15 @@ void VulkanRenderer::InitPipelines() {
     forwardPipeline->Init(this);
     Pipelines[ERenderPath::Forward] = std::move(forwardPipeline);
     
-    // Future: Pipelines[ERenderPath::Deferred] = ...
+    auto deferredPipeline = std::make_unique<FDeferredPipeline>();
+    deferredPipeline->Init(this);
+    Pipelines[ERenderPath::Deferred] = std::move(deferredPipeline);
 }
 
 VkRenderPass VulkanRenderer::GetRenderPass(ERenderPath path) const {
     auto it = Pipelines.find(path);
     if (it != Pipelines.end() && it->second) {
-        // Warning: safely assume it's FForwardPipeline for now since Deferred uses subpasses differently.
-        return static_cast<FForwardPipeline*>(it->second.get())->GetRenderPass();
+        return it->second->GetRenderPass();
     }
     return VK_NULL_HANDLE;
 }
@@ -219,7 +223,7 @@ void VulkanRenderer::InitDescriptors() {
 void VulkanRenderer::Render(
     const SceneViewData& viewData,
     const std::vector<RenderPacket>& renderPackets,
-    std::function<void(VkCommandBuffer)> onUIRender) {
+    std::function<void(VkCommandBuffer, uint32_t)> onUIRender) {
 
     VkDevice device = Context.GetDevice();
     vkWaitForFences(device, 1, &RenderFence, VK_TRUE, UINT64_MAX);
@@ -269,11 +273,13 @@ void VulkanRenderer::RecordCommandBuffer(
     uint32_t imageIndex,
     const SceneViewData& viewData,
     const std::vector<RenderPacket>& renderPackets,
-    std::function<void(VkCommandBuffer)> onUIRender) {
+    std::function<void(VkCommandBuffer, uint32_t)> onUIRender) {
 
     // 首先更新全局场景参数 UBO (由于它是共用的，放外部更新比放管道更合理)
     SceneDataUBO sceneData{};
-    sceneData.ViewProjection = viewData.ProjectionMatrix * viewData.ViewMatrix;
+    glm::mat4 viewProj = viewData.ProjectionMatrix * viewData.ViewMatrix;
+    sceneData.ViewProjection = viewProj;
+    sceneData.InvViewProj = glm::inverse(viewProj);
     sceneData.CameraPosition = glm::vec4(viewData.CameraPosition, 1.0f);
     
     int count = static_cast<int>(viewData.Lights.size());
@@ -293,10 +299,17 @@ void VulkanRenderer::RecordCommandBuffer(
     // 执行当前选中管线的具体命令录制
     auto it = Pipelines.find(viewData.RenderPath);
     if (it != Pipelines.end() && it->second) {
-        it->second->RecordCommands(cmdBuffer, imageIndex, this, viewData, renderPackets, onUIRender);
+        it->second->RecordCommands(cmdBuffer, imageIndex, this, viewData, renderPackets, nullptr);
     } else {
         LOG_CRITICAL("Selected RenderPath mapped to no active pipeline!");
     }
+
+    if (onUIRender) {
+        onUIRender(cmdBuffer, imageIndex);
+    }
+
+    // 所有人完了，统一在这里关闭 CB
+    VK_CHECK(vkEndCommandBuffer(cmdBuffer));
 }
 
 // ==========================================

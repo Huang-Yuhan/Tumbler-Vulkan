@@ -37,7 +37,7 @@ public:
     VkPipelineMultisampleStateCreateInfo Multisampling{};
 
     // 颜色混合 (透明度混合设置)
-    VkPipelineColorBlendAttachmentState ColorBlendAttachment{};
+    std::vector<VkPipelineColorBlendAttachmentState> ColorBlendAttachments;
 
     // 深度/模板测试
     VkPipelineDepthStencilStateCreateInfo DepthStencil{};
@@ -61,9 +61,10 @@ public:
      * @brief 组装所有积木，通知显卡创建管线对象
      * @param device 逻辑设备
      * @param renderPass 关联的渲染通道
+     * @param subpass 绑定的渲染子通道，默认是0
      * @return 创建成功的 VkPipeline 句柄
      */
-    VkPipeline Build(VkDevice device, VkRenderPass renderPass);
+    VkPipeline Build(VkDevice device, VkRenderPass renderPass, uint32_t subpass = 0);
 
     // ==========================================
     // 配置方法 (支持链式调用)
@@ -89,7 +90,7 @@ public:
     VulkanPipelineBuilder& SetMultisamplingNone();
 
     // 设置颜色混合 (是否开启 Alpha Blending)
-    VulkanPipelineBuilder& SetColorBlending(bool enableBlend);
+    VulkanPipelineBuilder& SetColorBlending(bool enableBlend, uint32_t attachmentCount = 1);
 
     // 关闭深度测试 (用于 2D UI 或背景)
     VulkanPipelineBuilder& DisableDepthTest();

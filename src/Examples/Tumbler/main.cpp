@@ -103,8 +103,8 @@ int main() {
 
             // --- C. 发送给底层渲染器执行 ---
             // 渲染器同时接收“视图”和“包裹”，并将 UI 录制指令作为回调传入
-            renderer.Render(viewData, renderPackets, [&](VkCommandBuffer cmd) {
-                ui_manager.RecordDrawCommands(cmd);
+            renderer.Render(viewData, renderPackets, [&](VkCommandBuffer cmd, uint32_t imgIdx) {
+                ui_manager.RecordDrawCommands(cmd, &renderer, imgIdx);
             });
         }
 

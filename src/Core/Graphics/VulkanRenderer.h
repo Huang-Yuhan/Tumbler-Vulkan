@@ -56,7 +56,7 @@ public:
     void Render(
         const SceneViewData& viewData,
         const std::vector<RenderPacket>& renderPackets,
-        std::function<void(VkCommandBuffer)> onUIRender = nullptr
+        std::function<void(VkCommandBuffer, uint32_t)> onUIRender = nullptr
     );
 
     // ==========================================
@@ -181,7 +181,7 @@ private:
         uint32_t imageIndex,
         const SceneViewData& viewData,
         const std::vector<RenderPacket>& renderPackets,
-        std::function<void(VkCommandBuffer)> onUIRender
+        std::function<void(VkCommandBuffer, uint32_t)> onUIRender
     );
 
     bool RecreateSwapchain();

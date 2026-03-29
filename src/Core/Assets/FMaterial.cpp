@@ -26,10 +26,12 @@ FMaterial::FMaterial(
 FMaterial::~FMaterial() {
     if (RenderDeviceRef) {
         VkDevice device = RenderDeviceRef->GetDevice();
-        if (Pipeline != VK_NULL_HANDLE) {
-            vkDestroyPipeline(device, Pipeline, nullptr);
-            Pipeline = VK_NULL_HANDLE;
+        for (auto& [path, pipeline] : Pipelines) {
+            if (pipeline != VK_NULL_HANDLE) {
+                vkDestroyPipeline(device, pipeline, nullptr);
+            }
         }
+        Pipelines.clear();
         if (PipelineLayout != VK_NULL_HANDLE) {
             vkDestroyPipelineLayout(device, PipelineLayout, nullptr);
             PipelineLayout = VK_NULL_HANDLE;
@@ -43,7 +45,7 @@ FMaterial::~FMaterial() {
 }
 
 FMaterial::FMaterial(FMaterial&& other) noexcept
-    : Pipeline(other.Pipeline)
+    : Pipelines(std::move(other.Pipelines))
     , PipelineLayout(other.PipelineLayout)
     , DescriptorSetLayout(other.DescriptorSetLayout)
     , RenderDeviceRef(other.RenderDeviceRef)
@@ -52,7 +54,6 @@ FMaterial::FMaterial(FMaterial&& other) noexcept
     , SwapchainExtent(other.SwapchainExtent)
     , AssetManager(other.AssetManager)
     , Renderer(other.Renderer) {
-    other.Pipeline = VK_NULL_HANDLE;
     other.PipelineLayout = VK_NULL_HANDLE;
     other.DescriptorSetLayout = VK_NULL_HANDLE;
     other.RenderDeviceRef = nullptr;
@@ -66,12 +67,15 @@ FMaterial& FMaterial::operator=(FMaterial&& other) noexcept {
     if (this != &other) {
         if (RenderDeviceRef) {
             VkDevice device = RenderDeviceRef->GetDevice();
-            if (Pipeline != VK_NULL_HANDLE) vkDestroyPipeline(device, Pipeline, nullptr);
+            for (auto& [path, pipe] : Pipelines) {
+                if (pipe != VK_NULL_HANDLE) vkDestroyPipeline(device, pipe, nullptr);
+            }
+            Pipelines.clear();
             if (PipelineLayout != VK_NULL_HANDLE) vkDestroyPipelineLayout(device, PipelineLayout, nullptr);
             if (DescriptorSetLayout != VK_NULL_HANDLE) vkDestroyDescriptorSetLayout(device, DescriptorSetLayout, nullptr);
         }
 
-        Pipeline = other.Pipeline;
+        Pipelines = std::move(other.Pipelines);
         PipelineLayout = other.PipelineLayout;
         DescriptorSetLayout = other.DescriptorSetLayout;
         RenderDeviceRef = other.RenderDeviceRef;
@@ -81,7 +85,7 @@ FMaterial& FMaterial::operator=(FMaterial&& other) noexcept {
         AssetManager = other.AssetManager;
         Renderer = other.Renderer;
 
-        other.Pipeline = VK_NULL_HANDLE;
+        other.Pipelines.clear();
         other.PipelineLayout = VK_NULL_HANDLE;
         other.DescriptorSetLayout = VK_NULL_HANDLE;
         other.RenderDeviceRef = nullptr;
@@ -93,13 +97,14 @@ FMaterial& FMaterial::operator=(FMaterial&& other) noexcept {
     return *this;
 }
 
-void FMaterial::BuildPipeline(const std::string& vertPath, const std::string& fragPath) {
+void FMaterial::BuildPipelines(const std::string& forwardVert, const std::string& forwardFrag, const std::string& deferredFrag) {
     if (!RenderDeviceRef) {
         throw std::runtime_error("RenderDevice is null!");
     }
 
     VkDevice device = RenderDeviceRef->GetDevice();
 
+    // 1. 设置 Descriptor Set Layout
     VkDescriptorSetLayoutBinding baseColorBinding{};
     baseColorBinding.binding = 0;
     baseColorBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -119,79 +124,61 @@ void FMaterial::BuildPipeline(const std::string& vertPath, const std::string& fr
     uboBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
     VkDescriptorSetLayoutBinding bindings[] = {baseColorBinding, normalMapBinding, uboBinding};
-
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = 3;
     layoutInfo.pBindings = bindings;
-
     if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &DescriptorSetLayout) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create descriptor set layout!");
     }
 
+    // 2. 建立 Pipeline Layout
     VkPushConstantRange pushConstantRange{};
     pushConstantRange.offset = 0;
     pushConstantRange.size = sizeof(glm::mat4);
     pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
     VkDescriptorSetLayout layouts[] = {GlobalSetLayout, DescriptorSetLayout};
-
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
     pipelineLayoutInfo.setLayoutCount = 2;
     pipelineLayoutInfo.pSetLayouts = layouts;
-
     if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &PipelineLayout) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create pipeline layout!");
     }
 
-    VkShaderModule vertModule = VK_NULL_HANDLE;
-    VkShaderModule fragModule = VK_NULL_HANDLE;
+    // 3. 通用 Shader 帮助闭包
+    auto loadShaderModule = [&](const std::string& path) -> VkShaderModule {
+        std::ifstream file(path, std::ios::ate | std::ios::binary);
+        if (!file.is_open()) return VK_NULL_HANDLE;
+        size_t size = static_cast<size_t>(file.tellg());
+        std::vector<char> buffer(size);
+        file.seekg(0);
+        file.read(buffer.data(), size);
+        file.close();
 
-    std::ifstream vertFile(vertPath, std::ios::ate | std::ios::binary);
-    if (!vertFile.is_open()) {
-        throw std::runtime_error("Failed to open vertex shader: " + vertPath);
-    }
-    size_t vertSize = static_cast<size_t>(vertFile.tellg());
-    std::vector<char> vertBuffer(vertSize);
-    vertFile.seekg(0);
-    vertFile.read(vertBuffer.data(), vertSize);
-    vertFile.close();
+        VkShaderModuleCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        createInfo.codeSize = buffer.size();
+        createInfo.pCode = reinterpret_cast<const uint32_t*>(buffer.data());
 
-    VkShaderModuleCreateInfo vertCreateInfo{};
-    vertCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    vertCreateInfo.codeSize = vertBuffer.size();
-    vertCreateInfo.pCode = reinterpret_cast<const uint32_t*>(vertBuffer.data());
+        VkShaderModule module;
+        if (vkCreateShaderModule(device, &createInfo, nullptr, &module) != VK_SUCCESS) return VK_NULL_HANDLE;
+        return module;
+    };
 
-    if (vkCreateShaderModule(device, &vertCreateInfo, nullptr, &vertModule) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create vertex shader module!");
-    }
-
-    std::ifstream fragFile(fragPath, std::ios::ate | std::ios::binary);
-    if (!fragFile.is_open()) {
-        vkDestroyShaderModule(device, vertModule, nullptr);
-        throw std::runtime_error("Failed to open fragment shader: " + fragPath);
-    }
-    size_t fragSize = static_cast<size_t>(fragFile.tellg());
-    std::vector<char> fragBuffer(fragSize);
-    fragFile.seekg(0);
-    fragFile.read(fragBuffer.data(), fragSize);
-    fragFile.close();
-
-    VkShaderModuleCreateInfo fragCreateInfo{};
-    fragCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    fragCreateInfo.codeSize = fragBuffer.size();
-    fragCreateInfo.pCode = reinterpret_cast<const uint32_t*>(fragBuffer.data());
-
-    if (vkCreateShaderModule(device, &fragCreateInfo, nullptr, &fragModule) != VK_SUCCESS) {
-        vkDestroyShaderModule(device, vertModule, nullptr);
-        throw std::runtime_error("Failed to create fragment shader module!");
+    VkShaderModule vertModule = loadShaderModule(forwardVert);
+    VkShaderModule forwardFragModule = loadShaderModule(forwardFrag);
+    VkShaderModule deferredFragModule = loadShaderModule(deferredFrag);
+    
+    if (!vertModule || !forwardFragModule || !deferredFragModule) {
+        throw std::runtime_error("Failed to load one or more shaders for Material pipelines.");
     }
 
+    // 4. 构建共有输入结构
     auto builder = VulkanPipelineBuilder::Begin(PipelineLayout);
-
     VkVertexInputBindingDescription bindingDescription{};
     bindingDescription.binding = 0;
     bindingDescription.stride = 11 * sizeof(float);
@@ -202,26 +189,36 @@ void FMaterial::BuildPipeline(const std::string& vertPath, const std::string& fr
         {1, 0, VK_FORMAT_R32G32B32_SFLOAT, 3 * sizeof(float)},
         {2, 0, VK_FORMAT_R32G32B32_SFLOAT, 6 * sizeof(float)},
         {3, 0, VK_FORMAT_R32G32_SFLOAT, 9 * sizeof(float)}
-        };
+    };
 
     builder.VertexInputInfo.vertexBindingDescriptionCount = 1;
     builder.VertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
     builder.VertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
     builder.VertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
-    Pipeline = builder
-        .SetShaders(vertModule, fragModule)
+    // 5. 编译: 前向管线 (1 颜色目标，开启 Alpha Blend)
+    Pipelines[ERenderPath::Forward] = builder
+        .SetShaders(vertModule, forwardFragModule)
         .SetViewport(SwapchainExtent.width, SwapchainExtent.height)
         .SetInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
         .SetPolygonMode(VK_POLYGON_MODE_FILL)
         .SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE)
         .SetMultisamplingNone()
         .EnableDepthTest(VK_TRUE, VK_COMPARE_OP_LESS)
-        .SetColorBlending(true)
-        .Build(device, RenderPass);
+        .SetColorBlending(true, 1) // Forward: 1 Attachment blending
+        .Build(device, Renderer->GetRenderPass(ERenderPath::Forward));
 
+    // 6. 编译: 延迟几何管线 (2 颜色目标，关闭 blend 以覆盖写入原始数值)
+    Pipelines[ERenderPath::Deferred] = builder
+        .SetShaders(vertModule, deferredFragModule)
+        // SetViewport 不需重复调用，参数已在 builder 内
+        .SetColorBlending(false, 2) // Deferred MRT: 2 Attachments (Albedo, Normal), no blending
+        .Build(device, Renderer->GetRenderPass(ERenderPath::Deferred));
+
+    // Cleanup Modules
     vkDestroyShaderModule(device, vertModule, nullptr);
-    vkDestroyShaderModule(device, fragModule, nullptr);
+    vkDestroyShaderModule(device, forwardFragModule, nullptr);
+    vkDestroyShaderModule(device, deferredFragModule, nullptr);
 
     LOG_INFO("Material Pipeline Built: {} x {}", SwapchainExtent.width, SwapchainExtent.height);
 }

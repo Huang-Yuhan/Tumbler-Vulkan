@@ -90,7 +90,7 @@ std::shared_ptr<FTexture> FAssetManager::GetOrLoadTexture(const std::string& nam
     return nullptr;
 }
 
-std::shared_ptr<FMaterial> FAssetManager::GetOrLoadMaterial(const std::string& name, const std::string& vertPath, const std::string& fragPath) {
+std::shared_ptr<FMaterial> FAssetManager::GetOrLoadMaterial(const std::string& name, const std::string& vertPath, const std::string& fragPath, const std::string& deferredFragPath) {
     std::lock_guard<std::mutex> lock(AssetMutex);
 
     auto it = MaterialCache.find(name);
@@ -112,7 +112,7 @@ std::shared_ptr<FMaterial> FAssetManager::GetOrLoadMaterial(const std::string& n
         this,
         Renderer
     );
-    newMaterial->BuildPipeline(vertPath, fragPath);
+    newMaterial->BuildPipelines(vertPath, fragPath, deferredFragPath);
 
     MaterialCache[name] = newMaterial;
     return newMaterial;

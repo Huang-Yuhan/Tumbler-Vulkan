@@ -21,6 +21,7 @@ layout(location = 3) out mat3 outTBN;
 // ==========================================
 layout(set = 0, binding = 0) uniform SceneData {
     mat4 ViewProj;
+    mat4 InvViewProj;
     vec4 CameraPos;
     vec4 LightPos;
     vec4 LightColor;

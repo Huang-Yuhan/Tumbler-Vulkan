@@ -42,4 +42,9 @@ public:
         const SceneViewData& viewData,
         const std::vector<RenderPacket>& renderPackets,
         std::function<void(VkCommandBuffer)> onUIRender) = 0;
+
+    /**
+     * @brief 获取管线对应的 RenderPass
+     */
+    virtual VkRenderPass GetRenderPass() const = 0;
 };

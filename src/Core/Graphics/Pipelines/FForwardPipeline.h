@@ -20,8 +20,7 @@ public:
         const std::vector<RenderPacket>& renderPackets,
         std::function<void(VkCommandBuffer)> onUIRender) override;
 
-    // 让 FMaterial 用来绑定 Forward 版本的 VkPipeline
-    [[nodiscard]] VkRenderPass GetRenderPass() const { return RenderPass; }
+    [[nodiscard]] VkRenderPass GetRenderPass() const override { return RenderPass; }
 
 private:
     void InitRenderPass(VulkanRenderer* renderer);

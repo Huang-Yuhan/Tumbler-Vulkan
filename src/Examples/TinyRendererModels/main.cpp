@@ -76,8 +76,8 @@ int main() {
             CFirstPersonCamera* cam = logic.GetMainCamera();
             SceneViewData viewData = logic.GetScene()->GenerateSceneView(cam, &cam->GetOwner()->Transform, aspectRatio);
 
-            renderer.Render(viewData, renderPackets, [&](VkCommandBuffer cmd) {
-                ui_manager.RecordDrawCommands(cmd);
+            renderer.Render(viewData, renderPackets, [&](VkCommandBuffer cmd, uint32_t imgIdx) {
+                ui_manager.RecordDrawCommands(cmd, &renderer, imgIdx);
             });
         }
 

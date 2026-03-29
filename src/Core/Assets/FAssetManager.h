@@ -45,7 +45,7 @@ public:
     // 3. Material 管理
     // ==========================================
     // 加载并构建 Shader Pipeline
-    std::shared_ptr<FMaterial> GetOrLoadMaterial(const std::string& name, const std::string& vertPath, const std::string& fragPath);
+    std::shared_ptr<FMaterial> GetOrLoadMaterial(const std::string& name, const std::string& vertPath, const std::string& fragPath, const std::string& deferredFragPath = "assets/shaders/engine/deferred_geometry.frag.spv");
 
 private:
     // 禁用拷贝和赋值
