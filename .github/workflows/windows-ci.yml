@@ -98,7 +98,18 @@ jobs:
 
       - name: Build
         shell: pwsh
-        run: cmake --build build --config Debug --parallel
+        run: |
+          $buildLog = "$env:RUNNER_TEMP\cmake-build.log"
+          & cmake --build build --config Debug --parallel 2>&1 | Tee-Object -FilePath $buildLog
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "========== Build failed (tail) =========="
+            $tail = Get-Content -Path $buildLog -Tail 120
+            $tail | ForEach-Object { Write-Host $_ }
+            $joined = ($tail -join ' | ')
+            if ($joined.Length -gt 4000) { $joined = $joined.Substring($joined.Length - 4000) }
+            Write-Host "::error title=CMake build failed::$joined"
+            exit $LASTEXITCODE
+          }
 
       - name: Test
         shell: pwsh
