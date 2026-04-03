@@ -69,13 +69,14 @@ jobs:
           $vcpkgTripletDir = "$vcpkgInstalledDir\$env:VCPKG_DEFAULT_TRIPLET"
           $vulkanIncludeDir = "$pwd\build\vcpkg_installed\$env:VCPKG_DEFAULT_TRIPLET\include"
           $vulkanLib = "$pwd\build\vcpkg_installed\$env:VCPKG_DEFAULT_TRIPLET\lib\vulkan-1.lib"
+          $configureLog = "$env:RUNNER_TEMP\cmake-configure.log"
           if (!(Test-Path "$vulkanIncludeDir\vulkan\vulkan.h")) {
             Write-Error "Missing Vulkan headers: $vulkanIncludeDir\vulkan\vulkan.h"
           }
           if (!(Test-Path $vulkanLib)) {
             Write-Error "Missing Vulkan library: $vulkanLib"
           }
-          cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
+          & cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=$env:VCPKG_DEFAULT_TRIPLET `
             -DVCPKG_MANIFEST_MODE=ON `
@@ -84,7 +85,16 @@ jobs:
             -DCMAKE_PREFIX_PATH="$vcpkgTripletDir" `
             -DVulkan_INCLUDE_DIR="$vulkanIncludeDir" `
             -DVulkan_LIBRARY="$vulkanLib" `
-            -DBUILD_TESTING=ON
+            -DBUILD_TESTING=ON 2>&1 | Tee-Object -FilePath $configureLog
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "========== Configure failed (tail) =========="
+            $tail = Get-Content -Path $configureLog -Tail 120
+            $tail | ForEach-Object { Write-Host $_ }
+            $joined = ($tail -join ' | ')
+            if ($joined.Length -gt 4000) { $joined = $joined.Substring($joined.Length - 4000) }
+            Write-Host "::error title=CMake configure failed::$joined"
+            exit $LASTEXITCODE
+          }
 
       - name: Build
         shell: pwsh
