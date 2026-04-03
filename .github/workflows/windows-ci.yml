@@ -34,14 +34,27 @@ jobs:
         uses: lukka/run-vcpkg@v11
         with:
           vcpkgJsonGlob: '**/vcpkg.json'
+          vcpkgGitCommitId: 'ff8f729804f07747ee5dae7d40a4a885066f9204'
+
+      - name: Print toolchain diagnostics
+        shell: pwsh
+        run: |
+          Write-Host "VCPKG_ROOT=$env:VCPKG_ROOT"
+          cmake --version
+          if (Test-Path "$env:VCPKG_ROOT/vcpkg.exe") {
+            & "$env:VCPKG_ROOT/vcpkg.exe" version
+          } else {
+            Write-Error "vcpkg.exe not found under VCPKG_ROOT."
+          }
 
       - name: Configure
         shell: pwsh
-        run: >
-          cmake -S . -B build -G "Visual Studio 17 2022" -A x64
-          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
-          -DVCPKG_TARGET_TRIPLET=$env:VCPKG_DEFAULT_TRIPLET
-          -DBUILD_TESTING=ON
+        run: |
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=$env:VCPKG_DEFAULT_TRIPLET `
+            -DVCPKG_MANIFEST_MODE=ON `
+            -DBUILD_TESTING=ON
 
       - name: Build
         shell: pwsh
