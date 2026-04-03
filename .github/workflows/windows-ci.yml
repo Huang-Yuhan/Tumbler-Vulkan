@@ -100,6 +100,8 @@ jobs:
         run: |
           $paths = @(
             "build/vcpkg-manifest-install.log",
+            "build/CMakeFiles/CMakeError.log",
+            "build/CMakeFiles/CMakeOutput.log",
             "build/vcpkg_installed/vcpkg/issue_body.md",
             "build/Testing/Temporary/LastTest.log",
             "build/Testing/Temporary/LastTestsFailed.log"
@@ -107,7 +109,15 @@ jobs:
           foreach ($path in $paths) {
             if (Test-Path $path) {
               Write-Host "========== $path =========="
-              Get-Content -Path $path -Tail 300
+              $tail = Get-Content -Path $path -Tail 120
+              $tail | ForEach-Object { Write-Host $_ }
+
+              $joined = ($tail -join "`n")
+              if ($joined.Length -gt 5000) {
+                $joined = $joined.Substring($joined.Length - 5000)
+              }
+              $escaped = $joined.Replace('%', '%25').Replace("`r", '').Replace("`n", '%0A')
+              Write-Output "::error title=Failure tail ($path)::$escaped"
             } else {
               Write-Host "Not found: $path"
             }
