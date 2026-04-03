@@ -73,6 +73,8 @@ void UIManager::Cleanup(VkDevice device) {
         vkDestroyFramebuffer(device, fb, nullptr);
     }
     UIFramebuffers.clear();
+    CachedSwapchainImageViews.clear();
+    CachedSwapchainExtent = {};
 
     if (ImGuiPool != VK_NULL_HANDLE) {
         vkDestroyDescriptorPool(device, ImGuiPool, nullptr);
@@ -90,6 +92,12 @@ void UIManager::EndFrame() {
 }
 
 void UIManager::RecordDrawCommands(VkCommandBuffer cmdBuffer, VulkanRenderer* renderer, uint32_t imageIndex) {
+    EnsureFramebuffersUpToDate(renderer);
+    if (imageIndex >= UIFramebuffers.size()) {
+        LOG_ERROR("UI framebuffer index out of range: {} / {}", imageIndex, UIFramebuffers.size());
+        return;
+    }
+
     VkRenderPassBeginInfo info{};
     info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     info.renderPass = UIRenderPass;
@@ -149,6 +157,9 @@ void UIManager::InitUIFramebuffers(VulkanRenderer* renderer) {
     const auto& imageViews = renderer->GetSwapchainImageViews();
     VkExtent2D extent = renderer->GetSwapchainExtent();
 
+    CachedSwapchainImageViews = imageViews;
+    CachedSwapchainExtent = extent;
+
     UIFramebuffers.resize(imageViews.size());
     for (size_t i = 0; i < imageViews.size(); i++) {
         VkImageView attachments[] = { imageViews[i] };
@@ -161,5 +172,47 @@ void UIManager::InitUIFramebuffers(VulkanRenderer* renderer) {
         info.height = extent.height;
         info.layers = 1;
         VK_CHECK(vkCreateFramebuffer(renderer->GetDevice(), &info, nullptr, &UIFramebuffers[i]));
+    }
+}
+
+void UIManager::RecreateUIFramebuffers(VulkanRenderer* renderer) {
+    VkDevice device = renderer->GetDevice();
+    for (auto fb : UIFramebuffers) {
+        vkDestroyFramebuffer(device, fb, nullptr);
+    }
+    UIFramebuffers.clear();
+    InitUIFramebuffers(renderer);
+}
+
+void UIManager::EnsureFramebuffersUpToDate(VulkanRenderer* renderer) {
+    const auto& currentViews = renderer->GetSwapchainImageViews();
+    VkExtent2D currentExtent = renderer->GetSwapchainExtent();
+
+    bool changed = false;
+    if (UIFramebuffers.size() != currentViews.size()) {
+        changed = true;
+    }
+
+    if (!changed &&
+        (CachedSwapchainExtent.width != currentExtent.width ||
+         CachedSwapchainExtent.height != currentExtent.height)) {
+        changed = true;
+    }
+
+    if (!changed && CachedSwapchainImageViews.size() == currentViews.size()) {
+        for (size_t i = 0; i < currentViews.size(); ++i) {
+            if (CachedSwapchainImageViews[i] != currentViews[i]) {
+                changed = true;
+                break;
+            }
+        }
+    } else if (!changed) {
+        changed = true;
+    }
+
+    if (changed) {
+        LOG_INFO("UI swapchain attachments changed, recreating UI framebuffers.");
+        ImGui_ImplVulkan_SetMinImageCount(static_cast<uint32_t>(currentViews.size()));
+        RecreateUIFramebuffers(renderer);
     }
 }

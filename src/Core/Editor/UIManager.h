@@ -25,7 +25,11 @@ private:
     VkDescriptorPool ImGuiPool = VK_NULL_HANDLE;
     VkRenderPass UIRenderPass = VK_NULL_HANDLE;
     std::vector<VkFramebuffer> UIFramebuffers;
+    std::vector<VkImageView> CachedSwapchainImageViews;
+    VkExtent2D CachedSwapchainExtent{};
     
     void InitUIRenderPass(VulkanRenderer* renderer);
     void InitUIFramebuffers(VulkanRenderer* renderer);
+    void RecreateUIFramebuffers(VulkanRenderer* renderer);
+    void EnsureFramebuffersUpToDate(VulkanRenderer* renderer);
 };

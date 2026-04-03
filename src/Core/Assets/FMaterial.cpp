@@ -200,6 +200,7 @@ void FMaterial::BuildPipelines(const std::string& forwardVert, const std::string
     Pipelines[ERenderPath::Forward] = builder
         .SetShaders(vertModule, forwardFragModule)
         .SetViewport(SwapchainExtent.width, SwapchainExtent.height)
+        .SetDynamicViewportScissor()
         .SetInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
         .SetPolygonMode(VK_POLYGON_MODE_FILL)
         .SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE)

@@ -53,6 +53,7 @@ void FDeferredPipeline::RecreateResources(VulkanRenderer* renderer)
 
     InitGBuffers(renderer);
     InitFramebuffers(renderer);
+    UpdateLightingDescriptorSet(renderer);
 }
 
 void FDeferredPipeline::InitRenderPass(VulkanRenderer* renderer)
@@ -422,6 +423,7 @@ void FDeferredPipeline::InitLightingPipeline(VulkanRenderer* renderer) {
     LightingPipeline = builder
         .SetShaders(vertShader, fragShader)
         .SetViewport(renderer->GetSwapchainExtent().width, renderer->GetSwapchainExtent().height)
+        .SetDynamicViewportScissor()
         .SetInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
         .SetPolygonMode(VK_POLYGON_MODE_FILL)
         .SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE) // 后期全屏四边形禁用剔除以免画不出来
