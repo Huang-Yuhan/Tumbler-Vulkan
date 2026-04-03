@@ -80,6 +80,63 @@ CMake 3.28 or higher is required. You are running version X.X.X
 1. 下载并安装最新版 [CMake](https://cmake.org/download/)
 2. 或使用 Visual Studio 自带的 CMake（版本通常足够新）
 
+### 1.5 CLion Build 输出乱码
+
+**现象：**
+- Build 窗口中的中文日志显示为 `閫傜敤浜?`、`姝ｅ湪缂栬瘧...` 等乱码。
+
+**原因：**
+- 项目文件和 CMake 消息是 UTF-8，但 CLion Build 窗口或其子进程按 CP936/GBK 解码，导致 UTF-8 文本被错误解释。
+
+**解决方案（UTF-8 主线）：**
+1. 打开 `File` → `Settings` → `Editor` → `File Encodings`
+2. 将 `Global Encoding`、`Project Encoding` 设为 `UTF-8`
+3. 打开 `Settings` → `Tools` → `Terminal`，将默认编码设为 `UTF-8`
+4. 打开 `Settings` → `Build, Execution, Deployment` → `CMake`
+5. 在当前 Build Profile 的 Environment 中添加 `VSLANG=2052`（中文输出）
+6. 点击 `File` → `Reload CMake Project` 后重新构建
+
+**兜底方案（稳定可读）：**
+- 如果仍偶发乱码，将同一位置的 `VSLANG` 改为 `1033`，强制 MSBuild 输出英文日志（ASCII，最稳定）。
+- 如果 `VSLANG=1033` 未生效，先在 Visual Studio Installer 中安装英文语言包（English），再重启 CLion 后重试。
+
+**命令行验证（可选）：**
+```powershell
+$env:VSLANG=2052
+cmake --build build --config Debug
+
+$env:VSLANG=1033
+cmake --build build --config Debug
+
+# 如果需要，可显式传递 MSBuild 语言参数
+cmake --build build --config Debug -- /p:PreferredUILang=en-US
+```
+
+### 1.6 VSCode CMake Tools 输出乱码/中文日志
+
+**现象：**
+- VSCode 输出中出现 `閫傜敤浜�`、`姝ｅ湪鎵�鎻忔簮...` 等乱码。
+- 或希望在 VSCode 中统一英文日志。
+
+**推荐做法（工作区配置）：**
+在项目的 `.vscode/settings.json` 中设置：
+
+```json
+{
+  "files.encoding": "utf8",
+  "cmake.outputLogEncoding": "utf-8",
+  "cmake.environment": { "VSLANG": "1033" },
+  "cmake.configureEnvironment": { "VSLANG": "1033" },
+  "cmake.buildEnvironment": { "VSLANG": "1033" },
+  "cmake.buildToolArgs": ["/p:PreferredUILang=en-US"]
+}
+```
+
+**说明：**
+- `cmake.outputLogEncoding` 用于修正 CMake Tools 对外部命令输出的解码。
+- `VSLANG=1033` + `PreferredUILang=en-US` 用于将 MSBuild 日志切到英文（需安装 VS 英文语言包）。
+- 你看到的 `[main]/[driver]` 前缀文本属于 VSCode/CMake Tools UI 文案，语言跟随 VSCode 显示语言；如需英文 UI，请在 VSCode 执行 `Configure Display Language` 切换到 `en`。
+
 ---
 
 ## 2. 运行时问题

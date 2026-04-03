@@ -3,7 +3,9 @@ project(Tumbler-Engine LANGUAGES CXX)
 
 # 强制要求使用 MSVC 编译器
 if(WIN32 AND NOT MSVC)
-    message(FATAL_ERROR "本项目必须使用 MSVC 编译器编译。请在 CLion Toolchain 中切换为 Visual Studio 并重新 Reload。")
+    message(FATAL_ERROR
+            "本项目必须使用 MSVC 编译器编译。请在 CLion Toolchain 中切换为 Visual Studio 并重新 Reload。\n"
+            "English: This project requires the MSVC compiler. In CLion, switch Toolchain to Visual Studio and reload CMake.")
 endif()
 
 set(CMAKE_CXX_STANDARD 20)
