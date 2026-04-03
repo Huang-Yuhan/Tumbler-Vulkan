@@ -26,6 +26,9 @@ find_package(spdlog CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(tinyobjloader CONFIG REQUIRED)
+if(BUILD_TESTING)
+    find_package(GTest CONFIG REQUIRED)
+endif()
 
 # 2. 编译 Shader (跟之前一样)
 add_subdirectory(assets/shaders)
@@ -75,6 +78,9 @@ endif()
 # =========================================================
 # CMake 会进入这个文件夹寻找另一个 CMakeLists.txt
 add_subdirectory(src/Examples)
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
 
 if(BUILD_TESTING)
     add_test(

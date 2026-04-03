@@ -12,6 +12,7 @@
     "spdlog",
     "stb",
     "tinyobjloader",
+    "gtest",
     {
       "name": "imgui",
       "features": [

@@ -64,6 +64,9 @@
 - [x] **Smoke Tests**
   - 已覆盖资源存在性、Shader `.spv` 产物、示例可执行产物。
   - 已覆盖延迟渲染关键产物与关键管线钩子存在性检查。
+- [x] **CI 合并门禁**
+  - GitHub Actions 已接入 Windows/MSVC 流水线，自动执行 configure + build + ctest。
+  - PR 与 `main` 推送都会触发，失败时自动上传测试日志。
 - [ ] **下一步测试增强**
   - 增加 headless 渲染一致性快照（如 RenderDoc/离屏比对）。
   - 增加 resize 压力测试与 descriptor 高频创建/销毁测试。

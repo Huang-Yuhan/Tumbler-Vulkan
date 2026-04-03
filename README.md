@@ -31,9 +31,23 @@ ctest -C Debug --output-on-failure
 - 主要示例可执行文件是否已产出
 - 延迟渲染关键产物与核心集成钩子（Subpass / descriptor 刷新）是否存在
 
+只运行单元测试（GoogleTest）：
+
+```powershell
+cd build
+ctest -C Debug -L unit --output-on-failure
+```
+
 ## 📚 文档
 
 完整的文档体系位于 `docs/` 目录：
+
+## 🔁 CI
+
+- GitHub Actions 在 `main` push 和 Pull Request 上会自动执行：
+  - CMake Configure (MSVC + vcpkg)
+  - Debug Build
+  - `ctest -C Debug --output-on-failure`
 
 | 文档 | 说明 |
 |------|------|
