@@ -19,22 +19,22 @@ jobs:
       VCPKG_FEATURE_FLAGS: manifests,versions,binarycaching
       CTEST_OUTPUT_ON_FAILURE: 1
       VSLANG: 1033
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup MSVC
-        uses: ilammy/msvc-dev-cmd@v1
-
-      - name: Setup CMake
-        uses: lukka/get-cmake@latest
-
-      - name: Setup vcpkg dependencies
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgJsonGlob: '**/vcpkg.json'
-          vcpkgGitCommitId: 'ff8f729804f07747ee5dae7d40a4a885066f9204'
+      - name: Bootstrap vcpkg (pinned baseline)
+        shell: pwsh
+        run: |
+          $vcpkgRoot = "$env:RUNNER_TEMP\vcpkg"
+          git init $vcpkgRoot
+          git -C $vcpkgRoot remote add origin https://github.com/microsoft/vcpkg.git
+          git -C $vcpkgRoot fetch --depth 1 origin ff8f729804f07747ee5dae7d40a4a885066f9204
+          git -C $vcpkgRoot checkout FETCH_HEAD
+          & "$vcpkgRoot\bootstrap-vcpkg.bat" -disableMetrics
+          "VCPKG_ROOT=$vcpkgRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Print toolchain diagnostics
         shell: pwsh
@@ -64,11 +64,21 @@ jobs:
         shell: pwsh
         run: ctest --test-dir build -C Debug --output-on-failure
 
-      - name: Upload test logs
+      - name: Print vcpkg logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-ctest-logs
-          path: |
-            build/Testing/Temporary/LastTest.log
-            build/Testing/Temporary/LastTestsFailed.log
+        shell: pwsh
+        run: |
+          $paths = @(
+            "build/vcpkg-manifest-install.log",
+            "build/vcpkg_installed/vcpkg/issue_body.md",
+            "build/Testing/Temporary/LastTest.log",
+            "build/Testing/Temporary/LastTestsFailed.log"
+          )
+          foreach ($path in $paths) {
+            if (Test-Path $path) {
+              Write-Host "========== $path =========="
+              Get-Content -Path $path -Tail 300
+            } else {
+              Write-Host "Not found: $path"
+            }
+          }
