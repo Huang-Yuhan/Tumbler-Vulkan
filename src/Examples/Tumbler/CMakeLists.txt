@@ -28,7 +28,9 @@ add_executable(App-Tumbler
 # 3. 链接与依赖 (保持不变)
 # =========================================================
 target_link_libraries(App-Tumbler PRIVATE TumblerCore)
-add_dependencies(App-Tumbler Shaders) # 确保 Shader 编译先完成
+if(TARGET Shaders)
+    add_dependencies(App-Tumbler Shaders) # 确保 Shader 编译先完成
+endif()
 
 # =========================================================
 # 4. 资源拷贝 (保持不变)

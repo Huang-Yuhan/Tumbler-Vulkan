@@ -4,6 +4,10 @@
 find_program(GLSLC_EXECUTABLE NAMES glslc HINTS "$ENV{VULKAN_SDK}/bin" "/usr/bin" "/usr/local/bin")
 if(NOT GLSLC_EXECUTABLE)
     message(WARNING "Could not find glslc shader compiler! Shaders will not be compiled.")
+    # Keep a no-op target so downstream add_dependencies(... Shaders) stays valid.
+    add_custom_target(Shaders ALL
+            COMMENT "glslc not found; skipping shader compilation."
+    )
     return()
 endif()
 
