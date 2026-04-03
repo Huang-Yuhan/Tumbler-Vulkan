@@ -29,6 +29,7 @@ ctest -C Debug --output-on-failure
 - 关键资产文件是否存在
 - Shader 源文件是否都生成了对应 `.spv`
 - 主要示例可执行文件是否已产出
+- 延迟渲染关键产物与核心集成钩子（Subpass / descriptor 刷新）是否存在
 
 ## 📚 文档
 

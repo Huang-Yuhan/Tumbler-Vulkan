@@ -84,4 +84,12 @@ if(BUILD_TESTING)
             -DBINARY_DIR=${CMAKE_BINARY_DIR}
             -P ${CMAKE_SOURCE_DIR}/cmake/tests/SmokeRuntimeArtifacts.cmake
     )
+
+    add_test(
+            NAME Smoke.DeferredPipeline
+            COMMAND ${CMAKE_COMMAND}
+            -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -DBINARY_DIR=${CMAKE_BINARY_DIR}
+            -P ${CMAKE_SOURCE_DIR}/cmake/tests/SmokeDeferredPipeline.cmake
+    )
 endif()
