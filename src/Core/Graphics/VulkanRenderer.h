@@ -112,6 +112,12 @@ public:
      * @return 分配的描述符集
      */
     VkDescriptorSet AllocateDescriptorSet(VkDescriptorSetLayout layout);
+    
+    /**
+     * @brief 延迟释放描述符集（在安全时机统一回收）
+     * @param descriptorSet 要释放的描述符集
+     */
+    void QueueDescriptorSetFree(VkDescriptorSet descriptorSet);
 
     // ==========================================
     // 向后兼容的委托方法
@@ -157,6 +163,7 @@ private:
     VkDescriptorSetLayout GlobalSetLayout = VK_NULL_HANDLE;
     VkDescriptorSet GlobalDescriptorSet = VK_NULL_HANDLE;
     AllocatedBuffer SceneParameterBuffer{};
+    std::vector<VkDescriptorSet> PendingDescriptorSetFrees;
 
     // ==========================================
     // 命令缓冲区（每帧重用）
@@ -171,6 +178,7 @@ private:
     void InitPipelines();
     void InitSyncStructures();
     void InitDescriptors();
+    void FlushPendingDescriptorSetFrees();
 
     // ==========================================
     // 渲染方法

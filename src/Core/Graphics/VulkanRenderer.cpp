@@ -58,6 +58,7 @@ void VulkanRenderer::Cleanup() {
     if (device != VK_NULL_HANDLE) {
         vkDeviceWaitIdle(device);
     }
+    FlushPendingDescriptorSetFrees();
 
     // 1. 清理描述符资源
     DestroyBuffer(SceneParameterBuffer);
@@ -96,6 +97,7 @@ void VulkanRenderer::Cleanup() {
     Window = nullptr;
     AssetManager = nullptr;
     MainCommandBuffer = VK_NULL_HANDLE;
+    PendingDescriptorSetFrees.clear();
 }
 
 void VulkanRenderer::InitPipelines() {
@@ -171,6 +173,7 @@ void VulkanRenderer::InitDescriptors() {
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     poolInfo.pPoolSizes = poolSizes.data();
     poolInfo.maxSets = 1000;
@@ -227,6 +230,7 @@ void VulkanRenderer::Render(
 
     VkDevice device = Context.GetDevice();
     vkWaitForFences(device, 1, &RenderFence, VK_TRUE, UINT64_MAX);
+    FlushPendingDescriptorSetFrees();
 
     uint32_t imageIndex;
     VkResult result = SwapChain.AcquireNextImage(ImageAvailableSemaphore, imageIndex);
@@ -346,4 +350,26 @@ VkDescriptorSet VulkanRenderer::AllocateDescriptorSet(VkDescriptorSetLayout layo
     VkDescriptorSet descriptorSet;
     VK_CHECK(vkAllocateDescriptorSets(Context.GetDevice(), &allocInfo, &descriptorSet));
     return descriptorSet;
+}
+
+void VulkanRenderer::QueueDescriptorSetFree(VkDescriptorSet descriptorSet) {
+    if (descriptorSet == VK_NULL_HANDLE) {
+        return;
+    }
+    PendingDescriptorSetFrees.push_back(descriptorSet);
+}
+
+void VulkanRenderer::FlushPendingDescriptorSetFrees() {
+    if (PendingDescriptorSetFrees.empty() || DescriptorPool == VK_NULL_HANDLE) {
+        return;
+    }
+
+    VK_CHECK(vkFreeDescriptorSets(
+        Context.GetDevice(),
+        DescriptorPool,
+        static_cast<uint32_t>(PendingDescriptorSetFrees.size()),
+        PendingDescriptorSetFrees.data()
+    ));
+
+    PendingDescriptorSetFrees.clear();
 }

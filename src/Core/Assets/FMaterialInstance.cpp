@@ -20,8 +20,14 @@ FMaterialInstance::FMaterialInstance(std::shared_ptr<FMaterial> parentMaterial, 
 }
 
 FMaterialInstance::~FMaterialInstance() {
-    if (Renderer && UBOBuffer.Buffer != VK_NULL_HANDLE) {
-        Renderer->DestroyBuffer(UBOBuffer);
+    if (Renderer) {
+        if (DescriptorSet != VK_NULL_HANDLE) {
+            Renderer->QueueDescriptorSetFree(DescriptorSet);
+            DescriptorSet = VK_NULL_HANDLE;
+        }
+        if (UBOBuffer.Buffer != VK_NULL_HANDLE) {
+            Renderer->DestroyBuffer(UBOBuffer);
+        }
     }
 }
 
