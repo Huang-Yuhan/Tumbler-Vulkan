@@ -10,6 +10,7 @@ endif()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+include(CTest)
 
 # 在 CMakeLists.txt 顶部
 if(MSVC)
@@ -74,3 +75,13 @@ endif()
 # =========================================================
 # CMake 会进入这个文件夹寻找另一个 CMakeLists.txt
 add_subdirectory(src/Examples)
+
+if(BUILD_TESTING)
+    add_test(
+            NAME Smoke.RuntimeArtifacts
+            COMMAND ${CMAKE_COMMAND}
+            -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -DBINARY_DIR=${CMAKE_BINARY_DIR}
+            -P ${CMAKE_SOURCE_DIR}/cmake/tests/SmokeRuntimeArtifacts.cmake
+    )
+endif()

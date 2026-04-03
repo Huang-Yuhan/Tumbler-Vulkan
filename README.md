@@ -16,6 +16,20 @@
 
 **👉 请查看 [快速入门指南](docs/00_Getting_Started.md) 了解如何搭建环境、编译并运行项目。**
 
+### ✅ 快速回归检查 (Smoke Test)
+
+在完成一次 `Debug` 构建后，可运行：
+
+```powershell
+cd build
+ctest -C Debug --output-on-failure
+```
+
+该检查会验证：
+- 关键资产文件是否存在
+- Shader 源文件是否都生成了对应 `.spv`
+- 主要示例可执行文件是否已产出
+
 ## 📚 文档
 
 完整的文档体系位于 `docs/` 目录：
