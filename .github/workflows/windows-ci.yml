@@ -65,6 +65,8 @@ jobs:
       - name: Configure
         shell: pwsh
         run: |
+          $vcpkgInstalledDir = "$pwd\build\vcpkg_installed"
+          $vcpkgTripletDir = "$vcpkgInstalledDir\$env:VCPKG_DEFAULT_TRIPLET"
           $vulkanIncludeDir = "$pwd\build\vcpkg_installed\$env:VCPKG_DEFAULT_TRIPLET\include"
           $vulkanLib = "$pwd\build\vcpkg_installed\$env:VCPKG_DEFAULT_TRIPLET\lib\vulkan-1.lib"
           if (!(Test-Path "$vulkanIncludeDir\vulkan\vulkan.h")) {
@@ -78,6 +80,8 @@ jobs:
             -DVCPKG_TARGET_TRIPLET=$env:VCPKG_DEFAULT_TRIPLET `
             -DVCPKG_MANIFEST_MODE=ON `
             -DVCPKG_MANIFEST_INSTALL=OFF `
+            -DVCPKG_INSTALLED_DIR="$vcpkgInstalledDir" `
+            -DCMAKE_PREFIX_PATH="$vcpkgTripletDir" `
             -DVulkan_INCLUDE_DIR="$vulkanIncludeDir" `
             -DVulkan_LIBRARY="$vulkanLib" `
             -DBUILD_TESTING=ON
