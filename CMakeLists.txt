@@ -23,15 +23,11 @@ find_package(glfw3 CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
-find_package(Stb QUIET)
-if(NOT Stb_FOUND)
-    # Some environments expose stb as headers only without a package config.
-    find_path(Stb_INCLUDE_DIR
-            NAMES stb_image.h
-    )
-    if(NOT Stb_INCLUDE_DIR)
-        message(FATAL_ERROR "Could not find stb headers (stb_image.h).")
-    endif()
+find_path(Stb_INCLUDE_DIR
+        NAMES stb_image.h
+)
+if(NOT Stb_INCLUDE_DIR)
+    message(FATAL_ERROR "Could not find stb headers (stb_image.h).")
 endif()
 find_package(imgui CONFIG REQUIRED)
 find_package(tinyobjloader CONFIG REQUIRED)
