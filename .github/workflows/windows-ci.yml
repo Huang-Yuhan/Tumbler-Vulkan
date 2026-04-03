@@ -99,6 +99,9 @@ jobs:
       - name: Build
         shell: pwsh
         run: |
+          $vcpkgBinDir = "$pwd\build\vcpkg_installed\$env:VCPKG_DEFAULT_TRIPLET\bin"
+          $vcpkgDebugBinDir = "$pwd\build\vcpkg_installed\$env:VCPKG_DEFAULT_TRIPLET\debug\bin"
+          $env:PATH = "$vcpkgBinDir;$vcpkgDebugBinDir;$env:PATH"
           $buildLog = "$env:RUNNER_TEMP\cmake-build.log"
           & cmake --build build --config Debug --parallel 2>&1 | Tee-Object -FilePath $buildLog
           if ($LASTEXITCODE -ne 0) {
@@ -113,7 +116,11 @@ jobs:
 
       - name: Test
         shell: pwsh
-        run: ctest --test-dir build -C Debug --output-on-failure
+        run: |
+          $vcpkgBinDir = "$pwd\build\vcpkg_installed\$env:VCPKG_DEFAULT_TRIPLET\bin"
+          $vcpkgDebugBinDir = "$pwd\build\vcpkg_installed\$env:VCPKG_DEFAULT_TRIPLET\debug\bin"
+          $env:PATH = "$vcpkgBinDir;$vcpkgDebugBinDir;$env:PATH"
+          ctest --test-dir build -C Debug --output-on-failure
 
       - name: Print vcpkg logs on failure
         if: failure()
