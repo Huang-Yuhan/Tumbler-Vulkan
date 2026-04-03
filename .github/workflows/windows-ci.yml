@@ -20,10 +20,14 @@ jobs:
       CTEST_OUTPUT_ON_FAILURE: 1
       VSLANG: 1033
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      VCPKG_FORCE_SYSTEM_BINARIES: 1
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Bootstrap vcpkg (pinned baseline)
         shell: pwsh
@@ -34,18 +38,29 @@ jobs:
           git -C $vcpkgRoot fetch --depth 1 origin ff8f729804f07747ee5dae7d40a4a885066f9204
           git -C $vcpkgRoot checkout FETCH_HEAD
           & "$vcpkgRoot\bootstrap-vcpkg.bat" -disableMetrics
-          "VCPKG_ROOT=$vcpkgRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_ROOT=$vcpkgRoot"
 
       - name: Print toolchain diagnostics
         shell: pwsh
         run: |
           Write-Host "VCPKG_ROOT=$env:VCPKG_ROOT"
           cmake --version
+          where.exe git
+          where.exe cmake
           if (Test-Path "$env:VCPKG_ROOT/vcpkg.exe") {
             & "$env:VCPKG_ROOT/vcpkg.exe" version
           } else {
             Write-Error "vcpkg.exe not found under VCPKG_ROOT."
           }
+
+      - name: Install dependencies (vcpkg manifest)
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_ROOT\vcpkg.exe" install `
+            --triplet $env:VCPKG_DEFAULT_TRIPLET `
+            --x-manifest-root="$pwd" `
+            --x-install-root="$pwd\build\vcpkg_installed" `
+            --clean-after-build
 
       - name: Configure
         shell: pwsh
@@ -54,6 +69,7 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=$env:VCPKG_DEFAULT_TRIPLET `
             -DVCPKG_MANIFEST_MODE=ON `
+            -DVCPKG_MANIFEST_INSTALL=OFF `
             -DBUILD_TESTING=ON
 
       - name: Build
