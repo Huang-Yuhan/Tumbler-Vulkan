@@ -93,6 +93,7 @@ if(BUILD_TESTING)
             COMMAND ${CMAKE_COMMAND}
             -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
             -DBINARY_DIR=${CMAKE_BINARY_DIR}
+            -DSHADERS_COMPILED=${TUMBLER_SHADERS_COMPILED}
             -P ${CMAKE_SOURCE_DIR}/cmake/tests/SmokeRuntimeArtifacts.cmake
     )
 
@@ -101,6 +102,7 @@ if(BUILD_TESTING)
             COMMAND ${CMAKE_COMMAND}
             -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
             -DBINARY_DIR=${CMAKE_BINARY_DIR}
+            -DSHADERS_COMPILED=${TUMBLER_SHADERS_COMPILED}
             -P ${CMAKE_SOURCE_DIR}/cmake/tests/SmokeDeferredPipeline.cmake
     )
 endif()

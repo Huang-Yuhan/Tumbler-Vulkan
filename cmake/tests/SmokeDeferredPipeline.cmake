@@ -25,9 +25,17 @@ set(required_deferred_shaders
         "${SOURCE_DIR}/assets/shaders/engine/deferred_lighting.frag"
 )
 
+set(skip_spirv_checks FALSE)
+if(DEFINED SHADERS_COMPILED AND NOT SHADERS_COMPILED)
+    set(skip_spirv_checks TRUE)
+    message(STATUS "Skipping deferred SPIR-V checks because glslc is unavailable in this environment.")
+endif()
+
 foreach(shader_file IN LISTS required_deferred_shaders)
     assert_exists("${shader_file}" "Deferred shader source")
-    assert_exists("${shader_file}.spv" "Deferred shader SPIR-V")
+    if(NOT skip_spirv_checks)
+        assert_exists("${shader_file}.spv" "Deferred shader SPIR-V")
+    endif()
 endforeach()
 
 set(deferred_pipeline_cpp "${SOURCE_DIR}/src/Core/Graphics/Pipelines/FDeferredPipeline.cpp")

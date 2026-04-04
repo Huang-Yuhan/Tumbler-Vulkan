@@ -31,6 +31,9 @@ if(WIN32)
     if(NOT _vcpkg_triplet)
         set(_vcpkg_triplet "x64-windows")
     endif()
+    if(_vcpkg_triplet MATCHES "^\\$env:")
+        set(_vcpkg_triplet "x64-windows")
+    endif()
 
     set(_unit_test_env_mod_list
             "PATH=path_list_prepend:${CMAKE_BINARY_DIR}/vcpkg_installed/${_vcpkg_triplet}/debug/bin"

@@ -1,6 +1,8 @@
 # shaders/CMakeLists.txt
 
 # 1. 查找编译器 (修改为更灵活的查找方式)
+set(TUMBLER_SHADERS_COMPILED OFF CACHE INTERNAL "Whether shader sources were compiled with glslc")
+
 find_program(GLSLC_EXECUTABLE NAMES glslc HINTS "$ENV{VULKAN_SDK}/bin" "/usr/bin" "/usr/local/bin")
 if(NOT GLSLC_EXECUTABLE)
     message(WARNING "Could not find glslc shader compiler! Shaders will not be compiled.")
@@ -10,6 +12,8 @@ if(NOT GLSLC_EXECUTABLE)
     )
     return()
 endif()
+
+set(TUMBLER_SHADERS_COMPILED ON CACHE INTERNAL "Whether shader sources were compiled with glslc" FORCE)
 
 # =========================================================
 # 2. 定义路径 (关键修改)
