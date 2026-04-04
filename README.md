@@ -1,5 +1,7 @@
 # Tumbler Vulkan Engine
 
+[![Windows CI](https://github.com/Huang-Yuhan/Tumbler-Vulkan/actions/workflows/windows-ci.yml/badge.svg?branch=main)](https://github.com/Huang-Yuhan/Tumbler-Vulkan/actions/workflows/windows-ci.yml)
+
 A modern Vulkan game engine prototype with a component-based architecture, PBR workflow, and ImGui tooling.
 
 ## Status
