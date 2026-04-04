@@ -17,6 +17,34 @@ gtest_add_tests(
         TARGET TumblerUnitTests
         TEST_LIST TumblerUnitTests_TESTS
 )
-set_tests_properties(${TumblerUnitTests_TESTS}
-        PROPERTIES LABELS "unit"
-)
+
+if(WIN32)
+    # Keep runtime DLLs next to the test executable for direct invocation.
+    add_custom_command(TARGET TumblerUnitTests POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_RUNTIME_DLLS:TumblerUnitTests>
+            $<TARGET_FILE_DIR:TumblerUnitTests>
+            COMMAND_EXPAND_LISTS
+    )
+
+    set(_vcpkg_triplet "${VCPKG_TARGET_TRIPLET}")
+    if(NOT _vcpkg_triplet)
+        set(_vcpkg_triplet "x64-windows")
+    endif()
+
+    set(_unit_test_env_mod_list
+            "PATH=path_list_prepend:${CMAKE_BINARY_DIR}/vcpkg_installed/${_vcpkg_triplet}/debug/bin"
+            "PATH=path_list_prepend:${CMAKE_BINARY_DIR}/vcpkg_installed/${_vcpkg_triplet}/bin"
+    )
+    list(JOIN _unit_test_env_mod_list ";" _unit_test_env_mod)
+
+    set_tests_properties(${TumblerUnitTests_TESTS}
+            PROPERTIES
+            LABELS "unit"
+            ENVIRONMENT_MODIFICATION "${_unit_test_env_mod}"
+    )
+else()
+    set_tests_properties(${TumblerUnitTests_TESTS}
+            PROPERTIES LABELS "unit"
+    )
+endif()

@@ -114,6 +114,19 @@ jobs:
       - name: Test
         shell: pwsh
         run: |
+          $vcpkgBinDir = "$pwd\build\vcpkg_installed\$env:VCPKG_DEFAULT_TRIPLET\bin"
+          $vcpkgDebugBinDir = "$pwd\build\vcpkg_installed\$env:VCPKG_DEFAULT_TRIPLET\debug\bin"
+          if (Test-Path $vcpkgDebugBinDir) {
+            $env:PATH = "$vcpkgDebugBinDir;$env:PATH"
+          } else {
+            Write-Warning "Missing vcpkg debug runtime dir: $vcpkgDebugBinDir"
+          }
+          if (Test-Path $vcpkgBinDir) {
+            $env:PATH = "$vcpkgBinDir;$env:PATH"
+          } else {
+            Write-Warning "Missing vcpkg runtime dir: $vcpkgBinDir"
+          }
+          Write-Host "CTest PATH prefix: $vcpkgDebugBinDir; $vcpkgBinDir"
           $testLog = "$env:RUNNER_TEMP\ctest.log"
           & ctest --test-dir build -C Debug --output-on-failure -V 2>&1 | Tee-Object -FilePath $testLog
           if ($LASTEXITCODE -ne 0) {
