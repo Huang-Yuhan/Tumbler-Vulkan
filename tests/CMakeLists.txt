@@ -13,7 +13,10 @@ target_link_libraries(TumblerUnitTests PRIVATE
 target_compile_features(TumblerUnitTests PRIVATE cxx_std_20)
 
 include(GoogleTest)
-gtest_discover_tests(TumblerUnitTests
-        DISCOVERY_TIMEOUT 60
+gtest_add_tests(
+        TARGET TumblerUnitTests
+        TEST_LIST TumblerUnitTests_TESTS
+)
+set_tests_properties(${TumblerUnitTests_TESTS}
         PROPERTIES LABELS "unit"
 )
