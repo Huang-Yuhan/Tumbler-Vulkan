@@ -85,6 +85,7 @@ Details: [docs/10_Troubleshooting_Guide.md](docs/10_Troubleshooting_Guide.md)
 - [docs/01_Architecture_Overview.md](docs/01_Architecture_Overview.md)
 - [docs/09_Rendering_Pipeline_Deep_Dive.md](docs/09_Rendering_Pipeline_Deep_Dive.md)
 - [docs/10_Troubleshooting_Guide.md](docs/10_Troubleshooting_Guide.md)
+- [docs/13_Testing_and_CI.md](docs/13_Testing_and_CI.md)
 
 ## Tech Stack
 

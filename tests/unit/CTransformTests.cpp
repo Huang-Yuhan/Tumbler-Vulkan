@@ -65,3 +65,25 @@ TEST(CTransformTests, ReparentUpdatesChildrenCollections) {
     ASSERT_EQ(parentB.GetChildren().size(), 1u);
     EXPECT_EQ(parentB.GetChildren()[0], &child);
 }
+
+TEST(CTransformTests, TransformDirectionIgnoresTranslation) {
+    CTransform transform;
+    transform.SetPosition(glm::vec3(100.0f, -50.0f, 25.0f));
+    transform.SetRotation(glm::vec3(0.0f, 90.0f, 0.0f));
+
+    const glm::vec3 dir = glm::normalize(transform.TransformDirection(glm::vec3(0.0f, 0.0f, 1.0f)));
+    EXPECT_NEAR(glm::abs(dir.x), 1.0f, 1e-3f);
+    EXPECT_NEAR(dir.y, 0.0f, 1e-3f);
+    EXPECT_NEAR(glm::abs(dir.z), 0.0f, 1e-3f);
+}
+
+TEST(CTransformTests, ChildWorldPositionUpdatesWhenParentMoves) {
+    CTransform parent;
+    CTransform child;
+    child.SetPosition(glm::vec3(1.0f, 0.0f, 0.0f));
+    child.SetParent(&parent, false);
+
+    parent.SetPosition(glm::vec3(5.0f, 0.0f, 0.0f));
+    const glm::vec3 world = child.TransformPoint(glm::vec3(0.0f));
+    ExpectVecNear(world, glm::vec3(6.0f, 0.0f, 0.0f));
+}

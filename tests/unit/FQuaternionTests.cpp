@@ -40,3 +40,22 @@ TEST(FQuaternionTests, SlerpReturnsMidRotationForHalfAlpha) {
     EXPECT_NEAR(forward.y, 0.0f, 1e-3f);
     EXPECT_NEAR(glm::abs(forward.z), 0.0f, 1e-3f);
 }
+
+TEST(FQuaternionTests, NormalizeReNormalizesScaledQuaternion) {
+    FQuaternion q;
+    q.Raw *= 3.0f;
+    ASSERT_GT(glm::length(q.Raw), 1.0f);
+
+    q.Normalize();
+
+    EXPECT_NEAR(glm::length(q.Raw), 1.0f, kEpsilon);
+}
+
+TEST(FQuaternionTests, VectorMultiplicationRotatesDirection) {
+    const FQuaternion q(glm::vec3(0.0f, 90.0f, 0.0f));
+    const glm::vec3 rotated = glm::normalize(q * glm::vec3(0.0f, 0.0f, 1.0f));
+
+    EXPECT_NEAR(glm::abs(rotated.x), 1.0f, 1e-3f);
+    EXPECT_NEAR(rotated.y, 0.0f, 1e-3f);
+    EXPECT_NEAR(glm::abs(rotated.z), 0.0f, 1e-3f);
+}
