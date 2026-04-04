@@ -113,7 +113,18 @@ jobs:
 
       - name: Test
         shell: pwsh
-        run: ctest --test-dir build -C Debug --output-on-failure
+        run: |
+          $testLog = "$env:RUNNER_TEMP\ctest.log"
+          & ctest --test-dir build -C Debug --output-on-failure -V 2>&1 | Tee-Object -FilePath $testLog
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "========== Test failed (tail) =========="
+            $tail = Get-Content -Path $testLog -Tail 200
+            $tail | ForEach-Object { Write-Host $_ }
+            $joined = ($tail -join ' | ')
+            if ($joined.Length -gt 4000) { $joined = $joined.Substring($joined.Length - 4000) }
+            Write-Host "::error title=CTest failed::$joined"
+            exit $LASTEXITCODE
+          }
 
       - name: Print vcpkg logs on failure
         if: failure()
