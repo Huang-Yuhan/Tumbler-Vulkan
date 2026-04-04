@@ -1,88 +1,95 @@
-# 🚀 Tumbler Vulkan Engine
+# Tumbler Vulkan Engine
 
-一个现代化的 Vulkan 游戏引擎，采用基于物理的渲染 (PBR) 和实体-组件系统架构。
+A modern Vulkan game engine prototype with a component-based architecture, PBR workflow, and ImGui tooling.
 
-> **当前状态**：🚧 稳固地基期 (架构重构与 PBR 基础完成)
+## Status
 
-## ✨ 特性
+- Core engine, examples, and CI pipeline are available.
+- Main development plan: [Tumbler_Dev_Plan.md](Tumbler_Dev_Plan.md)
 
-- **现代化渲染管线**：基于 Vulkan 的高性能渲染
-- **PBR 渲染**：支持 Cook-Torrance BRDF、金属工作流
-- **实体-组件系统**：灵活的 ECS 变体架构
-- **逻辑与渲染分离**：严格的数据流设计
-- **ImGui 集成**：内置调试和编辑器工具
+## Highlights
 
-## 📖 快速开始
+- Vulkan rendering pipeline
+- PBR material workflow
+- Component-style game architecture
+- Runtime examples under `src/Examples`
+- Unit tests with GoogleTest
 
-**👉 请查看 [快速入门指南](docs/00_Getting_Started.md) 了解如何搭建环境、编译并运行项目。**
+## Requirements
 
-### ✅ 快速回归检查 (Smoke Test)
+- Windows 10/11 x64
+- Visual Studio 2022 (MSVC toolchain)
+- CMake 3.28+
+- vcpkg (`VCPKG_ROOT` set)
+- Vulkan SDK/runtime
 
-在完成一次 `Debug` 构建后，可运行：
-
-```powershell
-cd build
-ctest -C Debug --output-on-failure
-```
-
-该检查会验证：
-- 关键资产文件是否存在
-- Shader 源文件是否都生成了对应 `.spv`
-- 主要示例可执行文件是否已产出
-- 延迟渲染关键产物与核心集成钩子（Subpass / descriptor 刷新）是否存在
-
-只运行单元测试（GoogleTest）：
+## Quick Start (Windows + MSVC + vcpkg)
 
 ```powershell
-cd build
-ctest -C Debug -L unit --output-on-failure
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
+  -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
+  -DVCPKG_TARGET_TRIPLET=x64-windows `
+  -DBUILD_TESTING=ON
+
+cmake --build build --config Debug --parallel
 ```
 
-## 📚 文档
+For a full setup walkthrough, see [docs/00_Getting_Started.md](docs/00_Getting_Started.md).
 
-完整的文档体系位于 `docs/` 目录：
+## Test Commands
 
-## 🔁 CI
+Run all tests:
 
-- GitHub Actions 在 `main` push 和 Pull Request 上会自动执行：
-  - CMake Configure (MSVC + vcpkg)
-  - Debug Build
-  - `ctest -C Debug --output-on-failure`
+```powershell
+ctest --test-dir build -C Debug --output-on-failure
+```
 
-| 文档 | 说明 |
-|------|------|
-| [文档索引](docs/INDEX.md) | 📍 所有文档的导航入口 |
-| [快速入门指南](docs/00_Getting_Started.md) | 🚀 环境配置与构建 |
-| [架构概览](docs/01_Architecture_Overview.md) | 🏗️ 引擎整体设计 |
-| [资源管理](docs/02_Asset_Management.md) | 📦 资源加载与缓存 |
-| [材质系统](docs/03_Material_System.md) | 🎨 PBR 材质系统 |
-| [PBR 理论与实践](docs/04_PBR_Theory_and_Practice.md) | 💡 基于物理的渲染 |
-| [Vulkan 核心概念](docs/05_Vulkan_Core_Concepts.md) | 🔧 Vulkan 工作流 |
-| [游戏系统架构](docs/06_Game_System_Architecture.md) | 🎮 ECS 与场景管理 |
-| [输入系统](docs/07_Input_System.md) | ⌨️ 键盘鼠标输入 |
-| [编辑器与调试工具](docs/08_Editor_and_Debugging.md) | 🔍 ImGui 调试 |
-| [渲染管线深度解析](docs/09_Rendering_Pipeline_Deep_Dive.md) | 🖼️ 渲染流程详解 |
-| [故障排除指南](docs/10_Troubleshooting_Guide.md) | ⚠️ 常见问题解答 |
+Run unit tests only:
 
-## 🎮 控制方式
+```powershell
+ctest --test-dir build -C Debug -L unit --output-on-failure
+```
 
-- **WASD**: 移动相机
-- **QE**: 上下移动
-- **鼠标拖动**: 旋转视角
-- **ImGui 面板**: 调整光源参数
+Smoke coverage includes:
 
-## 🗺️ 开发路线图
+- required runtime assets
+- example executable outputs
+- deferred pipeline integration checks
+- shader artifact checks (`.spv`)
 
-查看 [Tumbler_Dev_Plan.md](Tumbler_Dev_Plan.md) 了解详细的开发计划。
+Note: if `glslc` is unavailable, shader compile checks are skipped in smoke tests (CI-safe behavior).
 
-## 🛠️ 技术栈
+## CI
 
-- **图形 API**: Vulkan 1.3+
-- **语言**: C++20
-- **编译器**: MSVC (Visual Studio 2022)
-- **构建系统**: CMake 3.28+
-- **包管理**: vcpkg
+GitHub Actions workflow: [windows-ci.yml](.github/workflows/windows-ci.yml)
 
----
+Current CI lane on push/PR to `main`:
 
-**Happy Rendering! 🎨**
+- Configure (MSVC + vcpkg toolchain)
+- Debug build
+- `ctest --test-dir build -C Debug --output-on-failure`
+
+## Encoding / Garbled Logs (Windows IDE)
+
+If CLion/VSCode build output looks garbled, use:
+
+- UTF-8 file/project encoding
+- `VSLANG=1033` as stable English log fallback
+
+Details: [docs/10_Troubleshooting_Guide.md](docs/10_Troubleshooting_Guide.md)
+
+## Documentation
+
+- [docs/INDEX.md](docs/INDEX.md)
+- [docs/00_Getting_Started.md](docs/00_Getting_Started.md)
+- [docs/01_Architecture_Overview.md](docs/01_Architecture_Overview.md)
+- [docs/09_Rendering_Pipeline_Deep_Dive.md](docs/09_Rendering_Pipeline_Deep_Dive.md)
+- [docs/10_Troubleshooting_Guide.md](docs/10_Troubleshooting_Guide.md)
+
+## Tech Stack
+
+- Graphics API: Vulkan 1.3+
+- Language: C++20
+- Compiler: MSVC (Visual Studio 2022)
+- Build system: CMake
+- Package manager: vcpkg
