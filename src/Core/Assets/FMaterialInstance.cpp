@@ -60,6 +60,9 @@ void FMaterialInstance::ApplyChanges() {
 
     // 2. 准备更新 Vulkan 描述符集
     std::vector<VkWriteDescriptorSet> descriptorWrites;
+    descriptorWrites.reserve(3);
+    std::vector<VkDescriptorImageInfo> imageInfos;
+    imageInfos.reserve(2);
 
     // --- (A) 配置 BaseColorMap (Binding 0) ---
     std::shared_ptr<FTexture> baseColorTex = nullptr;
@@ -74,6 +77,7 @@ void FMaterialInstance::ApplyChanges() {
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         imageInfo.imageView = baseColorTex->GetImageView();
         imageInfo.sampler = baseColorTex->GetSampler();
+        imageInfos.push_back(imageInfo);
 
         VkWriteDescriptorSet texWrite{};
         texWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -82,7 +86,7 @@ void FMaterialInstance::ApplyChanges() {
         texWrite.dstArrayElement = 0;
         texWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         texWrite.descriptorCount = 1;
-        texWrite.pImageInfo = &imageInfo;
+        texWrite.pImageInfo = &imageInfos.back();
         descriptorWrites.push_back(texWrite);
     }
 
@@ -99,6 +103,7 @@ void FMaterialInstance::ApplyChanges() {
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         imageInfo.imageView = normalMapTex->GetImageView();
         imageInfo.sampler = normalMapTex->GetSampler();
+        imageInfos.push_back(imageInfo);
 
         VkWriteDescriptorSet texWrite{};
         texWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -107,7 +112,7 @@ void FMaterialInstance::ApplyChanges() {
         texWrite.dstArrayElement = 0;
         texWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         texWrite.descriptorCount = 1;
-        texWrite.pImageInfo = &imageInfo;
+        texWrite.pImageInfo = &imageInfos.back();
         descriptorWrites.push_back(texWrite);
     }
 
