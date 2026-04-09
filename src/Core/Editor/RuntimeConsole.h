@@ -16,10 +16,13 @@ enum class EConsoleMessageType {
     Error
 };
 
+using ConsoleAutocompleteHandler = std::function<std::vector<std::string>(const std::vector<std::string>& args, size_t activeArgIndex)>;
+
 struct ConsoleCommandDefinition {
     std::string Name;
     std::string Usage;
     std::string Description;
+    ConsoleAutocompleteHandler AutocompleteHandler;
     std::function<void(const std::vector<std::string>& args)> Handler;
 };
 
@@ -67,5 +70,6 @@ private:
     [[nodiscard]] std::vector<std::string> TokenizeCommand(const std::string& commandLine) const;
     [[nodiscard]] static std::string NormalizeCommandName(const std::string& name);
     static int InputTextCallback(ImGuiInputTextCallbackData* data);
+    int OnInputTextCompletion(ImGuiInputTextCallbackData* data);
     int OnInputTextHistory(ImGuiInputTextCallbackData* data);
 };

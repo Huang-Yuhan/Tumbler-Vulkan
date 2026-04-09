@@ -9,6 +9,13 @@
 #include <exception>
 
 namespace {
+struct ConsoleTokenRange {
+    size_t Start = 0;
+    size_t End = 0;
+    bool Quoted = false;
+    std::string Value;
+};
+
 std::string TrimCopy(const std::string& text)
 {
     size_t start = 0;
@@ -33,6 +40,108 @@ ImVec4 GetConsoleMessageColor(EConsoleMessageType type)
         case EConsoleMessageType::Info:
         default: return ImVec4(0.92f, 0.92f, 0.92f, 1.0f);
     }
+}
+
+bool StartsWithInsensitive(const std::string& value, const std::string& prefix)
+{
+    if (prefix.size() > value.size()) {
+        return false;
+    }
+
+    for (size_t index = 0; index < prefix.size(); ++index) {
+        if (std::tolower(static_cast<unsigned char>(value[index]))
+            != std::tolower(static_cast<unsigned char>(prefix[index]))) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+std::string BuildLongestCommonPrefix(const std::vector<std::string>& values)
+{
+    if (values.empty()) {
+        return {};
+    }
+
+    std::string prefix = values.front();
+    for (size_t valueIndex = 1; valueIndex < values.size() && !prefix.empty(); ++valueIndex) {
+        size_t matchLength = 0;
+        while (matchLength < prefix.size()
+            && matchLength < values[valueIndex].size()
+            && std::tolower(static_cast<unsigned char>(prefix[matchLength]))
+                == std::tolower(static_cast<unsigned char>(values[valueIndex][matchLength]))) {
+            ++matchLength;
+        }
+
+        prefix.resize(matchLength);
+    }
+
+    return prefix;
+}
+
+std::vector<ConsoleTokenRange> TokenizeWithRanges(const std::string& text)
+{
+    std::vector<ConsoleTokenRange> tokens;
+    size_t index = 0;
+    while (index < text.size()) {
+        while (index < text.size() && std::isspace(static_cast<unsigned char>(text[index])) != 0) {
+            ++index;
+        }
+
+        if (index >= text.size()) {
+            break;
+        }
+
+        ConsoleTokenRange token{};
+        if (text[index] == '"') {
+            token.Quoted = true;
+            ++index;
+            token.Start = index;
+            while (index < text.size() && text[index] != '"') {
+                ++index;
+            }
+            token.End = index;
+            token.Value = text.substr(token.Start, token.End - token.Start);
+            if (index < text.size() && text[index] == '"') {
+                ++index;
+            }
+        } else {
+            token.Start = index;
+            while (index < text.size() && std::isspace(static_cast<unsigned char>(text[index])) == 0) {
+                ++index;
+            }
+            token.End = index;
+            token.Value = text.substr(token.Start, token.End - token.Start);
+        }
+
+        tokens.push_back(std::move(token));
+    }
+
+    return tokens;
+}
+
+bool EndsWithWhitespaceOutsideQuotes(const std::string& text)
+{
+    bool inQuotes = false;
+    for (char ch : text) {
+        if (ch == '"') {
+            inQuotes = !inQuotes;
+        }
+    }
+
+    return !inQuotes
+        && !text.empty()
+        && std::isspace(static_cast<unsigned char>(text.back())) != 0;
+}
+
+std::string QuoteIfNeeded(const std::string& text)
+{
+    if (text.find_first_of(" \t") == std::string::npos) {
+        return text;
+    }
+
+    return "\"" + text + "\"";
 }
 }
 
@@ -128,7 +237,8 @@ void RuntimeConsole::Draw()
 
     const ImGuiInputTextFlags inputFlags =
         ImGuiInputTextFlags_EnterReturnsTrue |
-        ImGuiInputTextFlags_CallbackHistory;
+        ImGuiInputTextFlags_CallbackHistory |
+        ImGuiInputTextFlags_CallbackCompletion;
 
     if (ImGui::InputText("##ConsoleInput", InputBuffer.data(), InputBuffer.size(), inputFlags, &RuntimeConsole::InputTextCallback, this)) {
         ExecuteCurrentInput();
@@ -325,6 +435,138 @@ int RuntimeConsole::InputTextCallback(ImGuiInputTextCallbackData* data)
 
     if (data->EventFlag == ImGuiInputTextFlags_CallbackHistory) {
         return console->OnInputTextHistory(data);
+    }
+
+    if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion) {
+        return console->OnInputTextCompletion(data);
+    }
+
+    return 0;
+}
+
+int RuntimeConsole::OnInputTextCompletion(ImGuiInputTextCallbackData* data)
+{
+    if (data == nullptr) {
+        return 0;
+    }
+
+    const size_t cursorPos = static_cast<size_t>(data->CursorPos);
+    const std::string fullInput(data->Buf, static_cast<size_t>(data->BufTextLen));
+    const std::string prefixInput = fullInput.substr(0, cursorPos);
+    const std::vector<ConsoleTokenRange> allTokens = TokenizeWithRanges(fullInput);
+    const std::vector<ConsoleTokenRange> prefixTokens = TokenizeWithRanges(prefixInput);
+    const bool completingNewToken = EndsWithWhitespaceOutsideQuotes(prefixInput);
+
+    if (prefixTokens.empty()) {
+        AddMessage(EConsoleMessageType::Info, "Commands: type 'help' or press Tab after a prefix.");
+        return 0;
+    }
+
+    bool completingCommand = false;
+    std::vector<std::string> argsBeforeCursor;
+    size_t activeArgIndex = 0;
+    std::string currentPrefix;
+    size_t replaceStart = cursorPos;
+    size_t replaceEnd = cursorPos;
+    bool activeTokenQuoted = false;
+    std::vector<std::string> matches;
+
+    if (prefixTokens.size() == 1 && !completingNewToken) {
+        completingCommand = true;
+        currentPrefix = prefixTokens.front().Value;
+        replaceStart = allTokens.front().Start;
+        replaceEnd = allTokens.front().End;
+
+        for (const ConsoleCommandDefinition& command : Commands) {
+            if (StartsWithInsensitive(command.Name, currentPrefix)) {
+                matches.push_back(command.Name);
+            }
+        }
+    } else {
+        const std::string normalizedCommand = NormalizeCommandName(prefixTokens.front().Value);
+        const auto it = CommandLookup.find(normalizedCommand);
+        if (it == CommandLookup.end()) {
+            return 0;
+        }
+
+        const ConsoleCommandDefinition& command = Commands[it->second];
+        if (!command.AutocompleteHandler) {
+            return 0;
+        }
+
+        for (size_t tokenIndex = 1; tokenIndex < prefixTokens.size(); ++tokenIndex) {
+            argsBeforeCursor.push_back(prefixTokens[tokenIndex].Value);
+        }
+
+        if (completingNewToken) {
+            activeArgIndex = argsBeforeCursor.size();
+            currentPrefix.clear();
+            replaceStart = cursorPos;
+            replaceEnd = cursorPos;
+        } else {
+            if (argsBeforeCursor.empty()) {
+                return 0;
+            }
+
+            activeArgIndex = argsBeforeCursor.size() - 1;
+            currentPrefix = argsBeforeCursor.back();
+            replaceStart = allTokens[prefixTokens.size() - 1].Start;
+            replaceEnd = allTokens[prefixTokens.size() - 1].End;
+            activeTokenQuoted = allTokens[prefixTokens.size() - 1].Quoted;
+        }
+
+        matches = command.AutocompleteHandler(argsBeforeCursor, activeArgIndex);
+        std::erase_if(matches, [this, &currentPrefix](const std::string& value) {
+            return value.empty() || !StartsWithInsensitive(value, currentPrefix);
+        });
+    }
+
+    if (matches.empty()) {
+        return 0;
+    }
+
+    std::ranges::sort(matches, [this](const std::string& lhs, const std::string& rhs) {
+        return NormalizeCommandName(lhs) < NormalizeCommandName(rhs);
+    });
+    matches.erase(std::unique(matches.begin(), matches.end()), matches.end());
+
+    const std::string commonPrefix = BuildLongestCommonPrefix(matches);
+    const bool hasSingleMatch = matches.size() == 1;
+    std::string replacement = hasSingleMatch ? matches.front() : commonPrefix;
+
+    if (replacement.empty()) {
+        if (matches.size() > 1) {
+            std::string line = completingCommand ? "Command matches:" : "Argument matches:";
+            for (const std::string& name : matches) {
+                line += " ";
+                line += name;
+            }
+            AddMessage(EConsoleMessageType::Info, line);
+        }
+        return 0;
+    }
+
+    if (!completingCommand && !activeTokenQuoted) {
+        replacement = QuoteIfNeeded(replacement);
+    }
+
+    const std::string existingToken = fullInput.substr(replaceStart, replaceEnd - replaceStart);
+    if (hasSingleMatch && replaceEnd == cursorPos) {
+        replacement += ' ';
+    }
+
+    if (replacement != existingToken) {
+        data->DeleteChars(static_cast<int>(replaceStart), static_cast<int>(replaceEnd - replaceStart));
+        data->InsertChars(static_cast<int>(replaceStart), replacement.c_str());
+    }
+
+    if (matches.size() > 1 && commonPrefix.size() <= currentPrefix.size()) {
+        std::string line = completingCommand ? "Command matches:" : "Argument matches:";
+        for (const std::string& name : matches) {
+            line += " ";
+            line += name;
+        }
+        AddMessage(EConsoleMessageType::Info, line);
     }
 
     return 0;

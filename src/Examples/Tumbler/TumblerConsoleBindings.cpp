@@ -115,6 +115,48 @@ void AddUsage(RuntimeConsole& console, const std::string& usage)
 {
     console.AddMessage(EConsoleMessageType::Error, "Usage: " + usage);
 }
+
+std::vector<std::string> CollectActorNameSuggestions(
+    FScene& scene,
+    EditorSessionState& editorState,
+    bool includeSelectedToken,
+    bool includeNoneToken,
+    const FActor* excludedActor = nullptr)
+{
+    std::vector<std::string> suggestions;
+
+    if (includeSelectedToken
+        && editorState.SelectedActor != nullptr
+        && editorState.SelectedActor != excludedActor
+        && scene.ContainsActor(editorState.SelectedActor)) {
+        suggestions.push_back("selected");
+    }
+
+    if (includeNoneToken) {
+        suggestions.push_back("none");
+    }
+
+    for (const auto& actor : scene.GetAllActors()) {
+        if (actor.get() == excludedActor) {
+            continue;
+        }
+        suggestions.push_back(actor->Name);
+    }
+
+    return suggestions;
+}
+
+std::vector<std::string> CollectPointLightActorSuggestions(FScene& scene)
+{
+    std::vector<std::string> suggestions;
+    for (const auto& actor : scene.GetAllActors()) {
+        if (actor->GetComponent<CPointLight>() != nullptr) {
+            suggestions.push_back(actor->Name);
+        }
+    }
+
+    return suggestions;
+}
 }
 
 void RegisterTumblerConsoleCommands(
@@ -145,6 +187,13 @@ void RegisterTumblerConsoleCommands(
         .Name = "select",
         .Usage = "select <ActorName|none>",
         .Description = "Select an actor for inspector editing and selected-target commands.",
+        .AutocompleteHandler = [&scene, &editorState](const std::vector<std::string>&, size_t activeArgIndex) {
+            if (activeArgIndex != 0) {
+                return std::vector<std::string>{};
+            }
+
+            return CollectActorNameSuggestions(scene, editorState, false, true);
+        },
         .Handler = [&console, &scene, &editorState](const std::vector<std::string>& args) {
             if (args.size() != 1) {
                 AddUsage(console, "select <ActorName|none>");
@@ -172,6 +221,13 @@ void RegisterTumblerConsoleCommands(
         .Name = "actor.move",
         .Usage = "actor.move <ActorName|selected> <x> <y> <z>",
         .Description = "Set an actor world position.",
+        .AutocompleteHandler = [&scene, &editorState](const std::vector<std::string>&, size_t activeArgIndex) {
+            if (activeArgIndex != 0) {
+                return std::vector<std::string>{};
+            }
+
+            return CollectActorNameSuggestions(scene, editorState, true, false);
+        },
         .Handler = [&console, &scene, &editorState](const std::vector<std::string>& args) {
             if (args.size() != 4) {
                 AddUsage(console, "actor.move <ActorName|selected> <x> <y> <z>");
@@ -197,6 +253,13 @@ void RegisterTumblerConsoleCommands(
         .Name = "actor.rotate",
         .Usage = "actor.rotate <ActorName|selected> <pitch> <yaw> <roll>",
         .Description = "Set an actor rotation in Euler degrees.",
+        .AutocompleteHandler = [&scene, &editorState](const std::vector<std::string>&, size_t activeArgIndex) {
+            if (activeArgIndex != 0) {
+                return std::vector<std::string>{};
+            }
+
+            return CollectActorNameSuggestions(scene, editorState, true, false);
+        },
         .Handler = [&console, &scene, &editorState](const std::vector<std::string>& args) {
             if (args.size() != 4) {
                 AddUsage(console, "actor.rotate <ActorName|selected> <pitch> <yaw> <roll>");
@@ -222,6 +285,13 @@ void RegisterTumblerConsoleCommands(
         .Name = "actor.scale",
         .Usage = "actor.scale <ActorName|selected> <x> <y> <z>",
         .Description = "Set an actor scale.",
+        .AutocompleteHandler = [&scene, &editorState](const std::vector<std::string>&, size_t activeArgIndex) {
+            if (activeArgIndex != 0) {
+                return std::vector<std::string>{};
+            }
+
+            return CollectActorNameSuggestions(scene, editorState, true, false);
+        },
         .Handler = [&console, &scene, &editorState](const std::vector<std::string>& args) {
             if (args.size() != 4) {
                 AddUsage(console, "actor.scale <ActorName|selected> <x> <y> <z>");
@@ -293,6 +363,13 @@ void RegisterTumblerConsoleCommands(
         .Name = "light.intensity",
         .Usage = "light.intensity <ActorName> <value>",
         .Description = "Set a point light intensity.",
+        .AutocompleteHandler = [&scene](const std::vector<std::string>&, size_t activeArgIndex) {
+            if (activeArgIndex != 0) {
+                return std::vector<std::string>{};
+            }
+
+            return CollectPointLightActorSuggestions(scene);
+        },
         .Handler = [&console, &scene](const std::vector<std::string>& args) {
             if (args.size() != 2) {
                 AddUsage(console, "light.intensity <ActorName> <value>");
@@ -331,6 +408,13 @@ void RegisterTumblerConsoleCommands(
         .Name = "light.color",
         .Usage = "light.color <ActorName> <r> <g> <b>",
         .Description = "Set a point light RGB color.",
+        .AutocompleteHandler = [&scene](const std::vector<std::string>&, size_t activeArgIndex) {
+            if (activeArgIndex != 0) {
+                return std::vector<std::string>{};
+            }
+
+            return CollectPointLightActorSuggestions(scene);
+        },
         .Handler = [&console, &scene](const std::vector<std::string>& args) {
             if (args.size() != 4) {
                 AddUsage(console, "light.color <ActorName> <r> <g> <b>");
@@ -363,6 +447,13 @@ void RegisterTumblerConsoleCommands(
         .Name = "render.path",
         .Usage = "render.path <forward|deferred|gpu>",
         .Description = "Switch the active render path.",
+        .AutocompleteHandler = [](const std::vector<std::string>&, size_t activeArgIndex) {
+            if (activeArgIndex != 0) {
+                return std::vector<std::string>{};
+            }
+
+            return std::vector<std::string>{"forward", "deferred", "gpu"};
+        },
         .Handler = [&console, &editorState](const std::vector<std::string>& args) {
             if (args.size() != 1) {
                 AddUsage(console, "render.path <forward|deferred|gpu>");
@@ -436,6 +527,13 @@ void RegisterTumblerConsoleCommands(
         .Name = "destroy",
         .Usage = "destroy <ActorName|selected>",
         .Description = "Destroy an actor at the end of the frame.",
+        .AutocompleteHandler = [&scene, &camera, &editorState](const std::vector<std::string>&, size_t activeArgIndex) {
+            if (activeArgIndex != 0) {
+                return std::vector<std::string>{};
+            }
+
+            return CollectActorNameSuggestions(scene, editorState, true, false, camera.GetOwner());
+        },
         .Handler = [&console, &scene, &camera, &editorState](const std::vector<std::string>& args) {
             if (args.size() != 1) {
                 AddUsage(console, "destroy <ActorName|selected>");
