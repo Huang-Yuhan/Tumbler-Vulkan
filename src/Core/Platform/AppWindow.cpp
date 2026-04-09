@@ -160,8 +160,11 @@ bool SetEnvIfDifferent(const char* name, const char* value)
         return false;
     }
 
-    setenv(name, value, 1);
-    return true;
+#if defined(_WIN32)
+    return _putenv_s(name, value) == 0;
+#else
+    return setenv(name, value, 1) == 0;
+#endif
 }
 
 bool UnsetEnvIfPresent(const char* name)
@@ -170,8 +173,11 @@ bool UnsetEnvIfPresent(const char* name)
         return false;
     }
 
-    unsetenv(name);
-    return true;
+#if defined(_WIN32)
+    return _putenv_s(name, "") == 0;
+#else
+    return unsetenv(name) == 0;
+#endif
 }
 
 bool RestoreEnvFromBackup(const char* targetName, const char* backupName)

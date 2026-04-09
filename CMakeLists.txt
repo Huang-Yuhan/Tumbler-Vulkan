@@ -19,7 +19,15 @@ endif()
 
 # 1. 查找依赖
 find_package(Vulkan REQUIRED)
-find_package(glfw3 CONFIG REQUIRED)
+if(DEFINED VCPKG_INSTALLED_DIR AND DEFINED VCPKG_TARGET_TRIPLET)
+    set(TUMBLER_VCPKG_GLFW3_DIR
+            "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/glfw3")
+    if(EXISTS "${TUMBLER_VCPKG_GLFW3_DIR}/glfw3Config.cmake")
+        set(glfw3_DIR "${TUMBLER_VCPKG_GLFW3_DIR}" CACHE PATH
+                "Path to the glfw3 CMake package config" FORCE)
+    endif()
+endif()
+find_package(glfw3 3.4 CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
