@@ -1,4 +1,5 @@
 #include "UIManager.h"
+#include "Core/GameSystem/InputManager.h"
 #include "Core/Graphics/VulkanRenderer.h"
 #include "Core/Platform/AppWindow.h"
 #include "Core/Utils/VulkanUtils.h"
@@ -10,7 +11,7 @@
 
 #include "Core/Utils/Log.h"
 
-void UIManager::Init(AppWindow* window, VulkanRenderer* renderer) {
+void UIManager::Init(AppWindow* window, VulkanRenderer* renderer, InputManager* inputManager) {
     VkDevice device = renderer->GetDevice();
 
     // 1. 创建 ImGui 专属 Descriptor Pool
@@ -60,6 +61,8 @@ void UIManager::Init(AppWindow* window, VulkanRenderer* renderer) {
     init_info.MinImageCount = renderer->GetSwapchainImageCount();
     init_info.ImageCount = renderer->GetSwapchainImageCount();
     ImGui_ImplVulkan_Init(&init_info);
+
+    Console.Initialize(inputManager);
 }
 
 void UIManager::Cleanup(VkDevice device) {
@@ -87,7 +90,12 @@ void UIManager::BeginFrame() {
     ImGui::NewFrame();
 }
 
+void UIManager::TickInput() {
+    Console.TickInput();
+}
+
 void UIManager::EndFrame() {
+    Console.Draw();
     ImGui::Render();
 }
 

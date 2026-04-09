@@ -11,6 +11,7 @@ static int TranslateToGLFWKey(EKeyCode code)
         case EKeyCode::Escape: return GLFW_KEY_ESCAPE;
         case EKeyCode::Space: return GLFW_KEY_SPACE;
         case EKeyCode::Enter: return GLFW_KEY_ENTER;
+        case EKeyCode::GraveAccent: return GLFW_KEY_GRAVE_ACCENT;
         case EKeyCode::A: return GLFW_KEY_A;
         case EKeyCode::B: return GLFW_KEY_B;
         case EKeyCode::C: return GLFW_KEY_C;
@@ -89,11 +90,10 @@ void InputManager::Tick()
     }
 
     // 3. 处理鼠标锁定逻辑 (Editor Camera 体验优化)
-    bool bMouseRightPressed = CurrentKeys[static_cast<uint16_t>(EKeyCode::MouseRight)];
     bool bMouseRightJustPressed = CurrentKeys[static_cast<uint16_t>(EKeyCode::MouseRight)] && !PreviousKeys[static_cast<uint16_t>(EKeyCode::MouseRight)];
     bool bMouseRightJustReleased = !CurrentKeys[static_cast<uint16_t>(EKeyCode::MouseRight)] && PreviousKeys[static_cast<uint16_t>(EKeyCode::MouseRight)];
 
-    if (bMouseRightJustPressed && !IsUIFocused()) {
+    if (bMouseRightJustPressed && !IsInputBlocked()) {
         glfwSetInputMode(WindowHandle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         bCursorLocked = true;
         bFirstMouse = true;
@@ -104,7 +104,7 @@ void InputManager::Tick()
     }
 
     // 4. 处理鼠标和 UI 穿透
-    if (IsUIFocused()) {
+    if (IsInputBlocked()) {
         MouseDelta = glm::vec2(0.0f);
         bFirstMouse = true;
         if (bCursorLocked) {
@@ -137,7 +137,7 @@ void InputManager::BindAction(const std::string& name, EKeyCode key) {
 }
 
 float InputManager::GetAxis(const std::string& name) const {
-    if (IsUIFocused()) return 0.0f; // 如果在输入 UI，禁止移动角色
+    if (IsInputBlocked()) return 0.0f; // 如果在输入 UI，禁止移动角色
 
     auto it = AxisBindings.find(name);
     if (it != AxisBindings.end()) {
@@ -150,7 +150,7 @@ float InputManager::GetAxis(const std::string& name) const {
 }
 
 bool InputManager::IsActionPressed(const std::string& name) const {
-    if (IsUIFocused()) return false;
+    if (IsInputBlocked()) return false;
 
     auto it = ActionBindings.find(name);
     if (it != ActionBindings.end()) {
@@ -164,8 +164,14 @@ bool InputManager::GetKey(EKeyCode key) const
     return CurrentKeys[static_cast<uint16_t>(key)];
 }
 
+bool InputManager::WasKeyJustPressed(EKeyCode key) const
+{
+    const uint16_t index = static_cast<uint16_t>(key);
+    return CurrentKeys[index] && !PreviousKeys[index];
+}
+
 bool InputManager::IsActionJustPressed(const std::string& name) const {
-    if (IsUIFocused()) return false;
+    if (IsInputBlocked()) return false;
 
     auto it = ActionBindings.find(name);
     if (it != ActionBindings.end()) {
@@ -176,11 +182,35 @@ bool InputManager::IsActionJustPressed(const std::string& name) const {
 }
 
 glm::vec2 InputManager::GetMouseDelta() const {
+    if (IsInputBlocked()) {
+        return glm::vec2(0.0f);
+    }
     return MouseDelta;
+}
+
+void InputManager::SetGameplayInputBlocked(bool blocked)
+{
+    if (bGameplayInputBlocked == blocked) {
+        return;
+    }
+
+    bGameplayInputBlocked = blocked;
+    MouseDelta = glm::vec2(0.0f);
+    bFirstMouse = true;
+
+    if (blocked && bCursorLocked && WindowHandle != nullptr) {
+        glfwSetInputMode(WindowHandle, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        bCursorLocked = false;
+    }
 }
 
 bool InputManager::IsUIFocused() const {
     // 只要 ImGui 想要接管鼠标或键盘，我们就认为 UI 激活了
     ImGuiIO& io = ImGui::GetIO();
     return io.WantCaptureMouse || io.WantCaptureKeyboard;
+}
+
+bool InputManager::IsInputBlocked() const
+{
+    return bGameplayInputBlocked || IsUIFocused();
 }

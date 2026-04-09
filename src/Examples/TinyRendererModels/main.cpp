@@ -43,7 +43,7 @@ int main() {
         auto currentTime = std::chrono::high_resolution_clock::now();
 
         UIManager ui_manager;
-        ui_manager.Init(&window, &renderer);
+        ui_manager.Init(&window, &renderer, &inputManager);
 
         while (!window.ShouldClose()) {
             window.PollEvents();
@@ -58,6 +58,7 @@ int main() {
             }
 
             inputManager.Tick();
+            ui_manager.TickInput();
             logic.Tick(frameTime);
 
             std::vector<RenderPacket> renderPackets;

@@ -1,17 +1,18 @@
 {
   "name": "tumbler-engine",
   "version-string": "0.1.0",
+  "builtin-baseline": "ff8f729804f07747ee5dae7d40a4a885066f9204",
   "dependencies": [
     {
-      "name": "vulkan",
-      "platform": "windows"
+      "name": "glfw3",
+      "features": [
+        {
+          "name": "wayland",
+          "platform": "linux"
+        }
+      ]
     },
-    "glfw3",
     "glm",
-    "vulkan-memory-allocator",
-    "spdlog",
-    "stb",
-    "tinyobjloader",
     "gtest",
     {
       "name": "imgui",
@@ -19,7 +20,23 @@
         "glfw-binding",
         "vulkan-binding"
       ]
-    }
-  ],
-  "builtin-baseline": "ff8f729804f07747ee5dae7d40a4a885066f9204"
+    },
+    "spdlog",
+    "stb",
+    "tinyobjloader",
+    {
+      "name": "vulkan",
+      "platform": "windows | linux"
+    },
+    {
+      "name": "vulkan-loader",
+      "features": [
+        "wayland",
+        "xcb",
+        "xlib"
+      ],
+      "platform": "linux"
+    },
+    "vulkan-memory-allocator"
+  ]
 }

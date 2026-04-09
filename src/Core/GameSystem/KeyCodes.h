@@ -13,6 +13,7 @@ enum class EKeyCode : uint16_t {
     Escape,
     Space,
     Enter,
+    GraveAccent,
     LeftShift,
     LeftCtrl,
 

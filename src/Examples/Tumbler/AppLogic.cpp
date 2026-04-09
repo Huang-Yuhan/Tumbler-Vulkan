@@ -1,18 +1,20 @@
 #include "AppLogic.h"
+
+#include "Core/Editor/EditorSessionState.h"
+#include "Core/Utils/Log.h"
+
 #include <glm/vec3.hpp>
 #include <imgui.h>
 
 #include "Core/GameSystem/Components/CFirstPersonCamera.h"
-#include "Core/GameSystem/InputManager.h"
-#include "Core/GameSystem/Components/CFirstPersonCamera.h"
-#include "Core/GameSystem/InputManager.h"
 #include "Core/Assets/FMaterial.h"
-#include "Core/Assets/FMaterialInstance.h"
 #include "Core/Assets/FAssetManager.h"
+#include "Core/Assets/FMaterialInstance.h"
 #include "Core/GameSystem/FActor.h"
-#include "Core/Geometry/FMesh.h"
-#include "Core/GameSystem/Components/CMeshRenderer.h"
+#include "Core/GameSystem/InputManager.h"
 #include "Core/GameSystem/Components/CPointLight.h"
+#include "Core/GameSystem/Components/CMeshRenderer.h"
+#include "Core/Geometry/FMesh.h"
 
 void AppLogic::InitializeScene()
 {
@@ -65,9 +67,10 @@ AppLogic::~AppLogic() = default;
 FScene* AppLogic::GetScene() { return Scene.get(); }
 const FScene* AppLogic::GetScene() const { return Scene.get(); }
 
-void AppLogic::Init(VulkanRenderer* renderer, FAssetManager* assetMgr, InputManager* inputMgr) {
+void AppLogic::Init(VulkanRenderer* renderer, FAssetManager* assetMgr, InputManager* inputMgr, EditorSessionState* sessionState) {
     AssetMgr = assetMgr;
     InputMgr = inputMgr;
+    SessionState = sessionState;
     InitializeScene();
 
     // 0. 创建相机实体与漫游组件
@@ -171,6 +174,21 @@ void AppLogic::Tick(float deltaTime) {
     }
 }
 
+bool AppLogic::ValidateSelectedActor()
+{
+    if (SessionState == nullptr || Scene == nullptr || SessionState->SelectedActor == nullptr) {
+        return false;
+    }
+
+    if (!Scene->ContainsActor(SessionState->SelectedActor)) {
+        LOG_WARN("Selected actor was removed from the scene. Clearing editor selection.");
+        SessionState->SelectedActor = nullptr;
+        return false;
+    }
+
+    return true;
+}
+
 void AppLogic::UpdatePerformanceStats(float frameTime, int drawCallCount) {
     Stats.FrameTimeMs = frameTime * 1000.0f;
     Stats.FPS = 1.0f / frameTime;
@@ -234,7 +252,7 @@ void AppLogic::DrawCameraPanel() {
         
         glm::vec3 rot = cameraActor->Transform.GetEulerAngles();
         if (ImGui::DragFloat3("Rotation", &rot.x, 1.0f, -180.0f, 180.0f)) {
-            cameraActor->Transform.SetRotation(rot);
+            MainCamera->SetLookEuler(rot);
         }
         
         ImGui::Separator();
@@ -246,9 +264,15 @@ void AppLogic::DrawCameraPanel() {
         ImGui::Separator();
         ImGui::Text("Global Render Pipeline:");
         const char* pipelines[] = { "Forward Rendering", "Deferred Rendering", "GPU Driven (WIP)" };
-        int currentItem = static_cast<int>(CurrentRenderPath);
+        const ERenderPath currentPath = SessionState != nullptr ? SessionState->CurrentRenderPath : ERenderPath::Forward;
+        int currentItem = static_cast<int>(currentPath);
         if (ImGui::Combo("Pipeline Strategy", &currentItem, pipelines, IM_ARRAYSIZE(pipelines))) {
-            CurrentRenderPath = static_cast<ERenderPath>(currentItem);
+            const ERenderPath requestedPath = static_cast<ERenderPath>(currentItem);
+            if (requestedPath == ERenderPath::GPUDriven) {
+                LOG_WARN("GPU Driven render path is not implemented yet.");
+            } else if (SessionState != nullptr) {
+                SessionState->CurrentRenderPath = requestedPath;
+            }
         }
     }
     
@@ -282,14 +306,20 @@ static void DrawActorNode(FActor* actor, FActor*& selectedActor) {
 
 void AppLogic::DrawSceneHierarchyPanel() {
     ImGui::Begin("Scene Hierarchy");
-    
+
+    FActor* selectedActor = SessionState != nullptr ? SessionState->SelectedActor : nullptr;
+
     if (Scene) {
         const auto& actors = Scene->GetAllActors();
         for (const auto& actor : actors) {
             if (actor->Transform.GetParent() == nullptr) {
-                DrawActorNode(actor.get(), SelectedActor);
+                DrawActorNode(actor.get(), selectedActor);
             }
         }
+    }
+
+    if (SessionState != nullptr) {
+        SessionState->SelectedActor = selectedActor;
     }
     
     ImGui::End();
@@ -297,19 +327,21 @@ void AppLogic::DrawSceneHierarchyPanel() {
 
 void AppLogic::DrawInspectorPanel() {
     ImGui::Begin("Inspector");
-    
-    if (!SelectedActor) {
+
+    if (!ValidateSelectedActor()) {
         ImGui::Text("Select an object in the Scene Hierarchy");
         ImGui::End();
         return;
     }
-    
-    ImGui::Text("Actor: %s", SelectedActor->Name.c_str());
+
+    FActor* selectedActor = SessionState->SelectedActor;
+
+    ImGui::Text("Actor: %s", selectedActor->Name.c_str());
     ImGui::Separator();
     
     // 【架构重构：基于组件的动态 UI 渲染】
-    SelectedActor->Transform.OnDrawUI();
-    for (auto& comp : SelectedActor->Components) {
+    selectedActor->Transform.OnDrawUI();
+    for (auto& comp : selectedActor->Components) {
         comp->OnDrawUI();
     }
     
@@ -317,6 +349,7 @@ void AppLogic::DrawInspectorPanel() {
 }
 
 void AppLogic::DrawEditorUI() {
+    ValidateSelectedActor();
     DrawPerformancePanel();
     DrawCameraPanel();
     DrawSceneHierarchyPanel();

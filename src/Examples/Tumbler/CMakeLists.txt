@@ -1,12 +1,12 @@
 # =========================================================
 # 1. 自动搜索当前目录下的 .h, .hpp, .cpp, .c 文件
 # =========================================================
-file(GLOB APP_SOURCES
+file(GLOB APP_SOURCES CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/*.c"
 )
 
-file(GLOB APP_HEADERS
+file(GLOB APP_HEADERS CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp"
 )

@@ -3,7 +3,9 @@
 #include "Core/Graphics/VulkanRenderer.h"
 #include "AppLogic.h"
 #include "Core/Assets/FAssetManager.h"
+#include "Core/Editor/EditorSessionState.h"
 #include "Core/Editor/UIManager.h"
+#include "TumblerConsoleBindings.h"
 #include "Core/GameSystem/Components/CCamera.h"
 #include "Core/GameSystem/Components/CTransform.h"
 #include "Core/GameSystem/Components/CPointLight.h"
@@ -40,8 +42,10 @@ int main() {
         inputManager.BindAxis("MoveRight", EKeyCode::D, EKeyCode::A);
         inputManager.BindAxis("MoveUp", EKeyCode::E, EKeyCode::Q);
 
+        EditorSessionState editorSessionState;
+
         AppLogic logic;
-        logic.Init(&renderer, &assetManager, &inputManager);
+        logic.Init(&renderer, &assetManager, &inputManager, &editorSessionState);
 
         // 提前上传共用网格，防止渲染中途卡顿
         renderer.UploadMesh(assetManager.GetOrLoadMesh("DefaultPlane").get());
@@ -51,7 +55,8 @@ int main() {
 
         // 4. UI 系统初始化
         UIManager ui_manager;
-        ui_manager.Init(&window, &renderer);
+        ui_manager.Init(&window, &renderer, &inputManager);
+        RegisterTumblerConsoleCommands(ui_manager.GetConsole(), *logic.GetScene(), *logic.GetMainCamera(), editorSessionState);
 
         // ==========================================
         // 核心游戏与渲染主循环
@@ -71,6 +76,7 @@ int main() {
 
             // 更新输入系统
             inputManager.Tick();
+            ui_manager.TickInput();
 
             // 更新游戏逻辑 (相机漫游等)
             logic.Tick(frameTime);
@@ -99,7 +105,7 @@ int main() {
             SceneViewData viewData = logic.GetScene()->GenerateSceneView(cam, &cam->GetOwner()->Transform, aspectRatio);
             
             // 将从 UI 获取的管线枚举注入
-            viewData.RenderPath = logic.GetCurrentRenderPath();
+            viewData.RenderPath = editorSessionState.CurrentRenderPath;
 
             // --- C. 发送给底层渲染器执行 ---
             // 渲染器同时接收“视图”和“包裹”，并将 UI 录制指令作为回调传入

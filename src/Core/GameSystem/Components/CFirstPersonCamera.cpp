@@ -7,6 +7,16 @@ void CFirstPersonCamera::Init(InputManager* input) {
     Input = input;
 }
 
+void CFirstPersonCamera::SetLookEuler(const glm::vec3& eulerDegrees)
+{
+    Pitch = -eulerDegrees.x;
+    Yaw = -eulerDegrees.y + 90.0f;
+
+    if (Owner) {
+        Owner->Transform.SetRotation(eulerDegrees);
+    }
+}
+
 void CFirstPersonCamera::Update(float deltaTime) {
     if (!Input || !Owner) return;
 

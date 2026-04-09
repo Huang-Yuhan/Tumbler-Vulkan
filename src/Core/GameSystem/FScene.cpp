@@ -77,6 +77,17 @@ FActor * FScene::FindActorByName(const std::string &name) const
     return nullptr;
 }
 
+bool FScene::ContainsActor(const FActor* actor) const
+{
+    if (actor == nullptr) {
+        return false;
+    }
+
+    return std::ranges::any_of(Actors, [actor](const std::unique_ptr<FActor>& actorPtr) {
+        return actorPtr.get() == actor;
+    });
+}
+
 void FScene::ExtractRenderPackets(std::vector<RenderPacket>& outPackets) const {
     outPackets.clear(); // 清空上一帧的旧包裹
 

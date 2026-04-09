@@ -48,6 +48,7 @@ public:
     [[nodiscard]] const std::vector<std::unique_ptr<FActor>>& GetAllActors()const;
 
     [[nodiscard]] FActor* FindActorByName(const std::string& name) const;
+    [[nodiscard]] bool ContainsActor(const FActor* actor) const;
 
     void ExtractRenderPackets(std::vector<RenderPacket>& outPackets) const;
 

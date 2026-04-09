@@ -33,6 +33,7 @@ public:
     bool IsActionPressed(const std::string& name) const;
 
     bool GetKey(EKeyCode key) const;
+    bool WasKeyJustPressed(EKeyCode key) const;
 
     // 动作是否在当前帧【刚刚】被按下 (适合跳跃、打开菜单)
     bool IsActionJustPressed(const std::string& name) const;
@@ -40,10 +41,14 @@ public:
     // 获取鼠标相对上一帧的位移 (用于转动视角)
     glm::vec2 GetMouseDelta() const;
 
+    void SetGameplayInputBlocked(bool blocked);
+    [[nodiscard]] bool IsGameplayInputBlocked() const { return bGameplayInputBlocked; }
+
     // ==========================================
     // 3. UI 穿透拦截
     // ==========================================
     bool IsUIFocused() const;
+    bool IsInputBlocked() const;
 
 private:
     GLFWwindow* WindowHandle = nullptr;
@@ -61,4 +66,5 @@ private:
     glm::vec2 MouseDelta{0.0f};
     bool bFirstMouse = true;
     bool bCursorLocked = false;
+    bool bGameplayInputBlocked = false;
 };
