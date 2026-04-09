@@ -128,6 +128,7 @@ Tumbler 渲染系统高层设计文档，描述双管线策略模式、G-Buffer 
 
 **内容包括：**
 - 内置编辑器面板（性能统计、光源、相机、场景层级、材质编辑器）
+- Runtime Console（命令历史、`Tab` 自动补全、Tumbler 命令绑定）
 - AppLogic 编辑器架构
 - ImGui 简介
 - UIManager 类使用
@@ -157,6 +158,8 @@ Tumbler 渲染系统高层设计文档，描述双管线策略模式、G-Buffer 
 **内容包括：**
 - 构建问题
 - 运行时问题
+- Linux / Wayland Vulkan WSI 问题
+- Wayland 窗口装饰 / `libdecor-gtk` 问题
 - 资源问题
 - 性能问题
 - 调试工具使用

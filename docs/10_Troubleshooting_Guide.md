@@ -249,6 +249,116 @@ VUID-vkCmdBindDescriptorSets-pipelineLayout-00316
 - 着色器是否执行？
 - 输出的颜色是什么？
 
+### 2.6 Linux / Wayland：`glfwGetRequiredInstanceExtensions` 返回空，或缺少 `VK_KHR_wayland_surface`
+
+**典型日志：**
+```text
+GLFW platform is Wayland. Vulkan surface extension query failed.
+No Wayland Vulkan WSI extension was exposed. Expected VK_KHR_wayland_surface.
+```
+
+或：
+
+```text
+Crash: glfwGetRequiredInstanceExtensions returned NULL
+```
+
+**常见原因：**
+1. `glfw3` 没有按 Wayland 方式构建
+2. `vulkan-loader` 没有启用 `wayland/xcb/xlib` WSI feature
+3. 构建目录还是旧的，`vcpkg.json` 已改但依赖没重新解算
+
+**当前项目要求的 Linux manifest 关键项：**
+
+```json
+{
+  "name": "glfw3",
+  "features": [
+    { "name": "wayland", "platform": "linux" }
+  ]
+},
+{
+  "name": "vulkan",
+  "platform": "windows | linux"
+},
+{
+  "name": "vulkan-loader",
+  "platform": "linux",
+  "features": ["wayland", "xcb", "xlib"]
+}
+```
+
+**解决方案：**
+1. 删除旧构建目录或至少重新运行 CMake 配置
+2. 确认 `vcpkg.json` 包含上面的 Linux 依赖
+3. 重新配置并构建：
+
+```bash
+cmake -S . -B cmake-build-debug -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+
+cmake --build cmake-build-debug --target App-Tumbler
+```
+
+**验证思路：**
+- 日志中应看到 `GLFW Requested Extension: VK_KHR_wayland_surface`
+- `vulkan-loader` 的 CMakeCache 中 `BUILD_WSI_WAYLAND_SUPPORT` / `BUILD_WSI_XCB_SUPPORT` / `BUILD_WSI_XLIB_SUPPORT` 应为 `ON`
+
+**实现细节说明：**
+- 项目不再依赖 `imgui[vulkan-binding]` 间接把 `vulkan` 带进来，而是在 `vcpkg.json` 中显式声明 Linux 上的 `vulkan`
+- Linux 下额外显式声明了 `vulkan-loader[wayland,xcb,xlib]`
+- `AppWindow` 内部不是只调用一次 `glfwInit()` 就结束，而是按 Wayland → Any → X11 的顺序逐步尝试，并在失败时输出详细的 Vulkan WSI 扩展诊断
+
+### 2.7 Linux / Wayland：窗口没有标题栏或关闭按钮
+
+**典型日志：**
+```text
+Failed to load plugin 'libdecor-gtk.so': failed to init
+No plugins found, falling back on no decorations
+```
+
+**原因：**
+- 不一定是系统没装 `libdecor`
+- 更常见的是从 Snap Code / VSCode Snap 终端启动时，GTK / GIO / GSettings 环境变量被 Snap 运行时污染，导致 `libdecor-gtk` 初始化失败
+
+**当前引擎行为：**
+- 新版本会在 Wayland 下检测 Snap Code 注入环境
+- 在 GLFW 初始化前自动清理相关 GTK / GIO / Snap 变量
+- 因此新的 `App-Tumbler` 在同一终端环境下也应该恢复正常窗口装饰
+
+**实现细节说明：**
+- `AppWindow` 会先检查当前是否是 Wayland 会话
+- 如果检测到 `SNAP_NAME=code`，或若干 GTK / GIO / XDG 变量指向 `/snap/code/`
+  的运行时，就视为 Snap Code 环境污染
+- 代码会优先恢复 `XDG_DATA_DIRS_VSCODE_SNAP_ORIG` / `XDG_CONFIG_DIRS_VSCODE_SNAP_ORIG`
+- 然后移除 `GTK_EXE_PREFIX`、`GTK_PATH`、`GSETTINGS_SCHEMA_DIR`、`GIO_MODULE_DIR`、`XDG_DATA_HOME` 等会让 `libdecor-gtk` 误连 Snap 运行时的变量
+- 最后强制把 `GDK_BACKEND` 设为 `wayland`
+
+这个修复的重点不是“安装更多包”，而是让原生 GLFW / GTK 进程不要继承 VSCode Snap 自己的桌面运行时环境。
+
+**如果你仍然遇到问题：**
+1. 先确认你运行的是最新构建出的可执行文件
+2. 尽量从普通系统终端而不是 Snap Code 集成终端启动
+3. 检查系统包是否安装：
+   - `libdecor-0-0`
+   - `libdecor-0-plugin-1-gtk`
+   - `libgtk-3-0`
+4. 如果需要，使用最小干净环境验证：
+
+```bash
+env -i HOME=$HOME USER=$USER LOGNAME=$LOGNAME \
+  PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+  LANG=$LANG TERM=$TERM \
+  XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR \
+  XDG_SESSION_TYPE=$XDG_SESSION_TYPE \
+  WAYLAND_DISPLAY=$WAYLAND_DISPLAY \
+  DISPLAY=$DISPLAY \
+  DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS \
+  XDG_CURRENT_DESKTOP=$XDG_CURRENT_DESKTOP \
+  ./cmake-build-debug/src/Examples/Tumbler/App-Tumbler
+```
+
 ---
 
 ## 3. 资源问题

@@ -93,8 +93,11 @@ Tumbler-Vulkan/
 | 功能 | 文件位置 |
 |------|----------|
 | UI 管理器 | `src/Core/Editor/UIManager.h` |
+| 运行时控制台 | `src/Core/Editor/RuntimeConsole.h` |
+| 共享编辑状态 | `src/Core/Editor/EditorSessionState.h` |
 | 应用逻辑 | `src/Examples/Tumbler/AppLogic.h` |
 | 编辑器实现 | `src/Examples/Tumbler/AppLogic.cpp` |
+| 控制台命令绑定 | `src/Examples/Tumbler/TumblerConsoleBindings.cpp` |
 
 **编辑器面板方法：**
 - `DrawPerformancePanel()` - 性能统计
@@ -102,6 +105,7 @@ Tumbler-Vulkan/
 - `DrawCameraPanel()` - 相机参数
 - `DrawSceneHierarchyPanel()` - 场景层级
 - `DrawMaterialPanel()` - 材质编辑器
+- `RuntimeConsole::Draw()` - 运行时命令控制台
 
 ### 5. 想了解 Vulkan 底层？
 
@@ -133,6 +137,7 @@ src/Examples/Tumbler/main.cpp
 └── 主循环
     ├── 计算帧时间
     ├── 更新输入
+    ├── 更新控制台输入 (uiManager.TickInput)
     ├── 更新游戏逻辑 (logic.Tick)
     ├── 提取渲染数据 (ExtractRenderPackets)
     ├── 绘制编辑器 UI (DrawEditorUI)
@@ -156,8 +161,11 @@ AppLogic
 │   └── DrawMaterialPanel()
 └── 数据
     ├── Scene - 场景
-    ├── SelectedActor - 选中的物体
     └── Stats - 性能统计
+
+共享编辑状态位于 `EditorSessionState`：
+├── SelectedActor - 选中的物体
+└── CurrentRenderPath - 当前渲染路径
 ```
 
 ### 渲染流程 (`VulkanRenderer.cpp`)

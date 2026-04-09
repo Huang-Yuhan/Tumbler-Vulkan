@@ -14,13 +14,15 @@ A modern Vulkan game engine prototype with a component-based architecture, PBR w
 - Vulkan rendering pipeline
 - PBR material workflow
 - Component-style game architecture
+- Runtime console with history and Tab autocomplete
 - Runtime examples under `src/Examples`
 - Unit tests with GoogleTest
 
 ## Requirements
 
-- Windows 10/11 x64
-- Visual Studio 2022 (MSVC toolchain)
+- Windows 10/11 x64 or Linux x64
+- Visual Studio 2022 (MSVC toolchain) on Windows
+- GCC 13+ or Clang 16+ recommended on Linux
 - CMake 3.28+
 - vcpkg (`VCPKG_ROOT` set)
 - Vulkan SDK/runtime
@@ -36,7 +38,44 @@ cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
 cmake --build build --config Debug --parallel
 ```
 
-For a full setup walkthrough, see [docs/00_Getting_Started.md](docs/00_Getting_Started.md).
+For a full Windows setup walkthrough, see [docs/00_Getting_Started.md](docs/00_Getting_Started.md).
+
+## Quick Start (Linux + Ninja + vcpkg)
+
+```bash
+cmake -S . -B build-linux -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+  -DBUILD_TESTING=ON
+
+cmake --build build-linux --target App-Tumbler
+```
+
+The Linux manifest enables:
+
+- `glfw3[wayland]`
+- `vulkan`
+- `vulkan-loader[wayland,xcb,xlib]`
+
+This is required for proper Wayland/X11 Vulkan surface creation.
+
+## Runtime Console
+
+The built-in runtime console is owned by `UIManager` and is available in `App-Tumbler`.
+
+- `~`: open or close the console
+- `Enter`: run the current command
+- `Up/Down`: browse command history
+- `Tab`: autocomplete command names and supported arguments
+
+Example commands:
+
+- `help`
+- `actors`
+- `select MainLight`
+- `actor.move selected 0 2 0`
+- `render.path deferred`
+- `destroy selected`
 
 ## Test Commands
 
@@ -80,6 +119,11 @@ If CLion/VSCode build output looks garbled, use:
 
 Details: [docs/10_Troubleshooting_Guide.md](docs/10_Troubleshooting_Guide.md)
 
+## Linux Notes
+
+- On Wayland, the engine now auto-sanitizes Snap Code GTK/GIO environment pollution before GLFW initialization.
+- If Vulkan surface creation or window decorations still fail, see [docs/10_Troubleshooting_Guide.md](docs/10_Troubleshooting_Guide.md).
+
 ## Documentation
 
 - [docs/INDEX.md](docs/INDEX.md)
@@ -93,6 +137,6 @@ Details: [docs/10_Troubleshooting_Guide.md](docs/10_Troubleshooting_Guide.md)
 
 - Graphics API: Vulkan 1.3+
 - Language: C++20
-- Compiler: MSVC (Visual Studio 2022)
+- Compiler: MSVC (Windows), GCC/Clang (Linux)
 - Build system: CMake
 - Package manager: vcpkg

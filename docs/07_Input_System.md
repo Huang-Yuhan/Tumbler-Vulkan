@@ -1,6 +1,6 @@
 # 输入系统 (Input System)
 
-Tumbler 引擎的输入系统提供了灵活且易于使用的输入抽象层，封装了 GLFW 的底层输入 API，支持轴映射、动作绑定和鼠标输入。
+Tumbler 引擎的输入系统提供了灵活且易于使用的输入抽象层，封装了 GLFW 的底层输入 API，支持轴映射、动作绑定、原始按键查询以及运行时 UI 输入阻断。
 
 ## 1. 系统概述
 
@@ -9,6 +9,8 @@ Tumbler 引擎的输入系统提供了灵活且易于使用的输入抽象层，
 - 管理按键状态缓存
 - 提供轴（Axis）和动作（Action）的抽象绑定
 - 处理鼠标位移
+- 提供 `WasKeyJustPressed()` 这类不受 Gameplay 阻断影响的原始按键查询
+- 通过 `SetGameplayInputBlocked()` 在运行时控制台等 UI 打开时阻断游戏输入
 
 ## 2. 初始化
 
@@ -30,10 +32,21 @@ while (!window.ShouldClose()) {
     
     // 更新输入状态
     inputManager.Tick();
+    uiManager.TickInput();
     
     // ... 游戏逻辑 ...
 }
 ```
+
+推荐帧顺序：
+
+1. `window.PollEvents()`
+2. `inputManager.Tick()`
+3. `uiManager.TickInput()`
+4. `logic.Tick(frameTime)`
+5. `uiManager.BeginFrame()`
+6. `logic.DrawEditorUI()`
+7. `uiManager.EndFrame()`
 
 ## 4. 轴输入 (Axis Input)
 
@@ -87,10 +100,6 @@ if (inputManager.IsActionJustPressed("Jump")) {
     player->Jump();
 }
 
-// 检查动作是否在当前帧刚刚释放
-if (inputManager.IsActionJustReleased("Jump")) {
-    player->StopJumping();
-}
 ```
 
 ## 6. 直接按键查询
@@ -102,11 +111,59 @@ if (inputManager.IsActionJustReleased("Jump")) {
 if (inputManager.GetKey(EKeyCode::LeftShift)) {
     speed = sprintSpeed;
 }
+
+// 检查某个键是否在本帧刚刚按下
+if (inputManager.WasKeyJustPressed(EKeyCode::GraveAccent)) {
+    // 例如：切换运行时控制台
+}
 ```
 
-## 7. 鼠标输入
+## 7. 运行时 UI 输入阻断
 
-### 7.1 获取鼠标位移
+`InputManager` 区分“Gameplay 输入”和“原始按键输入”：
+
+- `GetAxis()`、`IsActionPressed()`、`IsActionJustPressed()`、`GetMouseDelta()` 会受到 UI 捕获和 `GameplayInputBlocked` 共同影响
+- `WasKeyJustPressed()` 不受 Gameplay 阻断影响，适合做控制台、调试菜单这类全局切换键
+
+示例：
+
+```cpp
+// 运行时控制台打开时，立即阻断相机移动与鼠标看向
+inputManager.SetGameplayInputBlocked(true);
+
+if (inputManager.IsGameplayInputBlocked()) {
+    // 这里的 WASD、鼠标位移都会被归零
+}
+```
+
+当前 Tumbler 示例中：
+
+- `~` 用于打开/关闭运行时控制台
+- 控制台打开后，同一帧开始阻断移动与鼠标视角输入
+- 鼠标右键锁定会自动解除
+
+### 7.1 实现细节
+
+`InputManager` 内部维护两份按键缓存：
+
+- `CurrentKeys[]`
+- `PreviousKeys[]`
+
+每帧 `Tick()` 的顺序大致是：
+
+1. 复制上一帧状态到 `PreviousKeys`
+2. 从 GLFW 读取当前键盘/鼠标状态写入 `CurrentKeys`
+3. 先处理鼠标右键锁定/解锁
+4. 再根据 `IsInputBlocked()` 决定是否清零 `MouseDelta`
+
+这种顺序保证了：
+- `WasKeyJustPressed()` 可以稳定通过 `Current && !Previous` 计算
+- 控制台在打开的同一帧就能把鼠标位移归零
+- 被阻断时如果此前处于鼠标锁定状态，会主动恢复系统光标
+
+## 8. 鼠标输入
+
+### 8.1 获取鼠标位移
 
 ```cpp
 // 获取鼠标相对上一帧的位移（适合转动视角）
@@ -117,7 +174,7 @@ float yaw   += mouseDelta.x * mouseSensitivity;
 float pitch += mouseDelta.y * mouseSensitivity;
 ```
 
-### 7.2 第一人称相机示例
+### 8.2 第一人称相机示例
 
 ```cpp
 class CFirstPersonCamera : public Component {
@@ -158,35 +215,35 @@ private:
 };
 ```
 
-## 8. UI 穿透检测
+## 9. UI 穿透检测
 
 当 ImGui 等 UI 获得焦点时，输入系统可以检测到这一点，避免游戏逻辑在 UI 交互时误触发：
 
 ```cpp
-if (!inputManager.IsUIFocused()) {
-    // 只有当 UI 没有焦点时才处理游戏输入
+if (!inputManager.IsInputBlocked()) {
+    // 只有当 UI 没有焦点且 Gameplay 输入未被阻断时才处理游戏输入
     ProcessGameInput();
 }
 ```
 
-## 9. KeyCodes (按键码)
+## 10. KeyCodes (按键码)
 
-所有支持的按键定义在 `KeyCodes.h` 中，包括：
+所有当前支持的按键定义在 `KeyCodes.h` 中，包括：
 
-### 9.1 键盘按键
+### 10.1 键盘按键
 
 ```cpp
 EKeyCode::Space
 EKeyCode::A, EKeyCode::B, ..., EKeyCode::Z
-EKeyCode::0, EKeyCode::1, ..., EKeyCode::9
-EKeyCode::LeftShift, EKeyCode::RightShift
-EKeyCode::LeftControl, EKeyCode::RightControl
-EKeyCode::LeftAlt, EKeyCode::RightAlt
-EKeyCode::Escape, EKeyCode::Enter, EKeyCode::Tab
-// ... 更多按键
+EKeyCode::Escape
+EKeyCode::Enter
+EKeyCode::GraveAccent
+EKeyCode::LeftShift
+EKeyCode::LeftCtrl
+EKeyCode::Up, EKeyCode::Down, EKeyCode::Left, EKeyCode::Right
 ```
 
-### 9.2 鼠标按键
+### 10.2 鼠标按键
 
 ```cpp
 EKeyCode::MouseLeft
@@ -194,7 +251,7 @@ EKeyCode::MouseRight
 EKeyCode::MouseMiddle
 ```
 
-## 10. 完整示例
+## 11. 完整示例
 
 ```cpp
 // 初始化
@@ -211,9 +268,10 @@ inputManager.BindAction("Jump",      EKeyCode::Space);
 while (!window.ShouldClose()) {
     window.PollEvents();
     inputManager.Tick();
+    uiManager.TickInput();
     
     // 只有当 UI 没焦点时才处理游戏输入
-    if (!inputManager.IsUIFocused()) {
+    if (!inputManager.IsInputBlocked()) {
         // 移动
         float forward = inputManager.GetAxis("MoveForward");
         float right = inputManager.GetAxis("MoveRight");
@@ -233,15 +291,15 @@ while (!window.ShouldClose()) {
 }
 ```
 
-## 11. 鼠标锁定功能 (Editor Camera 体验)
+## 12. 鼠标锁定功能 (Editor Camera 体验)
 
 输入系统内置了鼠标锁定功能，用于实现类似 Unreal/Unity 编辑器的无尽拖拽体验：
 
 ### 11.1 功能说明
 
-- 当按住鼠标右键（`EKeyCode::MouseRight`）时，自动锁定鼠标到窗口中心并隐藏光标
+- 当按住鼠标右键（`EKeyCode::MouseRight`）时，自动锁定鼠标并隐藏光标
 - 释放鼠标右键时，恢复鼠标正常模式
-- 在 UI 获得焦点时，自动解除鼠标锁定
+- 在 UI 获得焦点，或 Gameplay 输入被阻断时，自动解除鼠标锁定
 
 ### 11.2 实现细节
 

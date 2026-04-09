@@ -197,7 +197,77 @@ class FAssetManager {
 - 线程安全（`std::mutex` 保护）
 - 自动 GPU 上传（Mesh 通过 `ResourceUploadManager`）
 
-## 6. 设计原则总结
+## 6. 编辑器与运行时控制台架构
+
+为了避免把调试功能继续堆进 `AppLogic`，当前版本把编辑器运行时能力拆成了 3 层：
+
+### 6.1 `UIManager`：ImGui 生命周期与控制台宿主
+
+`UIManager` 负责：
+- ImGui 的 GLFW/Vulkan 后端初始化
+- 每帧 `BeginFrame()` / `EndFrame()`
+- 在 UI 结束前统一绘制 `RuntimeConsole`
+- 通过 `TickInput()` 驱动控制台输入逻辑
+
+这意味着控制台不再是示例逻辑的一部分，而是 Core 层的通用工具。
+
+### 6.2 `EditorSessionState`：共享编辑状态桥
+
+`EditorSessionState` 目前至少承载：
+- `SelectedActor`
+- `CurrentRenderPath`
+
+这样做的目的，是把“当前编辑上下文”从 `AppLogic` 私有状态中抽出来，让：
+- Hierarchy / Inspector
+- 运行时控制台命令
+- 渲染路径切换
+
+共享同一份状态，而不是在多个系统里复制一份选择结果。
+
+### 6.3 `RuntimeConsole`：Core 层命令框架
+
+`RuntimeConsole` 的职责固定为：
+- 管理开关状态、输入框、日志、历史记录和滚动
+- 注册命令定义
+- 执行内建命令
+- 提供命令名和参数级别的 `Tab` 补全
+
+Tumbler 专属命令并不写死在 Core 中，而是通过 `TumblerConsoleBindings.cpp` 注册进去。这样 Core 只依赖“命令框架”，不依赖具体场景业务。
+
+## 7. 输入与控制台的耦合边界
+
+`InputManager` 目前显式区分了两类输入：
+
+- **Gameplay 输入**
+  由 `GetAxis()`、`IsActionPressed()`、`IsActionJustPressed()`、`GetMouseDelta()` 消费
+- **原始按键输入**
+  由 `WasKeyJustPressed()` 提供
+
+这样运行时控制台可以使用 `WasKeyJustPressed(EKeyCode::GraveAccent)` 来切换开关，同时在打开控制台的同一帧调用 `SetGameplayInputBlocked(true)`，立即阻断相机移动和鼠标看向。
+
+这个设计比单纯依赖 `ImGuiIO::WantCaptureKeyboard` 更稳，因为它不需要等待 ImGui 下一阶段才告诉输入系统“现在 UI 想接管键盘”。
+
+## 8. Linux / Wayland 启动链路
+
+Linux 下的窗口和 Vulkan 初始化现在有一条更稳的引导链：
+
+1. `AppWindow` 先判断当前是否为 Wayland 会话
+2. 如果检测到 Snap Code 注入的 GTK/GIO 环境，会先清理相关环境变量
+3. GLFW 初始化优先尝试 `GLFW_PLATFORM_WAYLAND`
+4. 如果失败，则退回 `GLFW_ANY_PLATFORM`
+5. 最后在 Linux 下再尝试一次 `GLFW_PLATFORM_X11`
+
+同时，`AppWindow` 会在 `glfwGetRequiredInstanceExtensions()` 失败时：
+- 打印 GLFW 当前平台
+- 打印 Vulkan loader 暴露的实例扩展列表
+- 针对 Wayland / X11 分别指出缺的是 `VK_KHR_wayland_surface` 还是 `VK_KHR_xcb_surface` / `VK_KHR_xlib_surface`
+
+这套诊断链路的目标不是“吞掉错误”，而是把问题明确分成：
+- 工程依赖配置问题
+- 系统 Vulkan WSI 暴露问题
+- 桌面环境污染问题
+
+## 9. 设计原则总结
 
 | 原则 | 实践 |
 |------|------|

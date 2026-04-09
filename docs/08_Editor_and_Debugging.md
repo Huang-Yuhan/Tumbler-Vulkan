@@ -1,6 +1,6 @@
 # 编辑器与调试工具 (Editor & Debugging Tools)
 
-Tumbler 引擎集成了 ImGui 作为内置的调试和编辑器工具，提供了强大的即时可视化调试能力。
+Tumbler 引擎集成了 ImGui 作为内置的调试和编辑器工具，并在 Core 层提供了运行时命令控制台（`RuntimeConsole`），用于做接近 Unreal Console 的即时调试。
 
 ## 1. 内置编辑器面板
 
@@ -66,34 +66,197 @@ Tumbler 引擎内置了多个实用的编辑器面板，位于 `AppLogic` 类中
 
 **代码位置：** `src/Examples/Tumbler/AppLogic.cpp` - `DrawMaterialPanel()`
 
-## 2. AppLogic 编辑器架构
+### 1.6 运行时控制台 (Runtime Console)
 
-所有编辑器功能都封装在 `AppLogic` 类中，结构清晰，易于扩展：
+运行时控制台由 `UIManager` 托管，底层实现位于：
+
+- `src/Core/Editor/RuntimeConsole.h`
+- `src/Core/Editor/RuntimeConsole.cpp`
+
+Tumbler 示例命令绑定位于：
+
+- `src/Examples/Tumbler/TumblerConsoleBindings.cpp`
+
+**交互方式：**
+- `~`：打开/关闭控制台
+- `Enter`：执行命令
+- `Up/Down`：浏览历史
+- `Tab`：自动补全命令名和已支持的参数
+
+**内建命令：**
+- `help`
+- `clear`
+- `history`
+
+**Tumbler 示例命令：**
+- `actors`
+- `select <ActorName|none>`
+- `actor.move <ActorName|selected> <x> <y> <z>`
+- `actor.rotate <ActorName|selected> <pitch> <yaw> <roll>`
+- `actor.scale <ActorName|selected> <x> <y> <z>`
+- `camera.pos <x> <y> <z>`
+- `camera.speed <value>`
+- `light.intensity <ActorName> <value>`
+- `light.color <ActorName> <r> <g> <b>`
+- `render.path <forward|deferred|gpu>`
+- `spawn.light <Name> <x> <y> <z> <intensity>`
+- `destroy <ActorName|selected>`
+
+### 1.7 控制台实现细节
+
+`RuntimeConsole` 不是简单的 ImGui 输入框包装，而是一个小型命令运行时，内部主要由以下几部分构成：
+
+#### 命令存储
+
+- `std::vector<ConsoleCommandDefinition> Commands`
+- `std::unordered_map<std::string, size_t> CommandLookup`
+
+命令注册时会把 `Name` 归一化为小写后写入 `CommandLookup`，因此命令关键字大小写不敏感。
+
+#### 输入与日志缓存
+
+- `InputBuffer`：固定大小的字符缓冲区
+- `Messages`：日志列表，带消息类型颜色
+- `History`：历史命令
+- `HistoryIndex`：历史浏览游标
+
+日志区会在 `AddMessage()` 后自动把 `bScrollToBottom` 置位，在下一次绘制时滚到最底部。
+
+#### 命令解析
+
+执行输入时，控制台会：
+
+1. 先 `Trim` 输入
+2. 记录原始命令到日志区，前缀为 `>`
+3. 用 `TokenizeCommand()` 做参数分词
+4. 支持双引号包裹参数
+5. 取第一个 token 作为命令名，其余 token 作为参数列表
+
+也就是说：
+
+```text
+spawn.light "Point Light A" 0 2 0 20
+```
+
+会被解析为：
+
+- 命令名：`spawn.light`
+- 参数：`Point Light A`, `0`, `2`, `0`, `20`
+
+#### 输入回调
+
+控制台通过 `ImGui::InputText()` 的两个 callback flag 实现高级交互：
+
+- `ImGuiInputTextFlags_CallbackHistory`
+- `ImGuiInputTextFlags_CallbackCompletion`
+
+对应到：
+
+- `OnInputTextHistory()`
+- `OnInputTextCompletion()`
+
+### 1.8 `Tab` 自动补全实现
+
+当前补全逻辑分两层：
+
+#### 命令名补全
+
+当光标位于第一个 token 内时：
+
+1. 遍历 `Commands`
+2. 用大小写不敏感前缀匹配筛出候选
+3. 如果只有一个候选，直接补全并自动追加空格
+4. 如果有多个候选，补到最长公共前缀
+5. 如果最长公共前缀不足以继续缩小范围，则在日志区打印候选列表
+
+#### 参数补全
+
+`ConsoleCommandDefinition` 支持一个可选的：
 
 ```cpp
-class AppLogic {
-private:
-    // 选中的物体
-    FActor* SelectedActor = nullptr;
-    
-    // 性能统计数据
-    struct PerformanceStats { ... } Stats;
-    
-    // 各个面板的绘制方法
-    void DrawPerformancePanel();
-    void DrawLightPanel();
-    void DrawCameraPanel();
-    void DrawMaterialPanel();
-    void DrawSceneHierarchyPanel();
-    
-public:
-    // 统一的编辑器 UI 入口
-    void DrawEditorUI();
-    
-    // 更新性能统计
-    void UpdatePerformanceStats(float frameTime, int drawCallCount);
-};
+using ConsoleAutocompleteHandler =
+    std::function<std::vector<std::string>(
+        const std::vector<std::string>& args,
+        size_t activeArgIndex)>;
 ```
+
+控制台会把：
+- 当前命令已输入的参数
+- 当前正在补全的是第几个参数
+
+传给命令自己的补全函数，然后把返回的候选统一做：
+
+- 前缀过滤
+- 排序
+- 最长公共前缀计算
+- 必要时自动加引号
+
+这样 Core 只负责“补全机制”，而不需要知道 Tumbler 场景里有哪些 Actor。
+
+### 1.9 Tumbler 命令绑定实现
+
+Tumbler 的命令实现位于 `TumblerConsoleBindings.cpp`，这个文件负责两件事：
+
+1. 注册命令处理函数
+2. 注册命令自己的参数补全函数
+
+例如：
+
+- `select` / `destroy` / `actor.*`
+  会从 `FScene::GetAllActors()` 收集 Actor 名称
+- `light.intensity` / `light.color`
+  只返回带 `CPointLight` 组件的 Actor
+- `render.path`
+  返回固定枚举：`forward`、`deferred`、`gpu`
+
+这样可以保证：
+- Core 不依赖 Tumbler 场景结构
+- 场景补全候选始终来自运行时真实状态
+- 未来别的 Example 可以注册自己的命令和补全逻辑
+
+## 2. 编辑器架构
+
+现在的编辑器状态分为三层：
+
+1. `UIManager`
+   - 管理 ImGui 生命周期
+   - 托管 `RuntimeConsole`
+2. `EditorSessionState`
+   - 保存共享编辑状态，如 `SelectedActor` 和 `CurrentRenderPath`
+3. `AppLogic`
+   - 负责场景 Hierarchy、Inspector、性能面板等业务 UI
+
+简化结构如下：
+
+```cpp
+UIManager
+├── ImGui backend
+└── RuntimeConsole
+
+EditorSessionState
+├── SelectedActor
+└── CurrentRenderPath
+
+AppLogic
+├── Scene Hierarchy
+├── Inspector / Material UI
+└── Performance / Camera / Light panels
+```
+
+### 2.1 主循环中的时序
+
+在 `App-Tumbler` 中，控制台和编辑器的时序是：
+
+1. `window.PollEvents()`
+2. `inputManager.Tick()`
+3. `ui_manager.TickInput()`
+4. `logic.Tick(frameTime)`
+5. `ui_manager.BeginFrame()`
+6. `logic.DrawEditorUI()`
+7. `ui_manager.EndFrame()`
+8. `renderer.Render(...)`
+
+关键点是第 3 步：控制台会在逻辑更新前就决定本帧是否阻断 Gameplay 输入，因此相机不会在控制台刚打开的那一帧继续吃到 WASD 或鼠标位移。
 
 ## 3. ImGui 简介
 
@@ -111,22 +274,22 @@ Tumbler 引擎提供 `UIManager` 类来封装 ImGui 的初始化、帧管理和 
 
 ```cpp
 UIManager ui_manager;
-ui_manager.Init(&window, &renderer);
+ui_manager.Init(&window, &renderer, &inputManager);
 ```
 
 ### 4.2 帧生命周期
 
 ```cpp
 while (!window.ShouldClose()) {
-    // ... 游戏逻辑 ...
+    window.PollEvents();
+    inputManager.Tick();
+    ui_manager.TickInput();
+    logic.Tick(frameTime);
     
     // --- UI 绘制开始 ---
     ui_manager.BeginFrame();
     
-    // 在这里绘制 ImGui 控件
-    ImGui::Begin("Debug Panel");
-    ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-    ImGui::End();
+    logic.DrawEditorUI();
     
     ui_manager.EndFrame();
     // --- UI 绘制结束 ---
@@ -150,12 +313,13 @@ UI 绘制需要在 Vulkan 渲染循环中作为回调传入：
 renderer.Render(
     viewData, 
     renderPackets, 
-    [&](VkCommandBuffer cmd) {
-        // 在命令缓冲中录制 ImGui 绘制命令
-        ui_manager.RecordDrawCommands(cmd);
+    [&](VkCommandBuffer cmd, uint32_t imageIndex) {
+        ui_manager.RecordDrawCommands(cmd, &renderer, imageIndex);
     }
 );
 ```
+
+`ui_manager.EndFrame()` 会在 `ImGui::Render()` 之前统一绘制运行时控制台窗口。
 
 ## 6. 常用 ImGui 控件
 
