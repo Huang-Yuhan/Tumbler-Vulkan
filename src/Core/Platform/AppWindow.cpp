@@ -4,6 +4,7 @@
 
 #include "AppWindow.h"
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <cstring>
 #include <stdexcept>
@@ -139,6 +140,135 @@ bool IsWaylandSession()
     const char* waylandDisplay = std::getenv("WAYLAND_DISPLAY");
     return waylandDisplay != nullptr && waylandDisplay[0] != '\0';
 }
+
+bool EnvEquals(const char* name, const char* expected)
+{
+    const char* value = std::getenv(name);
+    return value != nullptr && std::strcmp(value, expected) == 0;
+}
+
+bool EnvContains(const char* name, const char* needle)
+{
+    const char* value = std::getenv(name);
+    return value != nullptr && std::strstr(value, needle) != nullptr;
+}
+
+bool SetEnvIfDifferent(const char* name, const char* value)
+{
+    const char* current = std::getenv(name);
+    if (current != nullptr && std::strcmp(current, value) == 0) {
+        return false;
+    }
+
+    setenv(name, value, 1);
+    return true;
+}
+
+bool UnsetEnvIfPresent(const char* name)
+{
+    if (std::getenv(name) == nullptr) {
+        return false;
+    }
+
+    unsetenv(name);
+    return true;
+}
+
+bool RestoreEnvFromBackup(const char* targetName, const char* backupName)
+{
+    const char* backup = std::getenv(backupName);
+    if (backup == nullptr || backup[0] == '\0') {
+        return false;
+    }
+
+    return SetEnvIfDifferent(targetName, backup);
+}
+
+bool IsSnapCodeGtkEnvironment()
+{
+    return EnvEquals("SNAP_NAME", "code")
+        || EnvContains("GTK_EXE_PREFIX", "/snap/code/")
+        || EnvContains("GTK_PATH", "/snap/code/")
+        || EnvContains("GSETTINGS_SCHEMA_DIR", "/snap/code/")
+        || EnvContains("XDG_DATA_DIRS", "/snap/code/")
+        || EnvContains("XDG_DATA_HOME", "/snap/code/")
+        || EnvContains("GIO_MODULE_DIR", "/snap/code/");
+}
+
+void SanitizeWaylandGtkEnvironment()
+{
+#if defined(__linux__)
+    if (!IsWaylandSession() || !IsSnapCodeGtkEnvironment()) {
+        return;
+    }
+
+    bool changed = false;
+
+    changed |= SetEnvIfDifferent("GDK_BACKEND", "wayland");
+    changed |= RestoreEnvFromBackup("XDG_DATA_DIRS", "XDG_DATA_DIRS_VSCODE_SNAP_ORIG");
+    changed |= RestoreEnvFromBackup("XDG_CONFIG_DIRS", "XDG_CONFIG_DIRS_VSCODE_SNAP_ORIG");
+
+    constexpr std::array<const char*, 30> envVarsToUnset = {
+        "SNAP",
+        "SNAP_NAME",
+        "SNAP_REVISION",
+        "SNAP_ARCH",
+        "SNAP_COOKIE",
+        "SNAP_COMMON",
+        "SNAP_CONTEXT",
+        "SNAP_DATA",
+        "SNAP_EUID",
+        "SNAP_EXE",
+        "SNAP_INSTANCE_NAME",
+        "SNAP_LAUNCHER_ARCH_TRIPLET",
+        "SNAP_LIBRARY_PATH",
+        "SNAP_REAL_HOME",
+        "SNAP_UID",
+        "SNAP_USER_COMMON",
+        "SNAP_USER_DATA",
+        "SNAP_VERSION",
+        "GTK_EXE_PREFIX",
+        "GTK_PATH",
+        "GDK_PIXBUF_MODULEDIR",
+        "GDK_PIXBUF_MODULE_FILE",
+        "GTK_IM_MODULE_FILE",
+        "GTK_MODULES",
+        "GSETTINGS_SCHEMA_DIR",
+        "GIO_MODULE_DIR",
+        "GIO_LAUNCHED_DESKTOP_FILE",
+        "GIO_LAUNCHED_DESKTOP_FILE_PID",
+        "CHROME_DESKTOP",
+        "XDG_DATA_HOME"
+    };
+
+    for (const char* envVar : envVarsToUnset) {
+        changed |= UnsetEnvIfPresent(envVar);
+    }
+
+    constexpr std::array<const char*, 9> vscodeVarsToUnset = {
+        "VSCODE_CLI",
+        "VSCODE_CODE_CACHE_PATH",
+        "VSCODE_CRASH_REPORTER_PROCESS_TYPE",
+        "VSCODE_CWD",
+        "VSCODE_ESM_ENTRYPOINT",
+        "VSCODE_HANDLES_UNCAUGHT_ERRORS",
+        "VSCODE_IPC_HOOK",
+        "VSCODE_NLS_CONFIG",
+        "VSCODE_PID"
+    };
+
+    for (const char* envVar : vscodeVarsToUnset) {
+        changed |= UnsetEnvIfPresent(envVar);
+    }
+
+    changed |= UnsetEnvIfPresent("ELECTRON_NO_ATTACH_CONSOLE");
+    changed |= UnsetEnvIfPresent("ELECTRON_RUN_AS_NODE");
+
+    if (changed) {
+        LOG_WARN("Detected Snap Code GTK environment on Wayland. Sanitizing GTK/GIO environment for libdecor window decorations.");
+    }
+#endif
+}
 }
 
 AppWindow::AppWindow(const AppWindowConfig& config)
@@ -154,6 +284,7 @@ AppWindow::~AppWindow()
 
 void AppWindow::Init()
 {
+    SanitizeWaylandGtkEnvironment();
     glfwSetErrorCallback(GlfwErrorCallback);
 
     const bool waylandSession = IsWaylandSession();
