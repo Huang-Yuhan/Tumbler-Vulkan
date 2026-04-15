@@ -7,6 +7,7 @@
 #include "ResourceUploadManager.h"
 #include "FVulkanMesh.h"
 #include "VulkanTypes.h"
+#include "DescriptorSetFreeQueue.h"
 #include <vulkan/vulkan.h>
 #include <vector>
 #include <functional>
@@ -118,6 +119,7 @@ public:
      * @param descriptorSet 要释放的描述符集
      */
     void QueueDescriptorSetFree(VkDescriptorSet descriptorSet);
+    [[nodiscard]] size_t GetPendingDescriptorSetFreeCount() const { return PendingDescriptorSetFrees.Size(); }
 
     // ==========================================
     // 向后兼容的委托方法
@@ -163,7 +165,7 @@ private:
     VkDescriptorSetLayout GlobalSetLayout = VK_NULL_HANDLE;
     VkDescriptorSet GlobalDescriptorSet = VK_NULL_HANDLE;
     AllocatedBuffer SceneParameterBuffer{};
-    std::vector<VkDescriptorSet> PendingDescriptorSetFrees;
+    DescriptorSetFreeQueue PendingDescriptorSetFrees;
 
     // ==========================================
     // 命令缓冲区（每帧重用）

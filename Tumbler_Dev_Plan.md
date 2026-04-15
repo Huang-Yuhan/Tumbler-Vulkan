@@ -94,10 +94,10 @@
     - `App-Tumbler` 已增加 `--resize-stress-test` 模式，可自动连续切换窗口尺寸并在固定帧数后退出。
     - 已验证 swapchain 重建、UI Framebuffer 重建、Lighting Descriptor 更新链路在高频 resize 下稳定。
     - 已接入默认关闭的 `TUMBLER_ENABLE_RUNTIME_SMOKE_TESTS` 选项，可注册 `Smoke.ResizeStressRuntime` 到 CTest。
-  - [ ] **Descriptor 高频创建/销毁测试**
-    - 针对材质实例、descriptor set 延迟释放和 pool 回收链路增加压力验证。
-    - 同时补单元测试和运行时压力路径，不只做一种验证方式。
-    - 重点防止重复释放、悬挂引用、pool 异常耗尽和对象销毁后 UI 悬挂。
+  - [x] **Descriptor 高频创建/销毁测试**
+    - 已为 descriptor 延迟释放队列补纯逻辑单元测试，覆盖空句柄忽略、重复入队去重、顺序与清空语义。
+    - `App-Tumbler` 已增加 `--descriptor-stress-test` 模式，可批量创建、更新、释放材质实例并在多轮渲染中自动退出。
+    - 已接入默认关闭的 `Smoke.DescriptorStressRuntime`，用于运行时 descriptor 分配/释放压力回归。
   - [ ] **隐藏窗口渲染 Smoke Test**
     - 基于当前 `AppWindow -> Surface -> Swapchain` 启动链路运行固定场景若干帧，但不要求显示正常交互窗口。
     - 目标是验证初始化、渲染、退出、资源释放链路稳定，而不是一步到位做 true headless。

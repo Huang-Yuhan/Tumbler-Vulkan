@@ -97,7 +97,7 @@ void VulkanRenderer::Cleanup() {
     Window = nullptr;
     AssetManager = nullptr;
     MainCommandBuffer = VK_NULL_HANDLE;
-    PendingDescriptorSetFrees.clear();
+    PendingDescriptorSetFrees.Clear();
 }
 
 void VulkanRenderer::InitPipelines() {
@@ -353,23 +353,22 @@ VkDescriptorSet VulkanRenderer::AllocateDescriptorSet(VkDescriptorSetLayout layo
 }
 
 void VulkanRenderer::QueueDescriptorSetFree(VkDescriptorSet descriptorSet) {
-    if (descriptorSet == VK_NULL_HANDLE) {
-        return;
-    }
-    PendingDescriptorSetFrees.push_back(descriptorSet);
+    PendingDescriptorSetFrees.Enqueue(descriptorSet);
 }
 
 void VulkanRenderer::FlushPendingDescriptorSetFrees() {
-    if (PendingDescriptorSetFrees.empty() || DescriptorPool == VK_NULL_HANDLE) {
+    if (PendingDescriptorSetFrees.Empty() || DescriptorPool == VK_NULL_HANDLE) {
         return;
     }
+
+    const auto& pendingDescriptorSets = PendingDescriptorSetFrees.GetPendingDescriptorSets();
 
     VK_CHECK(vkFreeDescriptorSets(
         Context.GetDevice(),
         DescriptorPool,
-        static_cast<uint32_t>(PendingDescriptorSetFrees.size()),
-        PendingDescriptorSetFrees.data()
+        static_cast<uint32_t>(pendingDescriptorSets.size()),
+        pendingDescriptorSets.data()
     ));
 
-    PendingDescriptorSetFrees.clear();
+    PendingDescriptorSetFrees.Clear();
 }
