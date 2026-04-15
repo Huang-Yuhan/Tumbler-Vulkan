@@ -10,18 +10,154 @@
 #include "Core/GameSystem/Components/CTransform.h"
 #include "Core/GameSystem/Components/CPointLight.h"
 #include <imgui.h>
+#include <algorithm>
+#include <array>
 #include <vector>
 #include <chrono>
+#include <charconv>
+#include <string_view>
+#include <system_error>
+#include <utility>
 
 #include "Core/GameSystem/FActor.h"
 #include "Core/GameSystem/InputManager.h"
 #include "Core/GameSystem/Components/CFirstPersonCamera.h"
 
-int main() {
+namespace {
+struct RuntimeTestOptions {
+    bool ResizeStressTest = false;
+    int MaxFrames = 240;
+    int FramesPerResize = 20;
+};
+
+int ParsePositiveIntOption(std::string_view argument, std::string_view prefix)
+{
+    const std::string_view valueText = argument.substr(prefix.size());
+    int value = 0;
+    const auto [ptr, ec] = std::from_chars(valueText.data(), valueText.data() + valueText.size(), value);
+    if (ec != std::errc{} || ptr != valueText.data() + valueText.size() || value <= 0) {
+        throw std::runtime_error("Invalid numeric option: " + std::string(argument));
+    }
+
+    return value;
+}
+
+RuntimeTestOptions ParseRuntimeTestOptions(int argc, char** argv)
+{
+    RuntimeTestOptions options;
+
+    for (int i = 1; i < argc; ++i) {
+        const std::string_view argument(argv[i]);
+        if (argument == "--resize-stress-test") {
+            options.ResizeStressTest = true;
+        } else if (argument.starts_with("--test-max-frames=")) {
+            options.MaxFrames = ParsePositiveIntOption(argument, "--test-max-frames=");
+        } else if (argument.starts_with("--test-frames-per-resize=")) {
+            options.FramesPerResize = ParsePositiveIntOption(argument, "--test-frames-per-resize=");
+        } else {
+            throw std::runtime_error("Unknown command line option: " + std::string(argument));
+        }
+    }
+
+    return options;
+}
+
+class ResizeStressTestRunner {
+public:
+    explicit ResizeStressTestRunner(RuntimeTestOptions options)
+        : Options(options)
+    {
+        if (!Options.ResizeStressTest) {
+            return;
+        }
+
+        const int minimumFrames = Options.FramesPerResize * static_cast<int>(ResizeSequence.size() + 1);
+        Options.MaxFrames = std::max(Options.MaxFrames, minimumFrames);
+
+        LOG_INFO("Resize stress test enabled. MaxFrames={}, FramesPerResize={}, Steps={}",
+                 Options.MaxFrames,
+                 Options.FramesPerResize,
+                 ResizeSequence.size());
+    }
+
+    [[nodiscard]] bool IsEnabled() const
+    {
+        return Options.ResizeStressTest;
+    }
+
+    void NotifyResizeObserved(int width, int height)
+    {
+        if (!IsEnabled()) {
+            return;
+        }
+
+        ++ObservedResizeEvents;
+        LOG_INFO("Resize stress observed framebuffer resize {}/{} at {}x{}",
+                 ObservedResizeEvents,
+                 ResizeSequence.size(),
+                 width,
+                 height);
+    }
+
+    void OnFrameCompleted(AppWindow& window)
+    {
+        if (!IsEnabled() || Completed) {
+            return;
+        }
+
+        ++FrameCount;
+
+        if (FrameCount % Options.FramesPerResize == 0 && NextResizeIndex < ResizeSequence.size()) {
+            const auto& [width, height] = ResizeSequence[NextResizeIndex];
+            ++NextResizeIndex;
+            LOG_INFO("Resize stress step {}/{} requesting {}x{}",
+                     NextResizeIndex,
+                     ResizeSequence.size(),
+                     width,
+                     height);
+            window.SetWindowSize(width, height);
+        }
+
+        if (NextResizeIndex == ResizeSequence.size()
+            && ObservedResizeEvents >= static_cast<int>(ResizeSequence.size())
+            && FrameCount >= Options.FramesPerResize * static_cast<int>(ResizeSequence.size() + 1)) {
+            Completed = true;
+            LOG_INFO("Resize stress test completed successfully after {} frames.", FrameCount);
+            window.RequestClose();
+            return;
+        }
+
+        if (FrameCount >= Options.MaxFrames) {
+            throw std::runtime_error("Resize stress test reached the frame limit before all resize events were observed.");
+        }
+    }
+
+private:
+    RuntimeTestOptions Options;
+    int FrameCount = 0;
+    int ObservedResizeEvents = 0;
+    size_t NextResizeIndex = 0;
+    bool Completed = false;
+
+    static constexpr std::array<std::pair<int, int>, 6> ResizeSequence = {{
+        {960, 540},
+        {1400, 900},
+        {1024, 768},
+        {1600, 900},
+        {800, 600},
+        {1280, 720}
+    }};
+};
+}
+
+int main(int argc, char** argv) {
     Log::Get().Init();
     LOG_INFO("Tumbler Engine Starting...");
 
     try {
+        const RuntimeTestOptions runtimeTestOptions = ParseRuntimeTestOptions(argc, argv);
+        ResizeStressTestRunner resizeStressTest(runtimeTestOptions);
+
         // 1. 基础系统初始化
         AppWindow::AppWindowConfig config;
         config.Title = "Tumbler Engine - PBR Architecture";
@@ -70,7 +206,11 @@ int main() {
 
             // 检查是否需要重建 Swapchain（窗口大小改变）
             if (window.IsFramebufferResized()) {
+                int framebufferWidth = 0;
+                int framebufferHeight = 0;
+                window.GetFramebufferSize(framebufferWidth, framebufferHeight);
                 window.ClearResizedFlag();
+                resizeStressTest.NotifyResizeObserved(framebufferWidth, framebufferHeight);
                 LOG_INFO("Window resized, recreating swapchain...");
             }
 
@@ -112,6 +252,8 @@ int main() {
             renderer.Render(viewData, renderPackets, [&](VkCommandBuffer cmd, uint32_t imgIdx) {
                 ui_manager.RecordDrawCommands(cmd, &renderer, imgIdx);
             });
+
+            resizeStressTest.OnFrameCompleted(window);
         }
 
         // ==========================================

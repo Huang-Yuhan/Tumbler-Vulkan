@@ -41,3 +41,12 @@ add_custom_command(TARGET App-Tumbler POST_BUILD
         "$<TARGET_FILE_DIR:App-Tumbler>/assets"
         COMMENT "Copying assets to executable directory..."
 )
+
+if(WIN32)
+    add_custom_command(TARGET App-Tumbler POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_RUNTIME_DLLS:App-Tumbler>
+            $<TARGET_FILE_DIR:App-Tumbler>
+            COMMAND_EXPAND_LISTS
+    )
+endif()

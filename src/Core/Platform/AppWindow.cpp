@@ -380,6 +380,20 @@ VkSurfaceKHR AppWindow::CreateSurface(VkInstance instance)
     return surface;
 }
 
+void AppWindow::SetWindowSize(int width, int height) const
+{
+    if (Handle != nullptr) {
+        glfwSetWindowSize(Handle, width, height);
+    }
+}
+
+void AppWindow::RequestClose() const
+{
+    if (Handle != nullptr) {
+        glfwSetWindowShouldClose(Handle, GLFW_TRUE);
+    }
+}
+
 void AppWindow::FramebufferResizeCallback(GLFWwindow* window, int width, int height) {
     auto appWindow = reinterpret_cast<AppWindow*>(glfwGetWindowUserPointer(window));
     if (appWindow) {

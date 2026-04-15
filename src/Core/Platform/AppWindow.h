@@ -49,6 +49,12 @@ public:
     // 创建 Vulkan Surface (连接窗口和 Vulkan Instance 的桥梁)
     VkSurfaceKHR CreateSurface(VkInstance instance);
 
+    // 调整窗口尺寸（用于自动化 resize 压力测试）
+    void SetWindowSize(int width, int height) const;
+
+    // 请求主循环退出
+    void RequestClose() const;
+
 private:
     GLFWwindow* Handle = nullptr;
     AppWindowConfig WindowConfig;

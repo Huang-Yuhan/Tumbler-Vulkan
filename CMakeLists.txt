@@ -11,6 +11,7 @@ endif()
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(CTest)
+option(TUMBLER_ENABLE_RUNTIME_SMOKE_TESTS "Enable runtime smoke tests that launch App-Tumbler." OFF)
 
 # 在 CMakeLists.txt 顶部
 if(MSVC)

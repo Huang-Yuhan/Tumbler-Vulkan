@@ -51,3 +51,41 @@ else()
             PROPERTIES LABELS "unit"
     )
 endif()
+
+if(TUMBLER_ENABLE_RUNTIME_SMOKE_TESTS AND TARGET App-Tumbler)
+    add_test(
+            NAME Smoke.ResizeStressRuntime
+            COMMAND $<TARGET_FILE:App-Tumbler>
+            --resize-stress-test
+            --test-max-frames=240
+            --test-frames-per-resize=20
+    )
+
+    set_tests_properties(Smoke.ResizeStressRuntime PROPERTIES
+            LABELS "smoke;runtime"
+            WORKING_DIRECTORY $<TARGET_FILE_DIR:App-Tumbler>
+            TIMEOUT 60
+    )
+
+    if(WIN32)
+        if(NOT DEFINED _vcpkg_triplet)
+            set(_vcpkg_triplet "${VCPKG_TARGET_TRIPLET}")
+            if(NOT _vcpkg_triplet)
+                set(_vcpkg_triplet "x64-windows")
+            endif()
+            if(_vcpkg_triplet MATCHES "^\\$env:")
+                set(_vcpkg_triplet "x64-windows")
+            endif()
+        endif()
+
+        set(_runtime_smoke_env_mod_list
+                "PATH=path_list_prepend:${CMAKE_BINARY_DIR}/vcpkg_installed/${_vcpkg_triplet}/debug/bin"
+                "PATH=path_list_prepend:${CMAKE_BINARY_DIR}/vcpkg_installed/${_vcpkg_triplet}/bin"
+        )
+        list(JOIN _runtime_smoke_env_mod_list ";" _runtime_smoke_env_mod)
+
+        set_tests_properties(Smoke.ResizeStressRuntime PROPERTIES
+                ENVIRONMENT_MODIFICATION "${_runtime_smoke_env_mod}"
+        )
+    endif()
+endif()
