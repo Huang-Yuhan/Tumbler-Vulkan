@@ -1,0 +1,68 @@
+Tumbler Vulkan Engine 项目说明
+
+这个文件用于给协作者和 Codex 提供项目级上下文，避免每次都从零摸索仓库结构、构建方式和常见坑。
+
+项目定位
+- 这是一个基于 C++20 和 Vulkan 的引擎原型工程。
+- `src/Core` 是可复用的核心层，`src/Examples` 放示例程序。
+- 当前主示例是 `App-Tumbler`，它包含运行时控制台、ImGui 编辑器 UI 和主要演示场景。
+
+关键目录
+- `src/Core`：渲染、平台层、输入、编辑器、资源系统、场景系统
+- `src/Examples/Tumbler`：主示例程序、Tumbler 命令绑定、场景逻辑
+- `src/Examples/TinyRendererModels`：较小的渲染示例
+- `tests/unit`：GoogleTest 单元测试
+- `docs`：入门、架构、排错、CI 等文档
+
+构建规则
+- Windows 下必须使用 MSVC，顶层 `CMakeLists.txt` 会显式拒绝非 MSVC 编译器。
+- Windows 和 Linux 都应优先使用 vcpkg toolchain。
+- GLFW 必须优先解析到 vcpkg 提供的版本，并且版本至少为 3.4。
+- 原因：项目使用了 `glfwGetPlatform` 等较新的 GLFW 平台 API，如果误链到系统自带的旧版 GLFW，Linux 本地构建可能会在链接阶段失败。
+- Linux 侧 Vulkan WSI 依赖需要保留：
+  `glfw3[wayland]`
+  `vulkan-loader[wayland,xcb,xlib]`
+
+常用命令
+- Windows 配置：
+  `cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOLCHAIN_FILE="%VCPKG_ROOT%/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows -DBUILD_TESTING=ON`
+- Windows 编译：
+  `cmake --build build --config Debug --parallel`
+- Windows 测试：
+  `ctest --test-dir build -C Debug --output-on-failure`
+- Linux 配置：
+  `cmake -S . -B build-linux -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" -DBUILD_TESTING=ON`
+- Linux 编译：
+  `cmake --build build-linux --parallel`
+- Linux 测试：
+  `ctest --test-dir build-linux --output-on-failure -V`
+
+运行时控制台
+- 控制台框架位于 Core 层，由 `UIManager` 托管。
+- Tumbler 专属命令不应塞进 Core 通用层，而是通过示例层绑定模块注册。
+- 默认交互：
+  `~` 打开或关闭控制台
+  `Enter` 执行命令
+  `Up/Down` 浏览历史
+  `Tab` 自动补全
+
+改动后最小验证
+- 如果改了 CMake、依赖、GLFW、窗口平台初始化、Wayland/X11 相关逻辑：
+  先重新配置，再完整编译，并执行 `ctest`
+- 如果改了运行时控制台、编辑器 UI 或输入接管：
+  启动 `App-Tumbler`，验证控制台开关、历史记录、补全和命令执行
+- 如果改了 Windows 构建链或平台兼容逻辑：
+  关注 `.github/workflows/windows-ci.yml` 对应的 GitHub Actions 结果
+
+近期已知重点
+- `AppWindow.cpp` 里的环境变量写入必须保持跨平台：
+  Windows 用 `_putenv_s`
+  非 Windows 用 `setenv` / `unsetenv`
+- 顶层 `CMakeLists.txt` 里已经加了对 vcpkg GLFW 包路径的优先绑定，不要轻易删掉，否则本地 Linux 可能再次误链系统 GLFW 3.3。
+
+建议优先阅读
+- `README.md`
+- `docs/00_Getting_Started.md`
+- `docs/01_Architecture_Overview.md`
+- `docs/10_Troubleshooting_Guide.md`
+- `docs/13_Testing_and_CI.md`

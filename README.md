@@ -8,6 +8,7 @@ A modern Vulkan game engine prototype with a component-based architecture, PBR w
 
 - Core engine, examples, and CI pipeline are available.
 - Main development plan: [Tumbler_Dev_Plan.md](Tumbler_Dev_Plan.md)
+- Project-level contributor notes: [.codex](.codex)
 
 ## Highlights
 
@@ -132,6 +133,7 @@ Details: [docs/10_Troubleshooting_Guide.md](docs/10_Troubleshooting_Guide.md)
 - [docs/09_Rendering_Pipeline_Deep_Dive.md](docs/09_Rendering_Pipeline_Deep_Dive.md)
 - [docs/10_Troubleshooting_Guide.md](docs/10_Troubleshooting_Guide.md)
 - [docs/13_Testing_and_CI.md](docs/13_Testing_and_CI.md)
+- [.codex](.codex) for project-specific contributor and Codex notes
 
 ## Tech Stack
 

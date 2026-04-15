@@ -4,4 +4,3 @@ vcpkg_installed/
 /assets/shaders/**/*.spv
 build/*
 .vscode/*
-.codex
