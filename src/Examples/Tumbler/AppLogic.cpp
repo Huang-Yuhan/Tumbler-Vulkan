@@ -16,6 +16,18 @@
 #include "Core/GameSystem/Components/CMeshRenderer.h"
 #include "Core/Geometry/FMesh.h"
 
+namespace {
+const char* ToRenderPathLabel(ERenderPath path)
+{
+    switch (path) {
+        case ERenderPath::Forward: return "Forward";
+        case ERenderPath::Deferred: return "Deferred";
+        case ERenderPath::GPUDriven: return "GPU Driven (WIP)";
+        default: return "Unknown";
+    }
+}
+}
+
 void AppLogic::InitializeScene()
 {
     Scene = std::make_unique<FScene>();
@@ -198,84 +210,130 @@ void AppLogic::UpdatePerformanceStats(float frameTime, int drawCallCount) {
     Stats.HistoryIndex = (Stats.HistoryIndex + 1) % FRAME_TIME_HISTORY_SIZE;
 }
 
-void AppLogic::DrawPerformancePanel() {
-    ImGui::Begin("Performance");
-    
+int AppLogic::CountPointLights() const
+{
+    if (Scene == nullptr) {
+        return 0;
+    }
+
+    int lightCount = 0;
+    for (const auto& actor : Scene->GetAllActors()) {
+        if (actor->GetComponent<CPointLight>() != nullptr) {
+            ++lightCount;
+        }
+    }
+
+    return lightCount;
+}
+
+void AppLogic::DrawPerformanceSection() {
+    const ERenderPath currentPath = SessionState != nullptr ? SessionState->CurrentRenderPath : ERenderPath::Forward;
+
     ImGui::Text("FPS: %.1f", Stats.FPS);
     ImGui::Text("Frame Time: %.2f ms", Stats.FrameTimeMs);
     ImGui::Text("Draw Calls: %d", Stats.DrawCallCount);
-    
+    ImGui::Text("Point Lights: %d", CountPointLights());
+    ImGui::Text("Render Path: %s", ToRenderPathLabel(currentPath));
+
     ImGui::Separator();
-    
+
     ImGui::Text("Frame Time Graph:");
     ImGui::PlotLines("##FrameTime", Stats.FrameTimeHistory, FRAME_TIME_HISTORY_SIZE, Stats.HistoryIndex, nullptr, 0.0f, 33.3f, ImVec2(0, 80));
-    
-    ImGui::End();
 }
 
-void AppLogic::DrawLightPanel() {
-    ImGui::Begin("Light Settings");
-    
+void AppLogic::DrawLightingSection() {
     if (FActor* mainLight = Scene->FindActorByName("MainLight")) {
         if (auto* pl = mainLight->GetComponent<CPointLight>()) {
             ImGui::Text("Main Light");
             ImGui::Separator();
-            
+
             glm::vec3 pos = mainLight->Transform.GetPosition();
             if (ImGui::DragFloat3("Position", &pos.x, 0.1f, -20.0f, 20.0f)) {
                 mainLight->Transform.SetPosition(pos);
             }
-            
+
             ImGui::ColorEdit3("Color", &pl->Color.x);
             ImGui::SliderFloat("Intensity", &pl->Intensity, 0.0f, 200.0f);
         }
     } else {
         ImGui::Text("MainLight not found");
     }
-    
-    ImGui::End();
 }
 
-void AppLogic::DrawCameraPanel() {
-    ImGui::Begin("Camera");
-    
+void AppLogic::DrawCameraSection() {
     if (MainCamera) {
         FActor* cameraActor = MainCamera->GetOwner();
-        
+
         ImGui::Text("Camera Settings");
         ImGui::Separator();
-        
+
         glm::vec3 pos = cameraActor->Transform.GetPosition();
         if (ImGui::DragFloat3("Position", &pos.x, 0.1f, -50.0f, 50.0f)) {
             cameraActor->Transform.SetPosition(pos);
         }
-        
+
         glm::vec3 rot = cameraActor->Transform.GetEulerAngles();
         if (ImGui::DragFloat3("Rotation", &rot.x, 1.0f, -180.0f, 180.0f)) {
             MainCamera->SetLookEuler(rot);
         }
-        
+
         ImGui::Separator();
-        
+
         ImGui::SliderFloat("FOV", &MainCamera->Fov, 30.0f, 120.0f);
         ImGui::SliderFloat("Move Speed", &MainCamera->MoveSpeed, 1.0f, 50.0f);
         ImGui::SliderFloat("Mouse Sensitivity", &MainCamera->MouseSensitivity, 0.1f, 5.0f);
-        
-        ImGui::Separator();
-        ImGui::Text("Global Render Pipeline:");
+    } else {
+        ImGui::Text("Main camera not found");
+    }
+}
+
+void AppLogic::DrawRenderingSection()
+{
+    ImGui::Text("Global Render Pipeline");
+    ImGui::Separator();
+
+    const ERenderPath currentPath = SessionState != nullptr ? SessionState->CurrentRenderPath : ERenderPath::Forward;
+    ImGui::Text("Current: %s", ToRenderPathLabel(currentPath));
+
+    if (SessionState != nullptr) {
         const char* pipelines[] = { "Forward Rendering", "Deferred Rendering", "GPU Driven (WIP)" };
-        const ERenderPath currentPath = SessionState != nullptr ? SessionState->CurrentRenderPath : ERenderPath::Forward;
         int currentItem = static_cast<int>(currentPath);
         if (ImGui::Combo("Pipeline Strategy", &currentItem, pipelines, IM_ARRAYSIZE(pipelines))) {
             const ERenderPath requestedPath = static_cast<ERenderPath>(currentItem);
             if (requestedPath == ERenderPath::GPUDriven) {
                 LOG_WARN("GPU Driven render path is not implemented yet.");
-            } else if (SessionState != nullptr) {
+            } else {
                 SessionState->CurrentRenderPath = requestedPath;
             }
         }
     }
-    
+}
+
+void AppLogic::DrawDebugPanel()
+{
+    if (!ImGui::Begin("Render Debug")) {
+        ImGui::End();
+        return;
+    }
+
+    constexpr ImGuiTreeNodeFlags sectionFlags = ImGuiTreeNodeFlags_DefaultOpen;
+
+    if (ImGui::CollapsingHeader("Performance", sectionFlags)) {
+        DrawPerformanceSection();
+    }
+
+    if (ImGui::CollapsingHeader("Camera", sectionFlags)) {
+        DrawCameraSection();
+    }
+
+    if (ImGui::CollapsingHeader("Lighting", sectionFlags)) {
+        DrawLightingSection();
+    }
+
+    if (ImGui::CollapsingHeader("Rendering", sectionFlags)) {
+        DrawRenderingSection();
+    }
+
     ImGui::End();
 }
 
@@ -350,8 +408,7 @@ void AppLogic::DrawInspectorPanel() {
 
 void AppLogic::DrawEditorUI() {
     ValidateSelectedActor();
-    DrawPerformancePanel();
-    DrawCameraPanel();
+    DrawDebugPanel();
     DrawSceneHierarchyPanel();
     DrawInspectorPanel();
 }

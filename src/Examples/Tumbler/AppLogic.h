@@ -37,12 +37,15 @@ private:
     void InitializeScene();
     void InitializePlanes() const;
 
-    void DrawPerformancePanel();
-    void DrawLightPanel();
-    void DrawCameraPanel();
+    void DrawDebugPanel();
+    void DrawPerformanceSection();
+    void DrawCameraSection();
+    void DrawLightingSection();
+    void DrawRenderingSection();
     void DrawInspectorPanel();
     void DrawSceneHierarchyPanel();
     bool ValidateSelectedActor();
+    [[nodiscard]] int CountPointLights() const;
 
 public:
     AppLogic() = default;

@@ -23,9 +23,11 @@
 1. **补完稳定性与回归测试**
    - 优先落地 resize 压力测试与 descriptor 高频创建/销毁测试。
    - 目标是先把 swapchain、UI framebuffer、descriptor 生命周期的回归风险压下去。
-2. **补齐调试面板**
-   - 优先做 G-Buffer 预览、FPS、Draw Call、光源数量统计。
-   - 目标是为 Shadow Mapping 和 SSAO 提供足够的可视化诊断能力。
+2. **先把调试窗口框架 Core 化，再补齐诊断能力**
+   - 优先把调试窗口宿主、section 注册机制和统一窗口布局下沉到 Core，而不是继续把示例 UI 堆在 `AppLogic`。
+   - Tumbler 只注册自己的 `Camera / Lighting` 这类场景专属 section，Core 只保留通用框架和通用诊断项。
+   - 在统一窗口里逐步补齐 G-Buffer 预览、FPS、Draw Call、光源数量、当前 Render Path 等能力。
+   - 目标是为 Shadow Mapping 和 SSAO 提供足够的可视化诊断能力，同时避免 Core 反向依赖示例逻辑。
 3. **进入高级视觉效果**
    - 先做方向光阴影，再做 SSAO。
    - 原因是 Shadow Mapping 是更基础的光照能力，SSAO 更适合作为后续增强项。
@@ -98,19 +100,28 @@
     - resize 压力运行过程中无崩溃、无卡死、无明显资源重建遗漏。
     - descriptor 压力测试后，场景删除和材质实例析构不触发断言或资源泄漏异常。
 
-### 阶段三点七：调试可视化与诊断能力 (Priority: High)
-*目标：在推进阴影和屏幕空间特效之前，先补够渲染诊断抓手。*
+### 阶段三点七：Core 化调试窗口与诊断能力 (Priority: High)
+*目标：在推进阴影和屏幕空间特效之前，先把调试窗口框架下沉到 Core，并补够渲染诊断抓手。*
 
-- [ ] **ImGui 渲染调试面板**
-  - 增加 G-Buffer 预览：至少包含法线图、深度图，必要时补 Albedo。
-  - 增加实时统计：FPS、Draw Call、光源数量、当前 Render Path。
-  - 为后续阴影贴图和 SSAO 预留调试窗口结构，避免后面再拆 UI。
+- [ ] **Core 调试窗口框架**
+  - 在 Core 层提供统一的 `Debug Window` / `Debug Panel Host`，负责单窗口绘制、section 注册、折叠布局与显示顺序管理。
+  - 框架本身只依赖通用编辑器/UI 基础设施，不直接依赖 `MainCamera`、`MainLight`、Tumbler Actor 命名等示例假设。
+  - 调试窗口默认采用一个窗口 + 多个 `CollapsingHeader` section 的形式，避免继续堆多个重复小窗。
+- [ ] **Core 通用诊断 Section**
+  - 提供通用性能与渲染信息：FPS、Frame Time、Draw Call、光源数量、当前 Render Path。
+  - 为 G-Buffer 预览预留统一入口：至少包含法线图、深度图，必要时补 Albedo。
+  - 为后续阴影贴图、SSAO、线框模式、法线可视化预留 section 插槽，避免后面再拆 UI 结构。
+- [ ] **Tumbler 专属 Section 绑定**
+  - Tumbler 的 `Camera / Lighting` 等场景专属调试能力不直接写死在 Core 中，而是通过注册模块挂到统一调试窗口。
+  - `Scene Hierarchy` 与 `Inspector` 继续保留为独立编辑器窗口，不强行塞进调试窗口。
 - [ ] **管线切换与观察辅助**
-  - 结合现有控制台或编辑器 UI，增加更直接的 render path 观察入口。
+  - 在统一调试窗口中保留 render path 的显示与切换入口，避免和其他面板重复。
   - 视情况补充线框模式或法线可视化，作为轻量级 debug pass。
 - [ ] **验收标准**
+  - 调试类信息统一收敛到一个窗口中，不再出现明显重复的 `Performance / Camera / Lighting / Render` 小窗。
+  - Core 层只提供框架和通用调试能力，不反向依赖 Tumbler 示例逻辑。
   - 常见渲染问题能通过 UI 直接观察到，而不必每次下断点或抓 RenderDoc。
-  - 调试面板本身不会破坏正常渲染路径和 swapchain 重建流程。
+  - 调试窗口本身不会破坏正常渲染路径和 swapchain 重建流程。
 
 ### 阶段四：高级视觉效果与阴影 (Priority: Medium)
 *目标：在 G-Buffer 的加持下，实现更高级的屏幕空间特效与物理阴影。*
