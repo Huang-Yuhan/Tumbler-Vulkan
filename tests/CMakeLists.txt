@@ -71,7 +71,10 @@ if(TUMBLER_ENABLE_RUNTIME_SMOKE_TESTS AND TARGET App-Tumbler)
             --test-instances-per-round=256
     )
 
-    set_tests_properties(Smoke.ResizeStressRuntime Smoke.DescriptorStressRuntime PROPERTIES
+    set_tests_properties(
+            Smoke.ResizeStressRuntime
+            Smoke.DescriptorStressRuntime
+            PROPERTIES
             LABELS "smoke;runtime"
             WORKING_DIRECTORY $<TARGET_FILE_DIR:App-Tumbler>
             TIMEOUT 60
@@ -94,7 +97,10 @@ if(TUMBLER_ENABLE_RUNTIME_SMOKE_TESTS AND TARGET App-Tumbler)
         )
         list(JOIN _runtime_smoke_env_mod_list ";" _runtime_smoke_env_mod)
 
-        set_tests_properties(Smoke.ResizeStressRuntime Smoke.DescriptorStressRuntime PROPERTIES
+        set_tests_properties(
+                Smoke.ResizeStressRuntime
+                Smoke.DescriptorStressRuntime
+                PROPERTIES
                 ENVIRONMENT_MODIFICATION "${_runtime_smoke_env_mod}"
         )
     endif()

@@ -297,6 +297,7 @@ private:
     int CompletedRounds = 0;
     bool PendingClose = false;
 };
+
 }
 
 int main(int argc, char** argv) {

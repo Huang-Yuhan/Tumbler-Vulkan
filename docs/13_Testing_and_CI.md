@@ -8,7 +8,8 @@ This document summarizes how to run tests locally, what CI validates, and how to
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
   -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
   -DVCPKG_TARGET_TRIPLET=x64-windows `
-  -DBUILD_TESTING=ON
+  -DBUILD_TESTING=ON `
+  -DTUMBLER_ENABLE_RUNTIME_SMOKE_TESTS=ON
 ```
 
 ```powershell
@@ -39,6 +40,11 @@ ctest --test-dir build -C Debug -N
 
 - `Smoke.*` tests: validate key assets, executable outputs, and deferred pipeline integration hooks.
 - `unit` label tests: pure C++ behavior checks powered by GoogleTest.
+
+When `TUMBLER_ENABLE_RUNTIME_SMOKE_TESTS=ON`, CTest also registers lightweight runtime tests that launch `App-Tumbler`:
+
+- `Smoke.ResizeStressRuntime`
+- `Smoke.DescriptorStressRuntime`
 
 Note: shader smoke checks rely on `.spv` artifacts. If `glslc` is unavailable in CI, shader artifact assertions are skipped by design.
 
