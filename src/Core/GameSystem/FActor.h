@@ -2,11 +2,11 @@
 
 #include <string>
 #include <vector>
+#include <unordered_map>
+#include <typeindex>
 #include <memory>
 
-// 因为 Transform 是成员变量(值类型)，必须包含头文件，不能前置声明
 #include "Core/GameSystem/Components/CTransform.h"
-// 因为 Template 函数里调用了 Comp->SetOwner，编译器需要看到 Component 的完整定义
 #include "Core/GameSystem/Components/Component.h"
 
 class FActor {
@@ -23,37 +23,27 @@ public:
 
     // 存储所有组件
     std::vector<std::unique_ptr<Component>> Components;
+    std::unordered_map<std::type_index, Component*> TypeMap;
 
-    // ==========================================
-    // 静态工厂方法 (声明)
-    // ==========================================
     static FActor* CreateActor(const std::string& name);
 
-    // ==========================================
-    // 模板函数 (实现必须保留在 .h 文件中)
-    // ==========================================
-
-    // 添加组件
     template<typename T, typename... Args>
     T* AddComponent(Args&&... args) {
-        // 1. 创建组件
         auto NewComp = std::make_unique<T>(std::forward<Args>(args)...);
-
-        // 2. 设置 Owner
         NewComp->SetOwner(this);
-
-        // 3. 获取原始指针用于返回
         T* Ptr = NewComp.get();
-
-        // 4. 移交所有权给 vector
+        TypeMap[std::type_index(typeid(T))] = Ptr;
         Components.push_back(std::move(NewComp));
-
         return Ptr;
     }
 
-    // 获取单个组件
     template<typename T>
     T* GetComponent() {
+        auto it = TypeMap.find(std::type_index(typeid(T)));
+        if (it != TypeMap.end()) {
+            return static_cast<T*>(it->second);
+        }
+        // Fallback for types added before TypeMap existed
         for (auto& Comp : Components) {
             if (T* Ptr = dynamic_cast<T*>(Comp.get())) {
                 return Ptr;

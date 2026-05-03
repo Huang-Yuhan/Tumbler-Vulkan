@@ -69,7 +69,7 @@ public:
      * @param cpuMesh CPU 端网格
      * @return GPU 端网格引用
      */
-    FVulkanMesh& UploadMesh(FMesh* cpuMesh);
+    FVulkanMesh& UploadMesh(std::shared_ptr<FMesh> cpuMesh);
 
     /**
      * @brief 加载纹理

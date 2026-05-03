@@ -78,20 +78,6 @@ FOV、NearPlane、FarPlane、Color、Intensity 等字段直接暴露为 public�
 
 ## 资源生命周期
 
-### P2 — MeshCache 用原始指针做 key
-
-**位置**：`src/Core/Graphics/ResourceUploadManager.h:129`
-
-```cpp
-std::unordered_map<FMesh*, FVulkanMesh> MeshCache;
-```
-
-如果 FMesh 被释放后新 FMesh 分配到同一地址，缓存命中返回过时的 `FVulkanMesh`。当前无 UnloadMesh API，Mesh 生命周期等同于应用生命周期，实际不会触发，但未来引入卸载路径后需修复。
-
-**修复方向**：引入卸载路径时，改为在 FMesh 析构时注册缓存清理回调。
-
----
-
 ### P2 — RenderDevice::Cleanup 不销毁资源
 
 **位置**：`src/Core/Graphics/RenderDevice.cpp:47-54`
@@ -127,16 +113,6 @@ this->~FTexture();
 ## 代码重复
 
 ## ECS 设计
-
-### P2 — GetComponent 用 dynamic_cast + 线性扫描
-
-**位置**：`FActor.h:57-63`
-
-每帧 `ExtractRenderPackets` 为每个 Actor 调用 `GetComponent<CMeshRenderer>()`，做 O(n) 线性扫描 + `dynamic_cast`。
-
-**修复方向**：引入类型索引（如 `type_index` → offset 映射），O(1) 查找。
-
----
 
 ### P3 — CMeshRenderer::GetMesh/GetMaterial 每次返回 shared_ptr 副本
 
@@ -174,7 +150,7 @@ this->~FTexture();
 
 | 优先级 | 数量 | 核心主题 |
 |--------|------|----------|
-| P2 | 2 | MeshCache 原始指针 key + GetComponent dynamic_cast |
+| P2 | 1 | RenderDevice::Cleanup 不销毁资源 |
 | P3 | 10 | 封装不足、可维护性 |
 
 建议修复顺序：P1（策略模式 + 资源安全）→ P2（硬编码消除 + 去重）→ P3（按需修复）。

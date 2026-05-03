@@ -25,7 +25,7 @@ void IRenderPipeline::DrawMeshPackets(VkCommandBuffer cmd, VulkanRenderer* rende
             VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4),
             &packet.TransformMatrix);
 
-        FVulkanMesh& gpuMesh = renderer->UploadMesh(packet.Mesh.get());
+        FVulkanMesh& gpuMesh = renderer->UploadMesh(packet.Mesh);
         VkBuffer vertexBuffers[] = {gpuMesh.VertexBuffer.Buffer};
         VkDeviceSize offsets[] = {0};
         vkCmdBindVertexBuffers(cmd, 0, 1, vertexBuffers, offsets);

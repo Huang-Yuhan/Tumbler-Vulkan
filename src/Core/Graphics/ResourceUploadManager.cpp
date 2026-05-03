@@ -64,9 +64,10 @@ void ResourceUploadManager::Cleanup() {
     Device = VK_NULL_HANDLE;
 }
 
-FVulkanMesh& ResourceUploadManager::UploadMesh(FMesh* cpuMesh) {
-    if (MeshCache.find(cpuMesh) != MeshCache.end()) {
-        return MeshCache[cpuMesh];
+FVulkanMesh& ResourceUploadManager::UploadMesh(std::shared_ptr<FMesh> cpuMesh) {
+    FMesh* const meshKey = cpuMesh.get();
+    if (MeshCache.find(meshKey) != MeshCache.end()) {
+        return MeshCache[meshKey];
     }
 
     FVulkanMesh gpuMesh;
@@ -114,9 +115,9 @@ FVulkanMesh& ResourceUploadManager::UploadMesh(FMesh* cpuMesh) {
     RenderDeviceRef->DestroyBuffer(vStaging);
     RenderDeviceRef->DestroyBuffer(iStaging);
 
-    MeshCache[cpuMesh] = gpuMesh;
+    MeshCache[meshKey] = gpuMesh;
     LOG_INFO("Uploaded Mesh. RawBytes: {}, Indices: {}", vSize, gpuMesh.IndexCount);
-    return MeshCache[cpuMesh];
+    return MeshCache[meshKey];
 }
 
 bool ResourceUploadManager::IsMeshUploaded(FMesh* cpuMesh) const {

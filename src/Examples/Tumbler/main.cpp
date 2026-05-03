@@ -382,7 +382,7 @@ int main(int argc, char** argv) {
         HiddenWindowSmokeTestRunner hiddenWindowSmokeTest(runtimeTestOptions);
 
         // 提前上传共用网格，防止渲染中途卡顿
-        renderer.UploadMesh(assetManager.GetOrLoadMesh("DefaultPlane").get());
+        renderer.UploadMesh(assetManager.GetOrLoadMesh("DefaultPlane"));
 
         // 3. 准备真实 DeltaTime 计时器
         auto currentTime = std::chrono::high_resolution_clock::now();

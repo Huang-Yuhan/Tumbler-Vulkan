@@ -41,7 +41,7 @@ std::shared_ptr<FMesh> FAssetManager::GetOrLoadMesh(const std::string& name, con
     
     // 4. 自动推送到 GPU
     if (Renderer) {
-        Renderer->UploadMesh(mesh.get());
+        Renderer->UploadMesh(mesh);
     }
 
     // 5. 存入缓存
@@ -58,7 +58,7 @@ void FAssetManager::RegisterMesh(const std::string& name, std::shared_ptr<FMesh>
     }
 
     if (Renderer && mesh) {
-        Renderer->UploadMesh(mesh.get());
+        Renderer->UploadMesh(mesh);
     }
 
     MeshCache[name] = mesh;

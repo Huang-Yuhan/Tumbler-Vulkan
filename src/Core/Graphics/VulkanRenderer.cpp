@@ -358,8 +358,8 @@ bool VulkanRenderer::LoadShaderModule(const char* filePath, VkShaderModule* outS
     return TheResourceUploadManager.LoadShaderModule(filePath, outShaderModule);
 }
 
-FVulkanMesh& VulkanRenderer::UploadMesh(FMesh* cpuMesh) {
-    return TheResourceUploadManager.UploadMesh(cpuMesh);
+FVulkanMesh& VulkanRenderer::UploadMesh(std::shared_ptr<FMesh> cpuMesh) {
+    return TheResourceUploadManager.UploadMesh(std::move(cpuMesh));
 }
 
 std::shared_ptr<FTexture> VulkanRenderer::LoadTexture(const std::string& filePath) {
