@@ -6,16 +6,6 @@
 
 ## 分层违规
 
-### P0 — AppLogic 直接管理 Vulkan 句柄
-
-**位置**：`src/Examples/Tumbler/AppLogic.h:39-42` / `AppLogic.cpp:450-504`
-
-Example 层直接调用 `vkCreateSampler`、`vkCreateDescriptorSetLayout`、`vkUpdateDescriptorSets` 来创建 G-Buffer 预览所需资源。AppLogic 不应该知道 Vulkan 的存在。
-
-**修复方向**：在 Core 层提供 `DebugOverlay` 或 `GBufferPreviewService`，对外暴露 `SetPreviewTexture(GBufferSlot, VkImageView)`，内部管理 Sampler / DescriptorSet 生命周期。AppLogic 只负责配置"预览什么"。
-
----
-
 ### P1 — VulkanRenderer 为 Example 层暴露 G-Buffer 访问器
 
 **位置**：`src/Core/Graphics/VulkanRenderer.h:105-106` / `VulkanRenderer.cpp:125-139`
@@ -303,9 +293,8 @@ Deferred 管线内联了一个 `loadShader` lambda，而 `ResourceUploadManager:
 
 | 优先级 | 数量 | 核心主题 |
 |--------|------|----------|
-| P0 | 1 | AppLogic 直接管理 Vulkan 句柄 |
 | P1 | 4 | 抽象漏洞（dynamic_cast, 死代码接口）+ 资源悬空 |
 | P2 | 9 | 硬编码、代码重复、生命周期管理 |
 | P3 | 10 | 封装不足、可维护性 |
 
-建议修复顺序：P0 → P1（策略模式 + 资源安全）→ P2（硬编码消除 + 去重）→ P3（按需修复）。
+建议修复顺序：P1（策略模式 + 资源安全）→ P2（硬编码消除 + 去重）→ P3（按需修复）。

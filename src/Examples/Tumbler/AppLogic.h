@@ -1,11 +1,12 @@
 #pragma once
-#include "Core/Graphics/VulkanRenderer.h"
 #include "Core/GameSystem/FScene.h"
+#include "Core/Editor/DebugTexturePreview.h"
 #include <memory>
 #include <string>
 #include <vector>
 
-class FMesh; // 前置声明
+class VulkanRenderer;
+class FMesh;
 class FAssetManager;
 class InputManager;
 class CFirstPersonCamera;
@@ -35,16 +36,11 @@ private:
         int HistoryIndex = 0;
     } Stats;
 
-    // GBuffer 调试预览资源
-    VkSampler DebugSampler = VK_NULL_HANDLE;
-    VkDescriptorSetLayout DebugGBufferSetLayout = VK_NULL_HANDLE;
-    VkDescriptorSet DebugAlbedoDescSet = VK_NULL_HANDLE;
-    VkDescriptorSet DebugNormalDescSet = VK_NULL_HANDLE;
+    // GBuffer 调试预览
+    DebugTexturePreview DebugPreview;
 
     void InitializeScene();
     void InitializePlanes() const;
-    void InitDebugResources();
-    void DestroyDebugResources();
 
     void DrawPerformanceSection();
     void DrawCameraSection();
@@ -53,7 +49,6 @@ private:
     void DrawDebugPanel();
     void DrawInspectorPanel();
     void DrawSceneHierarchyPanel();
-    void UpdateDebugGBufferDescriptors();
     bool ValidateSelectedActor();
     [[nodiscard]] int CountPointLights() const;
 

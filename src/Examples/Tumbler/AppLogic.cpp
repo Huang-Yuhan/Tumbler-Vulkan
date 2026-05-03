@@ -1,8 +1,8 @@
 #include "AppLogic.h"
 
 #include "Core/Editor/EditorSessionState.h"
+#include "Core/Graphics/VulkanRenderer.h"
 #include "Core/Utils/Log.h"
-#include "Core/Graphics/Pipelines/FDeferredPipeline.h"
 
 #include <glm/vec3.hpp>
 #include <imgui.h>
@@ -77,7 +77,9 @@ void AppLogic::InitializePlanes() const
 
 AppLogic::~AppLogic()
 {
-    DestroyDebugResources();
+    if (Renderer != nullptr) {
+        DebugPreview.Cleanup(Renderer->GetDevice());
+    }
 }
 
 FScene* AppLogic::GetScene() { return Scene.get(); }
@@ -177,7 +179,7 @@ void AppLogic::Init(VulkanRenderer* renderer, FAssetManager* assetMgr, InputMana
     // 挂载到剑身上，保持世界绝对坐标属性 (现在会跟着剑一起旋转)
     lightActor2->Transform.SetParent(&sword->Transform, true);
 
-    InitDebugResources();
+    DebugPreview.Init(Renderer);
 }
 
 void AppLogic::Tick(float deltaTime) {
@@ -345,7 +347,8 @@ void AppLogic::DrawDebugPanel()
         && SessionState->CurrentRenderPath == ERenderPath::Deferred
         && Renderer != nullptr
         && ImGui::CollapsingHeader("G-Buffer", sectionFlags)) {
-        UpdateDebugGBufferDescriptors();
+        DebugPreview.SetImage(0, Renderer->GetGBufferAlbedoImageView());
+        DebugPreview.SetImage(1, Renderer->GetGBufferNormalImageView());
 
         VkExtent2D extent = Renderer->GetSwapchainExtent();
         float aspect = extent.height > 0
@@ -357,14 +360,14 @@ void AppLogic::DrawDebugPanel()
 
         ImGui::BeginGroup();
         ImGui::Text("Albedo");
-        ImGui::Image((ImTextureID)(uintptr_t)DebugAlbedoDescSet, ImVec2(previewWidth, previewHeight));
+        ImGui::Image((ImTextureID)(uintptr_t)DebugPreview.GetTextureID(0), ImVec2(previewWidth, previewHeight));
         ImGui::EndGroup();
 
         ImGui::SameLine();
 
         ImGui::BeginGroup();
         ImGui::Text("Normal");
-        ImGui::Image((ImTextureID)(uintptr_t)DebugNormalDescSet, ImVec2(previewWidth, previewHeight));
+        ImGui::Image((ImTextureID)(uintptr_t)DebugPreview.GetTextureID(1), ImVec2(previewWidth, previewHeight));
         ImGui::EndGroup();
     }
 
@@ -446,96 +449,3 @@ void AppLogic::DrawEditorUI() {
     DrawSceneHierarchyPanel();
     DrawInspectorPanel();
 }
-
-void AppLogic::InitDebugResources()
-{
-    if (Renderer == nullptr) {
-        return;
-    }
-
-    VkDevice device = Renderer->GetDevice();
-
-    VkSamplerCreateInfo samplerInfo{};
-    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerInfo.magFilter = VK_FILTER_LINEAR;
-    samplerInfo.minFilter = VK_FILTER_LINEAR;
-    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    samplerInfo.maxLod = 1.0f;
-    vkCreateSampler(device, &samplerInfo, nullptr, &DebugSampler);
-
-    VkDescriptorSetLayoutBinding binding{};
-    binding.binding = 0;
-    binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    binding.descriptorCount = 1;
-    binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    VkDescriptorSetLayoutCreateInfo layoutInfo{};
-    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 1;
-    layoutInfo.pBindings = &binding;
-
-    vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &DebugGBufferSetLayout);
-
-    DebugAlbedoDescSet = Renderer->AllocateDescriptorSet(DebugGBufferSetLayout);
-    DebugNormalDescSet = Renderer->AllocateDescriptorSet(DebugGBufferSetLayout);
-}
-
-void AppLogic::DestroyDebugResources()
-{
-    if (Renderer == nullptr) {
-        return;
-    }
-
-    VkDevice device = Renderer->GetDevice();
-
-    if (DebugSampler != VK_NULL_HANDLE) {
-        vkDestroySampler(device, DebugSampler, nullptr);
-        DebugSampler = VK_NULL_HANDLE;
-    }
-    if (DebugGBufferSetLayout != VK_NULL_HANDLE) {
-        vkDestroyDescriptorSetLayout(device, DebugGBufferSetLayout, nullptr);
-        DebugGBufferSetLayout = VK_NULL_HANDLE;
-    }
-    // Descriptor sets are freed by the renderer's pool when it's destroyed
-    DebugAlbedoDescSet = VK_NULL_HANDLE;
-    DebugNormalDescSet = VK_NULL_HANDLE;
-}
-
-void AppLogic::UpdateDebugGBufferDescriptors()
-{
-    if (Renderer == nullptr || DebugSampler == VK_NULL_HANDLE || DebugGBufferSetLayout == VK_NULL_HANDLE) {
-        return;
-    }
-
-    VkDevice device = Renderer->GetDevice();
-
-    auto updateDescSet = [&](VkDescriptorSet descSet, VkImageView imageView) {
-        VkDescriptorImageInfo imageInfo{};
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo.imageView = imageView;
-        imageInfo.sampler = DebugSampler;
-
-        VkWriteDescriptorSet write{};
-        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.dstSet = descSet;
-        write.dstBinding = 0;
-        write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        write.descriptorCount = 1;
-        write.pImageInfo = &imageInfo;
-
-        vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
-    };
-
-    VkImageView albedoView = Renderer->GetGBufferAlbedoImageView();
-    if (albedoView != VK_NULL_HANDLE && DebugAlbedoDescSet != VK_NULL_HANDLE) {
-        updateDescSet(DebugAlbedoDescSet, albedoView);
-    }
-
-    VkImageView normalView = Renderer->GetGBufferNormalImageView();
-    if (normalView != VK_NULL_HANDLE && DebugNormalDescSet != VK_NULL_HANDLE) {
-        updateDescSet(DebugNormalDescSet, normalView);
-    }
-}
-
