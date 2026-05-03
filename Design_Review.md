@@ -1,0 +1,311 @@
+# 代码设计审阅 (Design Review)
+
+本文档记录对当前代码架构的系统性审阅，按严重程度从高到低排列。每项标注了优先级（P0-P3）、影响范围和修复建议。
+
+---
+
+## 分层违规
+
+### P0 — AppLogic 直接管理 Vulkan 句柄
+
+**位置**：`src/Examples/Tumbler/AppLogic.h:39-42` / `AppLogic.cpp:450-504`
+
+Example 层直接调用 `vkCreateSampler`、`vkCreateDescriptorSetLayout`、`vkUpdateDescriptorSets` 来创建 G-Buffer 预览所需资源。AppLogic 不应该知道 Vulkan 的存在。
+
+**修复方向**：在 Core 层提供 `DebugOverlay` 或 `GBufferPreviewService`，对外暴露 `SetPreviewTexture(GBufferSlot, VkImageView)`，内部管理 Sampler / DescriptorSet 生命周期。AppLogic 只负责配置"预览什么"。
+
+---
+
+### P1 — VulkanRenderer 为 Example 层暴露 G-Buffer 访问器
+
+**位置**：`src/Core/Graphics/VulkanRenderer.h:105-106` / `VulkanRenderer.cpp:125-139`
+
+`GetGBufferAlbedoImageView()` / `GetGBufferNormalImageView()` 的唯一调用者是 AppLogic 中的 G-Buffer 预览面板。Core 类不应为单个 Example 的需求开洞。
+
+**修复方向**：去掉这两个 getter。改为让 G-Buffer 预览通过一个通用的调试纹理注册接口获取 ImageView，或通过 `IRenderPipeline` 多态接口暴露。
+
+---
+
+### P2 — UIManager 是第二个渲染器
+
+**位置**：`src/Core/Editor/UIManager.h:31-34` / `UIManager.cpp`
+
+UIManager 拥有自己的 `VkRenderPass`、`VkFramebuffer` 数组，在 `RecordDrawCommands` 中自己调用 `vkCmdBeginRenderPass`/`vkCmdEndRenderPass`。它硬编码了交换链最终布局为 `VK_IMAGE_LAYOUT_PRESENT_SRC_KHR`。如果主渲染器将来加 HDR 或后处理 pass，UIManager 的布局假设会静默崩溃。
+
+**修复方向**：将 UI 渲染通道的创建收敛到统一的渲染通道工厂。UIManager 只负责录制 ImGui 绘制命令到现有 CommandBuffer，不做自己的 RenderPass 管理。
+
+---
+
+### P3 — 控制台硬编码按键和输入阻断
+
+**位置**：`src/Core/Editor/RuntimeConsole.cpp:167`
+
+控制台开关硬编码为 `EKeyCode::GraveAccent`，且 `TickInput()` 中直接调用 `Input->SetGameplayInputBlocked(bIsOpen)`。按键无法配置，阻断策略无法覆盖。
+
+**修复方向**：控制台的按键绑定改为可注册（例如 `SetToggleKey(EKeyCode)`），输入阻断改为回调通知而非直接 setter。
+
+---
+
+### P3 — EditorSessionState 混合编辑状态与渲染配置
+
+**位置**：`src/Core/Editor/EditorSessionState.h:7-11`
+
+`CurrentRenderPath` 是渲染器配置，`SelectedActor` 是编辑器选中状态，`ShowDebugPanel` 是 UI 状态，三者放在同一个 struct 中传递，职责不清晰。
+
+**修复方向**：将 `CurrentRenderPath` 移至独立的 `RenderSettings` 对象，`EditorSessionState` 只保留编辑器选中/聚焦相关状态。
+
+---
+
+## 抽象漏洞与策略模式破坏
+
+### P1 — dynamic_cast 穿透管线抽象
+
+**位置**：`src/Core/Graphics/VulkanRenderer.cpp:125-139`
+
+```cpp
+auto* deferred = dynamic_cast<FDeferredPipeline*>(it->second.get());
+```
+
+`IRenderPipeline` 接口没有 G-Buffer 访问器，迫使调用者 downcast 到 `FDeferredPipeline` 具体类型。添加新管线或修改 G-Buffer 结构时，所有 downcast 点都需要同步更新。
+
+**修复方向**：要么把 G-Buffer 查询提升为 `IRenderPipeline` 接口方法，要么通过独立的 `GBufferManager` 对象管理 G-Buffer 资源。
+
+---
+
+### P1 — IRenderPipeline 的 onUIRender 参数是死代码
+
+**位置**：`IRenderPipeline.h:44` / `VulkanRenderer.cpp:330`
+
+`RecordCommands` 接口的 `std::function<void(VkCommandBuffer)> onUIRender` 参数在所有调用点均传 `nullptr`。UI 渲染实际由 `VulkanRenderer::RecordCommandBuffer` 在管线完成后自己触发。
+
+**修复方向**：从接口中删除该参数，或者让管线真正接管 UI 回调。
+
+---
+
+### P2 — RenderDevice::CreateImage 缺少内存属性参数
+
+**位置**：`src/Core/Graphics/RenderDevice.cpp:92-117`
+
+`CreateImage` 没有提供指定 `VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT` 为 `requiredFlags` 的途径，导致 `FDeferredPipeline` 只能绕过它直接调用 `vmaCreateImage`。抽象有漏洞。
+
+**修复方向**：给 `CreateImage` 增加 `VkMemoryPropertyFlags requiredFlags` 参数。
+
+---
+
+### P3 — TransitionImageLayout 只支持两种转换路径
+
+**位置**：`src/Core/Graphics/CommandBufferManager.cpp:152-167`
+
+```
+if (UNDEFINED → TRANSFER_DST_OPTIMAL) { ... }
+else if (TRANSFER_DST_OPTIMAL → SHADER_READ_ONLY_OPTIMAL) { ... }
+else { throw std::invalid_argument("Unsupported layout transition!"); }
+```
+
+任何其他组合（包括 Deferred 管线中 `COLOR_ATTACHMENT_OPTIMAL → SHADER_READ_ONLY_OPTIMAL` 的 G-Buffer 屏障）都会抛异常。这个工具函数几乎不可用。
+
+**修复方向**：改为通用的布局转换函数，根据 `oldLayout` 和 `newLayout` 自动推导正确的 `srcAccessMask`/`dstAccessMask`/`srcStageMask`/`dstStageMask`。
+
+---
+
+## 硬编码与可配置性
+
+### P2 — 描述符池容量硬编码
+
+**位置**：`src/Core/Graphics/VulkanRenderer.cpp:194-196`
+
+```cpp
+poolSizes[0].descriptorCount = 1000;
+poolSizes[1].descriptorCount = 1000;
+poolInfo.maxSets = 1000;
+```
+
+超出 1000 时 `VK_CHECK(vkAllocateDescriptorSets)` 直接崩溃，无扩容或诊断。
+
+**修复方向**：改为可配置项，池耗尽时检测并给出诊断信息，或支持动态扩容。
+
+---
+
+### P2 — Forward 管线硬编码深度格式
+
+**位置**：`src/Core/Graphics/Pipelines/FForwardPipeline.cpp:60`
+
+```cpp
+depthAttachment.format = VK_FORMAT_D32_SFLOAT; // Normally queried
+```
+
+注释承认了问题。应该使用 `renderer->GetSwapchainDepthFormat()`。
+
+---
+
+### P2 — UINT64_MAX 无限超时
+
+**位置**：`VulkanRenderer.cpp:256` / `VulkanSwapchain.cpp:137`
+
+`vkWaitForFences` 和 `vkAcquireNextImageKHR` 使用 `UINT64_MAX` 超时。GPU 丢失或驱动崩溃时进程永久挂起。
+
+**修复方向**：使用非无限超时（如 5 秒），超时后检测设备丢失并尝试恢复或优雅退出。
+
+---
+
+### P3 — 组件成员全部 public
+
+**位置**：`CCamera.h:12-14` / `CPointLight.h:22-23` / `CDirectionalLight.h:25-26`
+
+FOV、NearPlane、FarPlane、Color、Intensity 等字段直接暴露为 public，无 setter 校验，无脏标记，无观察者通知。修改任一属性不会触发任何副作用（如标记 UBO 需要更新、标记场景图脏等）。
+
+**修复方向**：改为 private + getter/setter，setter 中触发必要的更新通知。
+
+---
+
+## 资源生命周期
+
+### P1 — RenderPacket 中存原始指针
+
+**位置**：`src/Core/Graphics/RenderPacket.h:8-15`
+
+```cpp
+struct RenderPacket {
+    FMesh* Mesh = nullptr;
+    FMaterialInstance* Material = nullptr;
+};
+```
+
+如果材质实例或网格在帧中被销毁，渲染包的指针悬空。渲染层没有帧保护机制（如引用计数、generation check）。
+
+**修复方向**：用 `std::shared_ptr` 或引入"渲染帧锁"机制，保证提取后到渲染完成前资源不被释放。
+
+---
+
+### P1 — MeshCache 用原始指针做 key
+
+**位置**：`src/Core/Graphics/ResourceUploadManager.h:129`
+
+```cpp
+std::unordered_map<FMesh*, FVulkanMesh> MeshCache;
+```
+
+如果 FMesh 被释放后新 FMesh 分配到同一地址，缓存命中返回过时的 `FVulkanMesh`（use-after-free）。
+
+**修复方向**：改用 `std::shared_ptr<FMesh>` 作为 key，或在 FMesh 析构时注册缓存清理回调。
+
+---
+
+### P2 — RenderDevice::Cleanup 不销毁资源
+
+**位置**：`src/Core/Graphics/RenderDevice.cpp:47-54`
+
+`Cleanup()` 只把指针置空，不释放任何 Buffer/Image。释放顺序完全依赖调用者按正确顺序手动调用。当前 `VulkanRenderer::Cleanup()` 的顺序碰巧正确，但无任何强制。
+
+**修复方向**：RenderDevice 应维护已分配资源的注册表，Cleanup 时检查并报告泄露。
+
+---
+
+### P3 — MainCommandBuffer 释放由 CommandBufferManager 隐式处理
+
+**位置**：`VulkanRenderer.cpp:99`
+
+`MainCommandBuffer` 在 `Cleanup()` 中只被置为 `VK_NULL_HANDLE`，实际释放依赖 `CommandBufferManager::Cleanup()` 销毁整个命令池。句柄悬空，不显式归还。
+
+**修复方向**：在置空前显式调用 `TheCommandBufferManager.FreeCommandBuffer(MainCommandBuffer)`。
+
+---
+
+### P3 — FTexture 移动赋值中显式调用析构函数
+
+**位置**：`src/Core/Assets/FTexture.cpp:46`
+
+```cpp
+this->~FTexture();
+```
+
+技术上属于未定义行为。惯用做法是抽取 `Release()` 私有方法，由析构函数和移动赋值共同调用。
+
+---
+
+## 代码重复
+
+### P2 — Forward/Deferred 网格渲染循环完全相同
+
+**位置**：`FForwardPipeline.cpp:174-204` vs `FDeferredPipeline.cpp:526-555`
+
+两者遍历 renderPackets、绑定描述符集、push 变换常量、绑定顶点/索引缓冲、`vkCmdDrawIndexed`。唯一区别是绑定的 pipeline 句柄。
+
+**修复方向**：提取为 `DrawMeshPackets(VkCommandBuffer, renderPackets, pipelineSelector)` 共享函数。
+
+---
+
+### P3 — Shader 加载逻辑重复
+
+**位置**：`FDeferredPipeline.cpp:396-411` vs `ResourceUploadManager.cpp:234-258`
+
+Deferred 管线内联了一个 `loadShader` lambda，而 `ResourceUploadManager::LoadShaderModule` 已实现相同逻辑。
+
+**修复方向**：Deferred 管线改为通过 `renderer->LoadShaderModule()` 加载。
+
+---
+
+### P3 — Framebuffer 创建循环重复
+
+**位置**：`FForwardPipeline.cpp:105-131` vs `FDeferredPipeline.cpp:300-329`
+
+两者都循环遍历 `renderer->GetSwapchainImageViews()` 创建 framebuffer，区别仅在于附件数量。
+
+**修复方向**：提取为 `CreateFramebuffers(device, renderPass, attachmentViews, extent)` 公共函数。
+
+---
+
+## ECS 设计
+
+### P2 — GetComponent 用 dynamic_cast + 线性扫描
+
+**位置**：`FActor.h:57-63`
+
+每帧 `ExtractRenderPackets` 为每个 Actor 调用 `GetComponent<CMeshRenderer>()`，做 O(n) 线性扫描 + `dynamic_cast`。
+
+**修复方向**：引入类型索引（如 `type_index` → offset 映射），O(1) 查找。
+
+---
+
+### P3 — CMeshRenderer::GetMesh/GetMaterial 每次返回 shared_ptr 副本
+
+**位置**：`CMeshRenderer.h:19, 23`
+
+热路径上每次调用产生原子引用计数开销。
+
+**修复方向**：返回 `const std::shared_ptr<T>&` 或裸指针。
+
+---
+
+### P3 — FMesh 是值类型却强制用 shared_ptr
+
+**位置**：`FMesh.h` / `FAssetManager.cpp`
+
+`FMesh` 无虚函数、可拷贝，但被强制通过 `shared_ptr` 使用。增加了不必要的堆分配和引用计数开销。
+
+**修复方向**：引入 `AssetHandle<FMesh>` 或直接用 `unique_ptr` 管理。
+
+---
+
+## 测试
+
+### P3 — 测试 Runner 类放在 main.cpp 匿名命名空间
+
+**位置**：`src/Examples/Tumbler/main.cpp:29-342`
+
+`ResizeStressTestRunner`、`DescriptorStressTestRunner`、`HiddenWindowSmokeTestRunner` 定义在 main.cpp 匿名命名空间内，无法被单元测试实例化，无法独立运行。
+
+**修复方向**：将测试 runner 提取到独立文件中，使其可被 CTest 或其他测试框架引入。
+
+---
+
+## 总结
+
+| 优先级 | 数量 | 核心主题 |
+|--------|------|----------|
+| P0 | 1 | AppLogic 直接管理 Vulkan 句柄 |
+| P1 | 4 | 抽象漏洞（dynamic_cast, 死代码接口）+ 资源悬空 |
+| P2 | 9 | 硬编码、代码重复、生命周期管理 |
+| P3 | 10 | 封装不足、可维护性 |
+
+建议修复顺序：P0 → P1（策略模式 + 资源安全）→ P2（硬编码消除 + 去重）→ P3（按需修复）。
