@@ -48,16 +48,6 @@ UIManager 拥有自己的 `VkRenderPass`、`VkFramebuffer` 数组，在 `RecordD
 
 ## 抽象漏洞与策略模式破坏
 
-### P2 — RenderDevice::CreateImage 缺少内存属性参数
-
-**位置**：`src/Core/Graphics/RenderDevice.cpp:92-117`
-
-`CreateImage` 没有提供指定 `VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT` 为 `requiredFlags` 的途径，导致 `FDeferredPipeline` 只能绕过它直接调用 `vmaCreateImage`。抽象有漏洞。
-
-**修复方向**：给 `CreateImage` 增加 `VkMemoryPropertyFlags requiredFlags` 参数。
-
----
-
 ### P3 — TransitionImageLayout 只支持两种转换路径
 
 **位置**：`src/Core/Graphics/CommandBufferManager.cpp:152-167`
@@ -89,16 +79,6 @@ poolInfo.maxSets = 1000;
 超出 1000 时 `VK_CHECK(vkAllocateDescriptorSets)` 直接崩溃，无扩容或诊断。
 
 **修复方向**：改为可配置项，池耗尽时检测并给出诊断信息，或支持动态扩容。
-
----
-
-### P2 — UINT64_MAX 无限超时
-
-**位置**：`VulkanRenderer.cpp:256` / `VulkanSwapchain.cpp:137`
-
-`vkWaitForFences` 和 `vkAcquireNextImageKHR` 使用 `UINT64_MAX` 超时。GPU 丢失或驱动崩溃时进程永久挂起。
-
-**修复方向**：使用非无限超时（如 5 秒），超时后检测设备丢失并尝试恢复或优雅退出。
 
 ---
 
@@ -169,16 +149,6 @@ this->~FTexture();
 两者遍历 renderPackets、绑定描述符集、push 变换常量、绑定顶点/索引缓冲、`vkCmdDrawIndexed`。唯一区别是绑定的 pipeline 句柄。
 
 **修复方向**：提取为 `DrawMeshPackets(VkCommandBuffer, renderPackets, pipelineSelector)` 共享函数。
-
----
-
-### P3 — Shader 加载逻辑重复
-
-**位置**：`FDeferredPipeline.cpp:396-411` vs `ResourceUploadManager.cpp:234-258`
-
-Deferred 管线内联了一个 `loadShader` lambda，而 `ResourceUploadManager::LoadShaderModule` 已实现相同逻辑。
-
-**修复方向**：Deferred 管线改为通过 `renderer->LoadShaderModule()` 加载。
 
 ---
 

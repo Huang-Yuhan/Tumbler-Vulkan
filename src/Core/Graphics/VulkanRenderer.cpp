@@ -247,7 +247,14 @@ void VulkanRenderer::Render(
     std::function<void(VkCommandBuffer, uint32_t)> onUIRender) {
 
     VkDevice device = Context.GetDevice();
-    vkWaitForFences(device, 1, &RenderFence, VK_TRUE, UINT64_MAX);
+    static constexpr uint64_t kFenceTimeoutNs = 5'000'000'000; // 5 seconds
+    VkResult waitResult = vkWaitForFences(device, 1, &RenderFence, VK_TRUE, kFenceTimeoutNs);
+    if (waitResult == VK_TIMEOUT) {
+        LOG_ERROR("GPU fence timeout — possible device lost. Attempting recovery.");
+        RecreateSwapchain();
+        return;
+    }
+    VK_CHECK(waitResult);
     FlushPendingDescriptorSetFrees();
 
     uint32_t imageIndex;

@@ -133,8 +133,8 @@ void VulkanSwapchain::Cleanup() {
 
 VkResult VulkanSwapchain::AcquireNextImage(VkSemaphore imageAvailableSemaphore, uint32_t& outImageIndex) const
 {
-    // timeout = UINT64_MAX 表示无限等待，直到有一张图可用
-    return vkAcquireNextImageKHR(ContextRef->GetDevice(), Swapchain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &outImageIndex);
+    static constexpr uint64_t kAcquireTimeoutNs = 5'000'000'000; // 5 seconds
+    return vkAcquireNextImageKHR(ContextRef->GetDevice(), Swapchain, kAcquireTimeoutNs, imageAvailableSemaphore, VK_NULL_HANDLE, &outImageIndex);
 }
 
 VkResult VulkanSwapchain::PresentImage(VkSemaphore renderFinishedSemaphore, uint32_t imageIndex) const

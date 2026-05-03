@@ -79,7 +79,8 @@ public:
         VkFormat format,
         VkImageTiling tiling,
         VkImageUsageFlags usage,
-        AllocatedImage& outImage
+        AllocatedImage& outImage,
+        VkMemoryPropertyFlags requiredFlags = 0
     );
 
     /**

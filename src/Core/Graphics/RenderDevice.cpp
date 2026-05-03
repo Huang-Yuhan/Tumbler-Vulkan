@@ -95,7 +95,8 @@ void RenderDevice::CreateImage(
     VkFormat format,
     VkImageTiling tiling,
     VkImageUsageFlags usage,
-    AllocatedImage& outImage) {
+    AllocatedImage& outImage,
+    VkMemoryPropertyFlags requiredFlags) {
 
     VkImageCreateInfo imageInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
     imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -111,6 +112,7 @@ void RenderDevice::CreateImage(
 
     VmaAllocationCreateInfo allocInfo{};
     allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+    allocInfo.requiredFlags = requiredFlags;
 
     VK_CHECK(vmaCreateImage(Allocator, &imageInfo, &allocInfo,
         &outImage.Image, &outImage.Allocation, nullptr));

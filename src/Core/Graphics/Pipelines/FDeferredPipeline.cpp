@@ -193,107 +193,46 @@ void FDeferredPipeline::InitGBuffers(VulkanRenderer* renderer)
 {
     VkExtent2D extent = renderer->GetSwapchainExtent();
     auto renderDev = renderer->GetRenderDevice();
-    VkDevice device = renderer->GetDevice();
 
     // 1. Albedo G-Buffer Allocation (VK_FORMAT_R8G8B8A8_UNORM)
     {
-        VkImageCreateInfo imageInfo{};
-        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-        imageInfo.imageType = VK_IMAGE_TYPE_2D;
-        imageInfo.extent.width = extent.width;
-        imageInfo.extent.height = extent.height;
-        imageInfo.extent.depth = 1;
-        imageInfo.mipLevels = 1;
-        imageInfo.arrayLayers = 1;
-        imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        renderDev->CreateImage(
+            extent.width, extent.height,
+            VK_FORMAT_R8G8B8A8_UNORM,
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            AlbedoImage,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-        // Use VMA via RenderDevice to allocate
-        VmaAllocationCreateInfo allocInfo{};
-        allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-        allocInfo.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-
-        if (vmaCreateImage(renderer->GetContext().GetAllocator(), &imageInfo, &allocInfo,
-            &AlbedoImage.Image, &AlbedoImage.Allocation, nullptr) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to allocate Albedo G-Buffer image.");
-        }
-
-        VkImageViewCreateInfo viewInfo{};
-        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        viewInfo.image = AlbedoImage.Image;
-        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        viewInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        viewInfo.subresourceRange.baseMipLevel = 0;
-        viewInfo.subresourceRange.levelCount = 1;
-        viewInfo.subresourceRange.baseArrayLayer = 0;
-        viewInfo.subresourceRange.layerCount = 1;
-
-        if (vkCreateImageView(device, &viewInfo, nullptr, &AlbedoImageView) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create Albedo G-Buffer image view.");
-        }
+        AlbedoImageView = renderDev->CreateImageView(AlbedoImage.Image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
     }
 
     // 2. Normal G-Buffer Allocation (VK_FORMAT_R16G16B16A16_SFLOAT)
     {
-        VkImageCreateInfo imageInfo{};
-        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-        imageInfo.imageType = VK_IMAGE_TYPE_2D;
-        imageInfo.extent.width = extent.width;
-        imageInfo.extent.height = extent.height;
-        imageInfo.extent.depth = 1;
-        imageInfo.mipLevels = 1;
-        imageInfo.arrayLayers = 1;
-        imageInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;
-        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        renderDev->CreateImage(
+            extent.width, extent.height,
+            VK_FORMAT_R16G16B16A16_SFLOAT,
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            NormalImage,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-        VmaAllocationCreateInfo allocInfo{};
-        allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-        allocInfo.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-
-        if (vmaCreateImage(renderer->GetContext().GetAllocator(), &imageInfo, &allocInfo,
-            &NormalImage.Image, &NormalImage.Allocation, nullptr) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to allocate Normal G-Buffer image.");
-        }
-
-        VkImageViewCreateInfo viewInfo{};
-        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        viewInfo.image = NormalImage.Image;
-        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        viewInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;
-        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        viewInfo.subresourceRange.baseMipLevel = 0;
-        viewInfo.subresourceRange.levelCount = 1;
-        viewInfo.subresourceRange.baseArrayLayer = 0;
-        viewInfo.subresourceRange.layerCount = 1;
-
-        if (vkCreateImageView(device, &viewInfo, nullptr, &NormalImageView) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create Normal G-Buffer image view.");
-        }
+        NormalImageView = renderDev->CreateImageView(NormalImage.Image, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT);
     }
 }
 
 void FDeferredPipeline::DestroyGBuffers(VulkanRenderer* renderer)
 {
-    VkDevice device = renderer->GetDevice();
-    auto allocator = renderer->GetContext().GetAllocator();
+    auto renderDev = renderer->GetRenderDevice();
 
     if (AlbedoImageView != VK_NULL_HANDLE) {
-        vkDestroyImageView(device, std::exchange(AlbedoImageView, VK_NULL_HANDLE), nullptr);
-        vmaDestroyImage(allocator, std::exchange(AlbedoImage.Image, VK_NULL_HANDLE), AlbedoImage.Allocation);
+        renderDev->DestroyImageView(std::exchange(AlbedoImageView, VK_NULL_HANDLE));
+        renderDev->DestroyImage(AlbedoImage);
     }
 
     if (NormalImageView != VK_NULL_HANDLE) {
-        vkDestroyImageView(device, std::exchange(NormalImageView, VK_NULL_HANDLE), nullptr);
-        vmaDestroyImage(allocator, std::exchange(NormalImage.Image, VK_NULL_HANDLE), NormalImage.Allocation);
+        renderDev->DestroyImageView(std::exchange(NormalImageView, VK_NULL_HANDLE));
+        renderDev->DestroyImage(NormalImage);
     }
 }
 
@@ -393,25 +332,10 @@ void FDeferredPipeline::InitLightingPipeline(VulkanRenderer* renderer) {
     }
 
     // 4. Load Shaders
-    auto loadShader = [&](const std::string& path) -> VkShaderModule {
-        std::ifstream file(path, std::ios::ate | std::ios::binary);
-        if (!file.is_open()) return VK_NULL_HANDLE;
-        size_t size = static_cast<size_t>(file.tellg());
-        std::vector<char> buf(size);
-        file.seekg(0);
-        file.read(buf.data(), size);
-        file.close();
-        VkShaderModuleCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        createInfo.codeSize = buf.size();
-        createInfo.pCode = reinterpret_cast<const uint32_t*>(buf.data());
-        VkShaderModule mod;
-        vkCreateShaderModule(device, &createInfo, nullptr, &mod);
-        return mod;
-    };
-
-    VkShaderModule vertShader = loadShader("assets/shaders/engine/deferred_lighting.vert.spv");
-    VkShaderModule fragShader = loadShader("assets/shaders/engine/deferred_lighting.frag.spv");
+    VkShaderModule vertShader;
+    VkShaderModule fragShader;
+    renderer->LoadShaderModule("assets/shaders/engine/deferred_lighting.vert.spv", &vertShader);
+    renderer->LoadShaderModule("assets/shaders/engine/deferred_lighting.frag.spv", &fragShader);
 
     // 5. Build Pipeline
     auto builder = VulkanPipelineBuilder::Begin(LightingPipelineLayout);
