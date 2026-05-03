@@ -1,6 +1,7 @@
 #pragma once
 #include "Core/GameSystem/FScene.h"
 #include "Core/Editor/DebugTexturePreview.h"
+#include "Core/Editor/DebugWindowHost.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -38,17 +39,19 @@ private:
         int HistoryIndex = 0;
     } Stats;
 
-    // GBuffer 调试预览
+    // 调试窗口
     DebugTexturePreview DebugPreview;
+    DebugWindowHost DebugWindow;
 
     void InitializeScene();
     void InitializePlanes() const;
+    void RegisterDebugSections();
+    void DrawGBufferSection();
 
     void DrawPerformanceSection();
     void DrawCameraSection();
     void DrawLightingSection();
     void DrawRenderingSection();
-    void DrawDebugPanel();
     void DrawInspectorPanel();
     void DrawSceneHierarchyPanel();
     bool ValidateSelectedActor();

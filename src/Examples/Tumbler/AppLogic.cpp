@@ -181,6 +181,7 @@ void AppLogic::Init(VulkanRenderer* renderer, FAssetManager* assetMgr, InputMana
     lightActor2->Transform.SetParent(&sword->Transform, true);
 
     DebugPreview.Init(Renderer);
+    RegisterDebugSections();
 }
 
 void AppLogic::Tick(float deltaTime) {
@@ -319,62 +320,6 @@ void AppLogic::DrawRenderingSection()
     }
 }
 
-void AppLogic::DrawDebugPanel()
-{
-    if (!ImGui::Begin("Render Debug")) {
-        ImGui::End();
-        return;
-    }
-
-    constexpr ImGuiTreeNodeFlags sectionFlags = ImGuiTreeNodeFlags_DefaultOpen;
-
-    if (ImGui::CollapsingHeader("Performance", sectionFlags)) {
-        DrawPerformanceSection();
-    }
-
-    if (ImGui::CollapsingHeader("Camera", sectionFlags)) {
-        DrawCameraSection();
-    }
-
-    if (ImGui::CollapsingHeader("Lighting", sectionFlags)) {
-        DrawLightingSection();
-    }
-
-    if (ImGui::CollapsingHeader("Rendering", sectionFlags)) {
-        DrawRenderingSection();
-    }
-
-    if (SessionState != nullptr
-        && RenderCfg->CurrentRenderPath == ERenderPath::Deferred
-        && Renderer != nullptr
-        && ImGui::CollapsingHeader("G-Buffer", sectionFlags)) {
-        DebugPreview.SetImage(0, Renderer->GetGBufferAlbedoImageView());
-        DebugPreview.SetImage(1, Renderer->GetGBufferNormalImageView());
-
-        VkExtent2D extent = Renderer->GetSwapchainExtent();
-        float aspect = extent.height > 0
-            ? static_cast<float>(extent.width) / static_cast<float>(extent.height)
-            : 16.0f / 9.0f;
-
-        float previewWidth = ImGui::GetContentRegionAvail().x * 0.48f;
-        float previewHeight = previewWidth / aspect;
-
-        ImGui::BeginGroup();
-        ImGui::Text("Albedo");
-        ImGui::Image((ImTextureID)(uintptr_t)DebugPreview.GetTextureID(0), ImVec2(previewWidth, previewHeight));
-        ImGui::EndGroup();
-
-        ImGui::SameLine();
-
-        ImGui::BeginGroup();
-        ImGui::Text("Normal");
-        ImGui::Image((ImTextureID)(uintptr_t)DebugPreview.GetTextureID(1), ImVec2(previewWidth, previewHeight));
-        ImGui::EndGroup();
-    }
-
-    ImGui::End();
-}
-
 static void DrawActorNode(FActor* actor, FActor*& selectedActor) {
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
     if (selectedActor == actor) {
@@ -444,9 +389,51 @@ void AppLogic::DrawInspectorPanel() {
     ImGui::End();
 }
 
+void AppLogic::RegisterDebugSections()
+{
+    DebugWindow.RegisterSection({"Performance", [this]{ DrawPerformanceSection(); }, 0});
+    DebugWindow.RegisterSection({"Camera",     [this]{ DrawCameraSection(); },     10});
+    DebugWindow.RegisterSection({"Lighting",   [this]{ DrawLightingSection(); },   20});
+    DebugWindow.RegisterSection({"Rendering",  [this]{ DrawRenderingSection(); },  30});
+    DebugWindow.RegisterSection({"G-Buffer",   [this]{ DrawGBufferSection(); },    40, false});
+}
+
+void AppLogic::DrawGBufferSection()
+{
+    if (SessionState == nullptr
+        || RenderCfg->CurrentRenderPath != ERenderPath::Deferred
+        || Renderer == nullptr) {
+        ImGui::TextDisabled("G-Buffer preview available in Deferred mode.");
+        return;
+    }
+
+    DebugPreview.SetImage(0, Renderer->GetGBufferAlbedoImageView());
+    DebugPreview.SetImage(1, Renderer->GetGBufferNormalImageView());
+
+    VkExtent2D extent = Renderer->GetSwapchainExtent();
+    float aspect = extent.height > 0
+        ? static_cast<float>(extent.width) / static_cast<float>(extent.height)
+        : 16.0f / 9.0f;
+
+    float previewWidth = ImGui::GetContentRegionAvail().x * 0.48f;
+    float previewHeight = previewWidth / aspect;
+
+    ImGui::BeginGroup();
+    ImGui::Text("Albedo");
+    ImGui::Image((ImTextureID)(uintptr_t)DebugPreview.GetTextureID(0), ImVec2(previewWidth, previewHeight));
+    ImGui::EndGroup();
+
+    ImGui::SameLine();
+
+    ImGui::BeginGroup();
+    ImGui::Text("Normal");
+    ImGui::Image((ImTextureID)(uintptr_t)DebugPreview.GetTextureID(1), ImVec2(previewWidth, previewHeight));
+    ImGui::EndGroup();
+}
+
 void AppLogic::DrawEditorUI() {
     ValidateSelectedActor();
-    DrawDebugPanel();
+    DebugWindow.Draw();
     DrawSceneHierarchyPanel();
     DrawInspectorPanel();
 }

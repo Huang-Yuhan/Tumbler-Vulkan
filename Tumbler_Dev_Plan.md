@@ -19,10 +19,10 @@
 
 ## 🎯 当前执行计划
 
-1. **Core 化调试窗口框架**
-   - 把调试窗口宿主、section 注册机制和统一布局下沉到 Core
-   - Tumbler 只注册 `Camera / Lighting` 等场景专属 section
-   - 在统一窗口里补齐 G-Buffer 预览、FPS、Draw Call、光源数量、Render Path 等能力
+1. **Core 化调试窗口框架** ✅
+   - `DebugWindowHost` 已下沉到 Core/Editor，提供 section 注册 + 优先级排序 + CollapsingHeader 渲染
+   - AppLogic 通过 lambda 注册 5 个 section（Performance / Camera / Lighting / Rendering / G-Buffer）
+   - G-Buffer 预览（Albedo + Normal）仅在 Deferred 模式显示
 
 2. **进入高级视觉效果**
    - 先做方向光阴影（Shadow Mapping），再做 SSAO
@@ -38,17 +38,15 @@
 
 ### 阶段三后继：Core 化调试窗口 (Priority: High)
 
-- [ ] **Core 调试窗口框架**
-  - 在 Core 层提供统一的 `Debug Window Host`，负责单窗口绘制、section 注册、折叠布局
-  - 框架只依赖通用编辑器/UI 基础设施，不依赖 Example 层
-  - 一个窗口 + 多个 `CollapsingHeader` section
-- [ ] **Core 通用诊断 Section**
-  - 通用性能信息：FPS、Frame Time、Draw Call、光源数量、Render Path
-  - G-Buffer 预览入口：法线图、深度图、Albedo
-  - 为阴影贴图、SSAO、线框模式、法线可视化预留 section 插槽
-- [ ] **Tumbler 专属 Section 绑定**
-  - `Camera / Lighting` 等场景专属调试能力通过注册模块挂载，不写死
-  - `Scene Hierarchy` 与 `Inspector` 继续保留为独立窗口
+- [x] **Core 调试窗口框架**
+  - `DebugWindowHost`（Core/Editor）提供 section 注册 + 优先级排序 + CollapsingHeader 渲染
+  - 框架不依赖 Example 层
+- [x] **Core 通用诊断 Section**
+  - Performance / Rendering / G-Buffer 三个通用 section 已实现
+  - G-Buffer 预览（Albedo + Normal）仅在 Deferred 模式显示
+- [x] **Tumbler 专属 Section 绑定**
+  - Camera / Lighting 通过 `RegisterDebugSections()` lambda 注册到 `DebugWindowHost`
+  - Scene Hierarchy / Inspector 保留为独立窗口
 
 ### 阶段四：高级视觉效果与阴影 (Priority: Medium)
 
