@@ -92,18 +92,6 @@ poolInfo.maxSets = 1000;
 
 ---
 
-### P2 — Forward 管线硬编码深度格式
-
-**位置**：`src/Core/Graphics/Pipelines/FForwardPipeline.cpp:60`
-
-```cpp
-depthAttachment.format = VK_FORMAT_D32_SFLOAT; // Normally queried
-```
-
-注释承认了问题。应该使用 `renderer->GetSwapchainDepthFormat()`。
-
----
-
 ### P2 — UINT64_MAX 无限超时
 
 **位置**：`VulkanRenderer.cpp:256` / `VulkanSwapchain.cpp:137`

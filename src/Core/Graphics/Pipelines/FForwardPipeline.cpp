@@ -57,7 +57,7 @@ void FForwardPipeline::InitRenderPass(VulkanRenderer* renderer)
 
     // 2. Depth Attachment
     VkAttachmentDescription depthAttachment{};
-    depthAttachment.format = VK_FORMAT_D32_SFLOAT; // Normally queried
+    depthAttachment.format = renderer->GetSwapchainDepthFormat();
     depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
     depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
