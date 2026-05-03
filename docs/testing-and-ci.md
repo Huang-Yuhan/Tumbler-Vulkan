@@ -41,18 +41,38 @@ ctest --test-dir build -C Debug -N
 - `Smoke.*` tests: validate key assets, executable outputs, and deferred pipeline integration hooks.
 - `unit` label tests: pure C++ behavior checks powered by GoogleTest.
 
-When `TUMBLER_ENABLE_RUNTIME_SMOKE_TESTS=ON`, CTest also registers lightweight runtime tests that launch `App-Tumbler`:
+### CMake 脚本烟雾测试（始终注册）
 
-- `Smoke.ResizeStressRuntime`
-- `Smoke.DescriptorStressRuntime`
+- `Smoke.RuntimeArtifacts` — 验证关键构建产物（exe、资产目录、着色器 `.spv`）存在
+- `Smoke.DeferredPipeline` — 验证 Deferred 管线关键产物和钩子
 
-Note: shader smoke checks rely on `.spv` artifacts. If `glslc` is unavailable in CI, shader artifact assertions are skipped by design.
+### 运行时烟雾测试（需 `TUMBLER_ENABLE_RUNTIME_SMOKE_TESTS=ON`）
+
+启动 `App-Tumbler` 自动执行固定帧数后退出：
+
+- `Smoke.ResizeStressRuntime` — 连续切换窗口尺寸，验证 swapchain/UI Framebuffer 稳定性
+- `Smoke.DescriptorStressRuntime` — 批量创建/销毁材质实例，验证描述符生命周期
+- `Smoke.HiddenWindowRuntime` — 隐藏窗口渲染固定帧数，验证初始化/渲染/退出全链路
+
+着色器产物检查依赖 `glslc`，不可用时自动跳过。
 
 ## 4. Add a New Unit Test
 
-1. Add a `TEST(...)` case into one of the existing files under `tests/unit/`.
-2. Keep tests deterministic.
-3. Reconfigure if needed, then run:
+现有单元测试文件（`tests/unit/`）：
+
+| 文件 | 覆盖内容 |
+|------|----------|
+| `DescriptorSetFreeQueueTests.cpp` | 描述符延迟释放队列 |
+| `FQuaternionTests.cpp` | 四元数运算 |
+| `CTransformTests.cpp` | Transform 层级变换 |
+| `FActorTests.cpp` | Actor 创建/组件管理 |
+| `FSceneTests.cpp` | 场景生命周期/延迟销毁 |
+
+添加新测试：
+
+1. 在对应文件中添加 `TEST(...)` 用例，或新建文件后在 `tests/CMakeLists.txt` 中注册
+2. 保持测试确定性
+3. 重新配置后运行：
 
 Deterministic checklist:
 

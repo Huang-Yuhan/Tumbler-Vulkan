@@ -78,7 +78,7 @@ storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE
 - Deferred 的 Geometry Pass 会自动关闭颜色混合
 - `colorWriteMask` 和打包输出格式由 `VulkanPipelineBuilder` 统一配置，确保写入 G-Buffer 时不会破坏打包后的浮点或材质参数
 
-运行时，`AppLogic` 通过 `SceneViewData` 中的 `ERenderPath` 指定当前渲染模式，材质系统则根据这个枚举自动绑定正确的 `VkPipeline` 变体。
+运行时，`RenderSettings::CurrentRenderPath` 决定渲染模式，在 main.cpp 中注入到 `SceneViewData`。材质系统根据 `ERenderPath` 自动绑定正确的 `VkPipeline` 变体。
 
 换句话说，上层逻辑只关心“我要用 Forward 还是 Deferred”，而不必自己处理每种材质在不同管线下的 Vulkan 细节。
 

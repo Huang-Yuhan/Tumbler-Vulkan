@@ -145,7 +145,7 @@ cmake --build build --config Debug -- /p:PreferredUILang=en-US
 
 **错误信息：**
 ```
-Failed to load shader module: shaders/pbr.vert.spv
+Failed to load shader module: assets/shaders/engine/pbr.vert.spv
 ```
 
 **原因：** 工作目录不正确，着色器未编译，或路径错误。

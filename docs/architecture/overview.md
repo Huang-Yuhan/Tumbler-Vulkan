@@ -1,278 +1,251 @@
-# 引擎架构概览 (Architecture Overview)
+# 引擎架构概览
 
-本项目作为一个 Vulkan 与现代游戏引擎概念的实践沙盒，在结构上遵循了"逻辑与渲染分离"的核心理念。
+本项目作为 Vulkan 与现代游戏引擎概念的实践沙盒，遵循"逻辑与渲染分离"的核心理念。
 
-## 1. 实体-组件系统 (ECS 变体)
-场景中的所有客观物体均由 `FActor` 表达。
-`FActor` 仅作为一个容器和 Transform（变换）的持有者，所有的特定能力均通过挂载特定的 `Component` 来实现。
-- **外观呈现**：挂载 `CMeshRenderer`，指定对应的 Mesh 和 MaterialInstance。
-- **环境光照**：挂载 `CPointLight` 或 `CDirectionalLight`。
+## 1. 实体-组件系统（ECS 变体）
 
-这种组合优于继承的设计，极大提升了对象设计时的灵活性。
+所有场景物体由 `FActor` 表达。`FActor` 持有 `CTransform` 作为值成员，其他能力通过挂载 `Component` 子类实现：
 
-## 2. 逻辑与渲染的极度解耦 (Physical Isolation)
+| 组件 | 能力 |
+|------|------|
+| `CMeshRenderer` | 外观呈现（Mesh + MaterialInstance） |
+| `CPointLight` | 点光源 |
+| `CDirectionalLight` | 方向光 |
+| `CCamera` / `CFirstPersonCamera` | 相机 / 第一人称漫游相机 |
 
-这是现代引擎（如 Unreal Engine）最核心的设计思想之一。
-渲染器 (`VulkanRenderer`) **绝对不应该**直接访问场景树或解析 `FActor`。它就像一个纯粹的画图机器，只有人在喂给它数据时，它才开始工作。
+组件通过 `GetComponent<T>()` 查找，内部使用 `std::type_index` 映射实现 O(1) 快速查找。
 
-### 数据流转流程：
-1. **客观世界提取 (`RenderPacket`)**
-   在渲染前，引擎从 `FScene` 的所有的 `CMeshRenderer` 中抽取纯净的渲染数据包 `RenderPacket`。包含：
-   - 几何体结构 `FMesh*`
-   - 材质属性 `FMaterialInstance*`
-   - 变换矩阵 `glm::mat4`
-   渲染器拿着这堆"包裹"，只管往画面上画，完全不知道它们属于哪个"Actor"。
+## 2. 逻辑与渲染的物理隔离
 
-2. **观察者视图 (`SceneViewData`)**
-   游戏视角不仅有相机矩阵（View, Projection），还包含了**能被这个相机看到的**所有光源信息（`std::vector<LightData> Lights`）。
-   `SceneViewData` 代表环境上下文。如果做分屏双人游戏或阴影映射，我们只需要生成多份不同的 `SceneViewData`，它们依然可以利用同一批 `RenderPacket`。
+渲染器 (`VulkanRenderer`) 不直接访问 `FActor` 或 `FScene`。数据流：
 
-这种严格的物理层面隔离，为将来的多线程渲染（逻辑线程打包，渲染线程解包提交）打下了稳固的基础。
+1. **`FScene::ExtractRenderPackets()`** — 从所有 `CMeshRenderer` 中提取 `RenderPacket` 列表（`shared_ptr<FMesh>`、`shared_ptr<FMaterialInstance>`、`mat4` 变换矩阵）
+2. **`FScene::GenerateSceneView()`** — 构建 `SceneViewData`（相机矩阵 + 可见光源列表 + `ERenderPath`）
+3. **`VulkanRenderer::Render()`** — 消费上述两种数据结构，对 Actor 和 Scene 一无所知
 
-## 3. VulkanRenderer 子系统架构
+`SceneViewData::RenderPath` 每帧决定使用 Forward 还是 Deferred 管线。渲染路径由 `RenderSettings::CurrentRenderPath` 统一管理，在 main.cpp 中注入到 `viewData`。
 
-为了遵循单一职责原则（SRP），`VulkanRenderer` 已被拆分为多个专注的子系统：
+## 3. VulkanRenderer 子系统
 
 ```
 VulkanRenderer (协调者)
-├── VulkanContext        - Vulkan 实例、设备、队列管理
-├── VulkanSwapchain      - 交换链、图像视图、深度缓冲
-├── RenderDevice         - GPU 资源创建/销毁 (Buffer, Image)
-├── CommandBufferManager - 命令池、命令缓冲、即时提交
-└── ResourceUploadManager - Mesh/Texture 上传管线
+├── VulkanContext          — Instance、Device、队列族
+├── VulkanSwapchain        — 交换链图像、深度缓冲、重建
+├── RenderDevice           — GPU 资源创建/销毁（VMA 封装）
+├── CommandBufferManager   — 命令池分配、即时提交、布局转换
+├── ResourceUploadManager  — Mesh 上传（staging→device-local）、纹理加载、Mesh 去重
+├── DescriptorSetFreeQueue — 描述符集延迟回收队列
+├── SceneParameterBuffer   — 全局 SceneDataUBO 持久映射
+└── 同步对象               — VkSemaphore（图像就绪/渲染完成）+ VkFence（帧栅栏）
 ```
 
-### 3.1 RenderDevice (渲染设备)
-**职责**：封装所有 GPU 资源的创建和销毁操作。
+### 3.1 RenderDevice
+
+封装 VMA 资源创建/销毁。`CreateImage()` 支持 `requiredFlags` 参数（如 `VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT`）。
 
 ```cpp
-class RenderDevice {
-    void CreateBuffer(size_t size, VkBufferUsageFlags usage, ...);
-    void DestroyBuffer(AllocatedBuffer& buffer);
-    void CreateImage(uint32_t width, uint32_t height, ...);
-    void DestroyImage(AllocatedImage& image);
-    VkSampler CreateSampler(...);
-    // ...
-};
+void CreateBuffer(size_t size, VkBufferUsageFlags usage, VmaMemoryUsage mem, AllocatedBuffer& out);
+void CreateImage(uint32_t w, uint32_t h, VkFormat fmt, VkImageTiling tiling,
+    VkImageUsageFlags usage, AllocatedImage& out, VkMemoryPropertyFlags requiredFlags = 0);
+void DestroyBuffer(AllocatedBuffer&);
+void DestroyImage(AllocatedImage&);
+VkImageView CreateImageView(VkImage, VkFormat, VkImageAspectFlags);
+VkSampler CreateSampler(VkFilter mag, VkFilter min, VkSamplerAddressMode, bool anisotropy);
 ```
 
-**设计优势**：
-- 统一的资源生命周期管理
-- VMA 内存分配逻辑集中化
-- 便于未来实现资源池和内存回收
-
-### 3.2 CommandBufferManager (命令缓冲管理器)
-**职责**：管理命令池和命令缓冲区的分配、提交、同步。
+### 3.2 CommandBufferManager
 
 ```cpp
-class CommandBufferManager {
-    VkCommandBuffer AllocatePrimaryCommandBuffer();
-    void FreeCommandBuffer(VkCommandBuffer cmd);
-    void ImmediateSubmit(std::function<void(VkCommandBuffer)>&& fn);
-    void TransitionImageLayout(VkImage, VkImageLayout old, VkImageLayout new);
-    // ...
-};
+VkCommandBuffer AllocatePrimaryCommandBuffer();
+void ImmediateSubmit(std::function<void(VkCommandBuffer)>&& fn);
+void TransitionImageLayout(VkImage, VkFormat, VkImageLayout old, VkImageLayout new);
+void CopyBufferToImage(VkBuffer, VkImage, uint32_t w, uint32_t h);
+void ResetCommandPool();
 ```
 
-**设计优势**：
-- 命令缓冲区的生命周期独立管理
-- 即时提交（Immediate Submit）逻辑复用
-- 支持多线程命令录制（未来扩展）
-
-### 3.3 ResourceUploadManager (资源上传管理器)
-**职责**：处理 CPU 数据到 GPU 的传输，包括 Mesh 和 Texture。
+### 3.3 ResourceUploadManager
 
 ```cpp
-class ResourceUploadManager {
-    FVulkanMesh& UploadMesh(FMesh* cpuMesh);
-    std::shared_ptr<FTexture> LoadTexture(const std::string& path);
-    bool LoadShaderModule(const char* path, VkShaderModule* out);
-    // ...
-};
+FVulkanMesh& UploadMesh(std::shared_ptr<FMesh> cpuMesh);      // 接受 shared_ptr 保证生命周期
+std::shared_ptr<FTexture> LoadTexture(const std::string& path);
+bool LoadShaderModule(const char* path, VkShaderModule* out);
+bool IsMeshUploaded(FMesh*) const;
+void ClearMeshCache();
 ```
-
-**设计优势**：
-- Staging Buffer 创建和销毁逻辑封装
-- Mesh 缓存管理（避免重复上传）
-- 纹理加载管线统一入口
 
 ### 3.4 子系统协作流程
 
 ```
-初始化阶段:
+初始化:
 VulkanRenderer::Init()
-    ├── Context.Init(window)           // 创建 Instance、Device
-    ├── RenderDevice.Init(&Context)    // 初始化资源管理器
+    ├── Context.Init(window)
+    ├── RenderDevice.Init(&Context)
     ├── CommandBufferManager.Init(&Context)
     ├── ResourceUploadManager.Init(&RenderDevice, &CommandBufferManager)
-    └── SwapChain.Init(&Context)
+    ├── SwapChain.Init(&Context)
+    └── InitPipelines()  // Forward + Deferred
 
-运行时渲染:
-VulkanRenderer::Render()
-    ├── 等待上一帧完成 (vkWaitForFences)
-    ├── 获取交换链图像
-    ├── 重置命令缓冲
-    ├── 录制渲染命令
-    │   └── ResourceUploadManager::UploadMesh() // 按需上传
-    ├── 提交到 GPU
-    └── 呈现图像
+每帧渲染:
+Render()
+    ├── FlushPendingDescriptorSetFrees()
+    ├── vkWaitForFences(kFenceTimeoutNs)  // 5 秒超时
+    ├── AcquireNextImage(kAcquireTimeoutNs)
+    ├── vkResetCommandBuffer()
+    ├── 更新 SceneDataUBO
+    ├── Pipeline->RecordCommands(...)
+    ├── onUIRender(cmd, imageIndex)       // ImGui 回调
+    └── vkEndCommandBuffer()
 
-清理阶段:
-VulkanRenderer::Cleanup()
-    ├── 等待 GPU 空闲
-    ├── ResourceUploadManager.Cleanup()  // 清理 Mesh 缓存
-    ├── CommandBufferManager.Cleanup()   // 销毁命令池
-    ├── RenderDevice.Cleanup()           // 清理 VMA
+清理:
+Cleanup()
+    ├── vkDeviceWaitIdle()
+    ├── FlushPendingDescriptorSetFrees()
+    ├── 销毁 DescriptorPool + GlobalSetLayout
+    ├── Pipelines[i]->Cleanup(this)
+    ├── 销毁同步对象
+    ├── ResourceUploadManager.Cleanup()
+    ├── CommandBufferManager.Cleanup()
+    ├── RenderDevice.Cleanup()
+    ├── SwapChain.Cleanup()
     └── Context.Cleanup()
 ```
 
-## 4. 材质系统架构
+## 4. 双管线策略
 
-材质系统采用"母体-实例"模式，支持高效的资源复用：
+`IRenderPipeline` 是策略接口，有两个实现：
 
-```
-FMaterial (母体材质)
-├── Pipeline              // 烘焙的渲染管线
-├── PipelineLayout        // 管线布局
-├── DescriptorSetLayout   // 描述符布局
-└── FMaterialInstance[]   // 材质实例列表
+| 管线 | Subpass 数 | 特点 |
+|------|-----------|------|
+| `FForwardPipeline` | 1 | 几何 + 光照在 `pbr.frag` 中同时计算 |
+| `FDeferredPipeline` | 2 | MRT G-Buffer（Albedo + Normal+Roughness）+ 全屏光照 pass |
 
-FMaterialInstance (材质实例)
-├── DescriptorSet         // 描述符集
-├── UBOBuffer            // 材质参数缓冲
-└── FMaterialUBO         // CPU 端参数镜像
-    ├── BaseColorTint
-    ├── Roughness
-    └── Metallic
-```
+两条管线在启动时一起初始化，`SceneViewData::RenderPath` 每帧选择使用哪条。运行时可通过控制台 `render.path` 命令或 ImGui Camera 面板热切换。
 
-### 4.1 依赖关系
+详细设计参见 [渲染架构](rendering.md)。
 
-```
-FMaterialInstance
-    └── FMaterial
-            └── RenderDevice (创建 Pipeline)
-            └── VulkanRenderer (分配 DescriptorSet)
-```
-
-### 4.2 使用流程
+### 4.1 IRenderPipeline 接口
 
 ```cpp
-// 1. 创建母体材质（由 FAssetManager 管理）
-auto pbrMaterial = AssetMgr->GetOrLoadMaterial(
-    "PBR_Base",
-    "shaders/pbr.vert.spv",
-    "shaders/pbr.frag.spv"
-);
+class IRenderPipeline {
+    virtual void Init(VulkanRenderer*) = 0;
+    virtual void Cleanup(VulkanRenderer*) = 0;
+    virtual void RecreateResources(VulkanRenderer*) = 0;
+    virtual void RecordCommands(VkCommandBuffer, uint32_t imageIndex,
+        VulkanRenderer*, const SceneViewData&,
+        const std::vector<RenderPacket>&) = 0;
+    virtual VkRenderPass GetRenderPass() const = 0;
 
-// 2. 创建材质实例
-auto matRed = pbrMaterial->CreateInstance();
+    virtual bool SupportsGBuffer() const { return false; }
+    virtual VkImageView GetGBufferAlbedoImageView() const { return VK_NULL_HANDLE; }
+    virtual VkImageView GetGBufferNormalImageView() const { return VK_NULL_HANDLE; }
+    virtual VkImageView GetGBufferDepthImageView() const { return VK_NULL_HANDLE; }
 
-// 3. 设置材质参数
-matRed->SetVector("BaseColorTint", glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
-matRed->SetFloat("Roughness", 0.5f);
-matRed->SetFloat("Metallic", 0.0f);
-
-// 4. 提交到 GPU
-matRed->ApplyChanges();
-
-// 5. 挂载到渲染组件
-meshRenderer->SetMaterial(matRed);
+    // 共享辅助方法
+    static void DrawMeshPackets(VkCommandBuffer, VulkanRenderer*,
+        ERenderPath, const std::vector<RenderPacket>&);
+    static void CreateFramebuffers(VkDevice, VkRenderPass, VkExtent2D,
+        const std::vector<VkImageView>& swapchainImageViews,
+        const std::vector<VkImageView>& sharedAttachments,
+        std::vector<VkFramebuffer>& out);
+};
 ```
 
-## 5. 资产管理系统
+`DrawMeshPackets` 和 `CreateFramebuffers` 是静态方法，Forward 和 Deferred 管线共享，避免代码重复。
+
+## 5. 材质系统（母体-实例模式）
+
+`FMaterial` 持有烘焙后的管线（`VkPipeline`、`VkPipelineLayout`、`VkDescriptorSetLayout`），一个母体对应 Forward + Deferred 两套管线。
+
+`FMaterialInstance` 持有每实例的 `DescriptorSet`、`UBOBuffer`、CPU 端 `FMaterialUBO` 镜像。实例通过 `FMaterial::CreateInstance()` 创建，由调用者持有 `shared_ptr`。
+
+```
+FMaterial (母体)                     FMaterialInstance (实例 × N)
+├── Pipelines[ERenderPath]           ├── shared_ptr<FMaterial> Parent
+├── PipelineLayout                   ├── VkDescriptorSet
+└── DescriptorSetLayout              ├── AllocatedBuffer UBOBuffer
+                                     └── FMaterialUBO ParameterData
+```
+
+编辑材质参数时应使用 `UpdateUBO()`（直接写入持久映射缓冲），而非 `ApplyChanges()`（仅更新描述符写入，参数值会丢失）。
+
+## 6. 资产管理系统
 
 `FAssetManager` 提供统一的资产加载和缓存：
 
 ```cpp
-class FAssetManager {
-    std::shared_ptr<FMesh> GetOrLoadMesh(const std::string& name, const std::string& path);
-    std::shared_ptr<FTexture> GetOrLoadTexture(const std::string& name, const std::string& path);
-    std::shared_ptr<FMaterial> GetOrLoadMaterial(const std::string& name, ...);
+std::shared_ptr<FMesh> GetOrLoadMesh(name, path);     // 自动 GPU 上传
+std::shared_ptr<FTexture> GetOrLoadTexture(name, path);
+std::shared_ptr<FMaterial> GetOrLoadMaterial(name, vertPath, fragPath);
+void RegisterMesh(name, shared_ptr<FMesh>);           // 注册 CPU 端 Mesh
+```
+
+特性：自动缓存 + `std::mutex` 线程安全 + Mesh 自动 GPU 上传。
+
+## 7. 编辑器与运行时控制台
+
+### 7.1 UIManager
+
+Core 层 ImGui 宿主。管理 GLFW/Vulkan 后端的 Init/Cleanup、每帧 `BeginFrame()`/`EndFrame()`、`RecordDrawCommands()` 录制 UI 绘制命令。
+
+### 7.2 EditorSessionState / RenderSettings
+
+```cpp
+struct EditorSessionState {
+    FActor* SelectedActor = nullptr;   // 当前选中 Actor
+    bool ShowDebugPanel = true;        // 是否显示调试面板
+};
+
+struct RenderSettings {
+    ERenderPath CurrentRenderPath = ERenderPath::Forward;  // 当前渲染路径
 };
 ```
 
-**特性**：
-- 自动缓存，避免重复加载
-- 线程安全（`std::mutex` 保护）
-- 自动 GPU 上传（Mesh 通过 `ResourceUploadManager`）
+两者分离：`EditorSessionState` 管理编辑器选中状态，`RenderSettings` 管理渲染配置。`RenderSettings` 不与 Actor 选中状态耦合，未来扩展渲染配置项（如阴影质量、分辨率缩放）可直接加入。
 
-## 6. 编辑器与运行时控制台架构
+### 7.3 DebugTexturePreview
 
-为了避免把调试功能继续堆进 `AppLogic`，当前版本把编辑器运行时能力拆成了 3 层：
+Core/Editor 层组件，封装 G-Buffer 调试预览所需的 Vulkan 资源（`VkSampler`、`VkDescriptorSetLayout`、`VkDescriptorSet`）。AppLogic 不直接触碰任何 `vk*` 函数：
 
-### 6.1 `UIManager`：ImGui 生命周期与控制台宿主
+```cpp
+class DebugTexturePreview {
+    void Init(VulkanRenderer*);
+    void Cleanup(VkDevice);
+    void SetImage(int slot, VkImageView);    // slot 0=Albedo, 1=Normal
+    VkDescriptorSet GetTextureID(int slot) const;  // 用于 ImGui::Image()
+};
+```
 
-`UIManager` 负责：
-- ImGui 的 GLFW/Vulkan 后端初始化
-- 每帧 `BeginFrame()` / `EndFrame()`
-- 在 UI 结束前统一绘制 `RuntimeConsole`
-- 通过 `TickInput()` 驱动控制台输入逻辑
+预览嵌入在统一的 Render Debug 窗口中，仅在 Deferred 模式下显示。
 
-这意味着控制台不再是示例逻辑的一部分，而是 Core 层的通用工具。
+### 7.4 RuntimeConsole
 
-### 6.2 `EditorSessionState`：共享编辑状态桥
+Core 层命令框架：管理开关状态、输入框、历史记录、日志、Tab 补全。控制台切换键可通过 `SetToggleKey(EKeyCode)` 配置，默认为 `GraveAccent`。Tumbler 专属命令通过 `TumblerConsoleBindings.cpp` 注册。
 
-`EditorSessionState` 目前至少承载：
-- `SelectedActor`
-- `CurrentRenderPath`
+## 8. 输入系统
 
-这样做的目的，是把“当前编辑上下文”从 `AppLogic` 私有状态中抽出来，让：
-- Hierarchy / Inspector
-- 运行时控制台命令
-- 渲染路径切换
+`InputManager` 区分两层输入：
 
-共享同一份状态，而不是在多个系统里复制一份选择结果。
+- **Gameplay 输入**：`GetAxis()`、`IsActionPressed()`、`GetMouseDelta()`（被 Blocked 时返回零值）
+- **原始按键输入**：`WasKeyJustPressed()`、`GetKey()`（不受 Blocked 影响）
 
-### 6.3 `RuntimeConsole`：Core 层命令框架
+UI 焦点状态通过 `SetUIFocused(bool)` 从外部注入（main.cpp 中读取 `ImGui::GetIO().WantCaptureMouse/Keyboard`），`InputManager` 不再直接依赖 ImGui。
 
-`RuntimeConsole` 的职责固定为：
-- 管理开关状态、输入框、日志、历史记录和滚动
-- 注册命令定义
-- 执行内建命令
-- 提供命令名和参数级别的 `Tab` 补全
+## 9. Linux / Wayland 启动链路
 
-Tumbler 专属命令并不写死在 Core 中，而是通过 `TumblerConsoleBindings.cpp` 注册进去。这样 Core 只依赖“命令框架”，不依赖具体场景业务。
+1. 检测 Wayland 会话
+2. 清理 Snap Code 注入的 GTK/GIO 环境变量
+3. GLFW 优先尝试 `GLFW_PLATFORM_WAYLAND`
+4. 失败则退回 `GLFW_ANY_PLATFORM`
+5. 最终兜底尝试 `GLFW_PLATFORM_X11`
 
-## 7. 输入与控制台的耦合边界
+Vulkan 表面扩展失败时打印完整诊断信息（平台、可用扩展列表、缺失的 WSI 扩展）。
 
-`InputManager` 目前显式区分了两类输入：
-
-- **Gameplay 输入**
-  由 `GetAxis()`、`IsActionPressed()`、`IsActionJustPressed()`、`GetMouseDelta()` 消费
-- **原始按键输入**
-  由 `WasKeyJustPressed()` 提供
-
-这样运行时控制台可以使用 `WasKeyJustPressed(EKeyCode::GraveAccent)` 来切换开关，同时在打开控制台的同一帧调用 `SetGameplayInputBlocked(true)`，立即阻断相机移动和鼠标看向。
-
-这个设计比单纯依赖 `ImGuiIO::WantCaptureKeyboard` 更稳，因为它不需要等待 ImGui 下一阶段才告诉输入系统“现在 UI 想接管键盘”。
-
-## 8. Linux / Wayland 启动链路
-
-Linux 下的窗口和 Vulkan 初始化现在有一条更稳的引导链：
-
-1. `AppWindow` 先判断当前是否为 Wayland 会话
-2. 如果检测到 Snap Code 注入的 GTK/GIO 环境，会先清理相关环境变量
-3. GLFW 初始化优先尝试 `GLFW_PLATFORM_WAYLAND`
-4. 如果失败，则退回 `GLFW_ANY_PLATFORM`
-5. 最后在 Linux 下再尝试一次 `GLFW_PLATFORM_X11`
-
-同时，`AppWindow` 会在 `glfwGetRequiredInstanceExtensions()` 失败时：
-- 打印 GLFW 当前平台
-- 打印 Vulkan loader 暴露的实例扩展列表
-- 针对 Wayland / X11 分别指出缺的是 `VK_KHR_wayland_surface` 还是 `VK_KHR_xcb_surface` / `VK_KHR_xlib_surface`
-
-这套诊断链路的目标不是“吞掉错误”，而是把问题明确分成：
-- 工程依赖配置问题
-- 系统 Vulkan WSI 暴露问题
-- 桌面环境污染问题
-
-## 9. 设计原则总结
+## 10. 设计原则总结
 
 | 原则 | 实践 |
 |------|------|
 | 单一职责 | 每个子系统只负责一个领域 |
-| 依赖倒置 | 高层模块不依赖低层模块实现细节 |
-| 开闭原则 | 新增渲染特性无需修改核心渲染器 |
-| 接口隔离 | 子系统暴露最小必要接口 |
-| 迪米特法则 | 模块间通信通过明确的接口 |
+| 逻辑渲染分离 | Renderer 不访问 Actor，只消费 RenderPacket + SceneViewData |
+| 策略模式 | IRenderPipeline → Forward / Deferred 可热切换 |
+| 母体-实例 | FMaterial 管线共享 + FMaterialInstance 参数独立 |
+| 依赖倒置 | Core 不依赖 Example；Example 命令通过注册机制挂载 |

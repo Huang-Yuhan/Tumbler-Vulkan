@@ -1,276 +1,173 @@
-# 代码导航指南 (Code Navigation Guide)
+# 代码导航指南
 
-本文档帮助你快速理解 Tumbler 引擎的代码结构，找到你需要阅读的代码。
+帮助你快速理解代码结构，找到需要阅读的代码。
 
----
-
-## 📂 目录结构概览
+## 目录结构
 
 ```
 Tumbler-Vulkan/
 ├── src/
-│   ├── Core/                    # 引擎核心代码
-│   │   ├── Assets/              # 资产管理
-│   │   ├── Editor/              # 编辑器工具
-│   │   ├── GameSystem/          # 游戏系统 (ECS)
-│   │   ├── Geometry/            # 几何数据
+│   ├── Core/
+│   │   ├── Assets/              # 资产管理（Mesh/Texture/Material）
+│   │   ├── Editor/              # 编辑器工具（UIManager/RuntimeConsole/DebugTexturePreview）
+│   │   ├── GameSystem/          # ECS（FActor/FScene/Component/InputManager）
+│   │   │   └── Components/      # 组件（CTransform/CMeshRenderer/CCamera/CPointLight/...）
+│   │   ├── Geometry/            # 几何数据（FMesh）
 │   │   ├── Graphics/            # 渲染系统
-│   │   ├── Platform/            # 平台抽象
-│   │   └── Utils/               # 工具类
-│   └── Examples/                # 示例程序
-│       ├── Tumbler/             # 主要示例 (PBR 渲染)
-│       └── TinyRendererModels/  # 简单示例
-├── assets/                      # 资源文件
+│   │   │   └── Pipelines/       # 管线策略实现（FForwardPipeline/FDeferredPipeline）
+│   │   ├── Platform/            # 平台抽象（AppWindow GLFW 封装）
+│   │   └── Utils/               # 工具类（Log/Singleton/VMA 实现）
+│   └── Examples/
+│       ├── Tumbler/             # 主示例（PBR 渲染 + 编辑器）
+│       └── TinyRendererModels/  # 简单渲染示例
+├── assets/
 │   ├── models/                  # 3D 模型
-│   ├── shaders/                 # 着色器
+│   ├── shaders/engine/          # 着色器（GLSL → SPIR-V）
 │   └── textures/                # 纹理
-└── docs/                        # 文档
+├── docs/                        # 文档（入门/架构/指南/参考）
+└── tests/unit/                  # GoogleTest 单元测试
 ```
 
----
+## 按功能查找
 
-## 🎯 按功能查找代码
+### 1. 渲染流程
 
-### 1. 想了解渲染流程？
-
-**入口文件：** `src/Examples/Tumbler/main.cpp`
+入口：`src/Examples/Tumbler/main.cpp` — 主循环
 
 阅读顺序：
-1. **`main.cpp`** - 主循环，了解整体流程
-   - 初始化顺序
-   - 帧循环结构
-   - 数据准备 → UI → 渲染 流程
+1. **`main.cpp`** — 帧循环（数据提取 → UI → 渲染）
+2. **`VulkanRenderer.cpp`** — `Render()` / `RecordCommandBuffer()` 方法
+3. **`IRenderPipeline.h`** — 管线策略接口
+4. **`FForwardPipeline.cpp`** / **`FDeferredPipeline.cpp`** — 具体管线实现
+5. **`PipelineUtils.cpp`** — `DrawMeshPackets()` / `CreateFramebuffers()` 共享辅助
 
-2. **`VulkanRenderer.cpp`** - 渲染器核心
-   - 位置：`src/Core/Graphics/VulkanRenderer.cpp`
-   - 重点看 `Render()` 方法
+### 2. 游戏系统（ECS）
 
-3. **`RenderPacket.h`** - 渲染数据包
-   - 位置：`src/Core/Graphics/RenderPacket.h`
-   - 了解要传给 GPU 什么数据
-
-4. **着色器**
-   - 顶点着色器：`assets/shaders/engine/pbr.vert`
-   - 片段着色器：`assets/shaders/engine/pbr.frag`
-
-### 2. 想了解游戏系统 (ECS)？
-
-**核心文件：**
-
-| 功能 | 文件位置 |
-|------|----------|
-| 游戏实体 | `src/Core/GameSystem/FActor.h` |
-| 组件基类 | `src/Core/GameSystem/Components/Component.h` |
+| 功能 | 文件 |
+|------|------|
+| Actor | `src/Core/GameSystem/FActor.h` |
+| Component 基类 | `src/Core/GameSystem/Components/Component.h` |
 | 场景管理 | `src/Core/GameSystem/FScene.h` |
-| 变换组件 | `src/Core/GameSystem/Components/CTransform.h` |
+| Transform | `src/Core/GameSystem/Components/CTransform.h` |
 | 网格渲染 | `src/Core/GameSystem/Components/CMeshRenderer.h` |
 | 相机 | `src/Core/GameSystem/Components/CCamera.h` |
 | 第一人称相机 | `src/Core/GameSystem/Components/CFirstPersonCamera.h` |
 | 点光源 | `src/Core/GameSystem/Components/CPointLight.h` |
+| 方向光 | `src/Core/GameSystem/Components/CDirectionalLight.h` |
 
-**阅读示例：** `src/Examples/Tumbler/AppLogic.cpp` - `InitializeScene()` 方法
+参考示例：`src/Examples/Tumbler/AppLogic.cpp` — `InitializeScene()` 方法
 
-### 3. 想了解材质系统？
+### 3. 材质系统
 
-**核心文件：**
-
-| 功能 | 文件位置 |
-|------|----------|
+| 功能 | 文件 |
+|------|------|
 | 材质母体 | `src/Core/Assets/FMaterial.h` |
-| 材质实例 | `src/Core/Assets/FMaterialInstance.h` |
-| 材质 UBO | `src/Core/Assets/FMaterialInstance.h` (看 `FMaterialUBO` 结构体) |
+| 材质实例 | `src/Core/Assets/FMaterialInstance.h`（含 `FMaterialUBO` 结构体） |
 | 资产管理 | `src/Core/Assets/FAssetManager.h` |
 | 纹理 | `src/Core/Assets/FTexture.h` |
 
-**重要提示：**
-- 编辑材质参数时，使用 `UpdateUBO()` 而不是 `ApplyChanges()`（见 `08_Editor_and_Debugging.md`）
-- 材质参数必须与着色器中的 `MaterialParams` 结构体完全一致
+重要提示：编辑材质参数时使用 `UpdateUBO()` 而非 `ApplyChanges()`。
 
-### 4. 想了解编辑器功能？
+### 4. 编辑器
 
-**核心文件：**
-
-| 功能 | 文件位置 |
-|------|----------|
+| 功能 | 文件 |
+|------|------|
 | UI 管理器 | `src/Core/Editor/UIManager.h` |
 | 运行时控制台 | `src/Core/Editor/RuntimeConsole.h` |
-| 共享编辑状态 | `src/Core/Editor/EditorSessionState.h` |
-| 应用逻辑 | `src/Examples/Tumbler/AppLogic.h` |
-| 编辑器实现 | `src/Examples/Tumbler/AppLogic.cpp` |
+| G-Buffer 预览 | `src/Core/Editor/DebugTexturePreview.h` |
+| 共享编辑状态 | `src/Core/Editor/EditorSessionState.h`（含 `RenderSettings`） |
+| AppLogic 编辑器方法 | `src/Examples/Tumbler/AppLogic.h` / `.cpp` |
 | 控制台命令绑定 | `src/Examples/Tumbler/TumblerConsoleBindings.cpp` |
 
-**编辑器面板方法：**
-- `DrawPerformancePanel()` - 性能统计
-- `DrawLightPanel()` - 光源设置
-- `DrawCameraPanel()` - 相机参数
-- `DrawSceneHierarchyPanel()` - 场景层级
-- `DrawMaterialPanel()` - 材质编辑器
-- `RuntimeConsole::Draw()` - 运行时命令控制台
+编辑器面板方法：
+- `DrawDebugPanel()` — 统一调试窗口（含 `CollapsingHeader` 布局）
+- `DrawPerformanceSection()` — 性能统计
+- `DrawLightingSection()` — 光源设置
+- `DrawCameraSection()` — 相机参数
+- `DrawRenderingSection()` — 渲染路径选择
+- `DrawSceneHierarchyPanel()` — 场景层级（独立窗口）
+- `DrawInspectorPanel()` — Inspector（独立窗口）
 
-### 5. 想了解 Vulkan 底层？
+### 5. Vulkan 底层
 
-**核心文件：**
-
-| 功能 | 文件位置 |
-|------|----------|
-| Vulkan 上下文 | `src/Core/Graphics/VulkanContext.h` |
-| 渲染设备 | `src/Core/Graphics/RenderDevice.h` |
-| 交换链 | `src/Core/Graphics/VulkanSwapchain.h` |
-| 命令缓冲管理 | `src/Core/Graphics/CommandBufferManager.h` |
+| 功能 | 文件 |
+|------|------|
+| VulkanContext | `src/Core/Graphics/VulkanContext.h` |
+| RenderDevice | `src/Core/Graphics/RenderDevice.h` |
+| Swapchain | `src/Core/Graphics/VulkanSwapchain.h` |
+| CommandBuffer | `src/Core/Graphics/CommandBufferManager.h` |
 | 资源上传 | `src/Core/Graphics/ResourceUploadManager.h` |
-| Vulkan 类型 | `src/Core/Graphics/VulkanTypes.h` |
 | 管线构建器 | `src/Core/Graphics/VulkanPipelineBuilder.h` |
+| VulkanTypes | `src/Core/Graphics/VulkanTypes.h`（AllocatedBuffer/Image、SceneDataUBO） |
+| 描述符队列 | `src/Core/Graphics/DescriptorSetFreeQueue.h` |
 
----
+## 关键代码位置速查
 
-## 🔍 关键代码位置速查
-
-### 主循环 (`main.cpp`)
+### 主循环
 
 ```
 src/Examples/Tumbler/main.cpp
-├── 初始化部分
-│   ├── 创建窗口
-│   ├── 创建渲染器
-│   ├── 初始化资源管理器
-│   └── 初始化 AppLogic
-└── 主循环
-    ├── 计算帧时间
-    ├── 更新输入
-    ├── 更新控制台输入 (uiManager.TickInput)
-    ├── 更新游戏逻辑 (logic.Tick)
-    ├── 提取渲染数据 (ExtractRenderPackets)
-    ├── 绘制编辑器 UI (DrawEditorUI)
-    └── 渲染 (renderer.Render)
+├── 初始化
+│   ├── 创建窗口 + VulkanRenderer + FAssetManager
+│   ├── InputManager 绑定（MoveForward/MoveRight/MoveUp）
+│   ├── EditorSessionState + RenderSettings
+│   └── AppLogic::Init(renderer, assetMgr, inputMgr, sessionState, renderSettings)
+└── 帧循环
+    ├── SetUIFocused() → inputManager.Tick() → ui_manager.TickInput()
+    ├── logic.Tick(frameTime)
+    ├── scene->ExtractRenderPackets(renderPackets)
+    ├── ui_manager.BeginFrame() → logic.UpdatePerformanceStats() → DrawEditorUI() → EndFrame()
+    ├── scene->GenerateSceneView(...)
+    └── renderer.Render(viewData, renderPackets, UI callback)
 ```
 
-### AppLogic 架构 (`AppLogic.h/cpp`)
+### AppLogic 数据成员
 
 ```
 AppLogic
-├── 初始化
-│   └── InitializeScene() - 创建场景中的物体
-├── 每帧更新
-│   └── Tick() - 更新相机等
-├── 编辑器 UI
-│   ├── DrawEditorUI() - 统一入口
-│   ├── DrawPerformancePanel()
-│   ├── DrawLightPanel()
-│   ├── DrawCameraPanel()
-│   ├── DrawSceneHierarchyPanel()
-│   └── DrawMaterialPanel()
-└── 数据
-    ├── Scene - 场景
-    └── Stats - 性能统计
-
-共享编辑状态位于 `EditorSessionState`：
-├── SelectedActor - 选中的物体
-└── CurrentRenderPath - 当前渲染路径
+├── Scene (unique_ptr<FScene>)
+├── AssetMgr / InputMgr / SessionState / RenderCfg / Renderer（指针）
+├── MainCamera (CFirstPersonCamera*)
+├── Stats (PerformanceStats)
+└── DebugPreview (DebugTexturePreview)
 ```
 
-### 渲染流程 (`VulkanRenderer.cpp`)
+### EditorSessionState / RenderSettings
 
-```
-Render() 方法流程：
-1. 等待上一帧完成
-2. 获取下一帧图像
-3. 重置命令缓冲
-4. 开始 RenderPass
-5. 绑定全局描述符集
-6. 遍历 RenderPackets：
-   ├── 绑定材质管线
-   ├── 绑定材质描述符集
-   ├── 绑定网格
-   └── 绘制
-7. 绘制 UI
-8. 结束 RenderPass
-9. 提交命令缓冲
-10. 呈现
+```cpp
+struct EditorSessionState {
+    FActor* SelectedActor;      // Hierarchy 面板选中
+    bool ShowDebugPanel;        // 调试窗口开关
+};
+struct RenderSettings {
+    ERenderPath CurrentRenderPath;  // Forward / Deferred / GPUDriven
+};
 ```
 
----
+### 渲染流程
 
-## 📖 推荐阅读顺序
+```
+Render() 方法：
+1. FlushPendingDescriptorSetFrees()
+2. vkWaitForFences(kFenceTimeoutNs)  // 5 秒超时
+3. AcquireNextImage(kAcquireTimeoutNs)
+4. vkResetCommandBuffer()
+5. 更新 SceneDataUBO (memcpy 到持久映射缓冲)
+6. pipeline->RecordCommands(cmd, imageIndex, ...)
+   ├── [Forward]  单 Subpass：几何 + 光照
+   └── [Deferred] Subpass 0: G-Buffer 写入 → Subpass 1: 全屏光照
+7. onUIRender(cmd, imageIndex)  // ImGui 录制
+8. vkEndCommandBuffer()
+9. vkQueueSubmit() → vkQueuePresentKHR()
+```
 
-如果你是第一次阅读代码，建议按以下顺序：
+## 配套文档
 
-### 第一阶段：理解整体流程
-1. **`src/Examples/Tumbler/main.cpp`** - 看主循环
-2. **`src/Examples/Tumbler/AppLogic.cpp`** - 看 `InitializeScene()` 和 `Tick()`
-3. **`docs/architecture/overview.md`** - 读架构文档
-
-### 第二阶段：理解游戏系统
-1. **`src/Core/GameSystem/FActor.h`** - 了解 Actor
-2. **`src/Core/GameSystem/Components/Component.h`** - 了解 Component
-3. **`src/Core/GameSystem/FScene.h`** - 了解 Scene
-4. **`docs/architecture/ecs.md`** - 读游戏系统文档
-
-### 第三阶段：理解渲染
-1. **`src/Core/Graphics/RenderPacket.h`** - 看渲染数据包
-2. **`src/Core/Graphics/VulkanRenderer.cpp`** - 看 `Render()` 方法
-3. **`assets/shaders/engine/pbr.vert`** - 看顶点着色器
-4. **`assets/shaders/engine/pbr.frag`** - 看片段着色器
-5. **`docs/reference/rendering-pipeline.md`** - 读渲染管线文档
-
-### 第四阶段：理解材质
-1. **`src/Core/Assets/FMaterialInstance.h`** - 看 `FMaterialUBO`
-2. **`src/Core/Assets/FMaterialInstance.cpp`** - 看 `UpdateUBO()` 和 `ApplyChanges()`
-3. **`docs/architecture/material.md`** - 读材质系统文档
-
-### 第五阶段：深入 Vulkan
-1. **`src/Core/Graphics/VulkanContext.h`**
-2. **`src/Core/Graphics/VulkanSwapchain.h`**
-3. **`docs/reference/vulkan-concepts/`** - 读 Vulkan 文档
-
----
-
-## 💡 阅读技巧
-
-### 1. 从示例入手
-先看 `src/Examples/Tumbler/` 下的代码，这是实际使用引擎的地方，最容易理解。
-
-### 2. 先看头文件
-头文件 (`.h`) 通常包含类的接口和关键数据结构，先看头文件能快速了解这个类是做什么的。
-
-### 3. 使用搜索
-如果你在找某个功能，可以用搜索工具（如 VS Code 的搜索）搜索关键词：
-- 找 PBR 相关：搜索 "PBR" 或 "BRDF"
-- 找 Vulkan 相关：搜索 "Vk" 或 "Vulkan"
-- 找材质相关：搜索 "Material"
-
-### 4. 画图理解
-遇到复杂的数据流时，不妨画个图：
-- 数据从哪里来？
-- 经过哪些处理？
-- 最终到哪里去？
-
-### 5. 调试 + 断点
-在关键位置打断点，看变量的值，理解代码执行流程。
-
----
-
-## 🔧 常见问题
-
-### Q: 我想添加一个新的 Component，应该怎么做？
-A: 参考 `src/Core/GameSystem/Components/` 下的现有组件，继承 `Component` 类即可。
-
-### Q: 我想修改着色器，应该改哪里？
-A: 修改 `assets/shaders/engine/` 下的 `.vert` 和 `.frag` 文件，然后重新编译项目（CMake 会自动编译着色器）。
-
-### Q: 我想添加一个新的编辑器面板，应该怎么做？
-A: 在 `AppLogic` 类中添加新的 `DrawXxxPanel()` 方法，然后在 `DrawEditorUI()` 中调用它。
-
-### Q: 渲染数据是如何从 CPU 传到 GPU 的？
-A: 看 `RenderPacket` 结构，以及 `VulkanRenderer::Render()` 方法中如何遍历和使用 `RenderPacket`。
-
----
-
-## 📚 配套文档
-
-阅读代码时，配合以下文档会更容易理解：
-
-- [架构概览 (01_Architecture_Overview.md)](01_Architecture_Overview.md)
-- [游戏系统架构 (06_Game_System_Architecture.md)](06_Game_System_Architecture.md)
-- [渲染管线深度解析 (09_Rendering_Pipeline_Deep_Dive.md)](09_Rendering_Pipeline_Deep_Dive.md)
-- [材质系统 (03_Material_System.md)](03_Material_System.md)
-- [Vulkan 核心概念 (05_Vulkan_Core_Concepts.md)](05_Vulkan_Core_Concepts.md)
+- [架构概览](architecture/overview.md)
+- [设计决策](architecture/decisions.md)
+- [渲染架构](architecture/rendering.md)
+- [渲染管线深度解析](../reference/rendering-pipeline.md)
+- [ECS 游戏系统](architecture/ecs.md)
+- [材质系统](architecture/material.md)
+- [编辑器与调试](../guides/editor.md)
+- [Vulkan 核心概念](../reference/vulkan-concepts/)

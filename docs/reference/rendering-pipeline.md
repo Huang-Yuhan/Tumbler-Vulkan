@@ -53,8 +53,8 @@ Tumbler 引擎的渲染系统采用严格的分层 + 策略模式设计：
 
 ```cpp
 struct RenderPacket {
-    FMesh* Mesh;                    // 几何体
-    FMaterialInstance* Material;    // 材质实例（携带描述符集）
+    std::shared_ptr<FMesh> Mesh;              // 几何体（shared_ptr 保证帧内安全）
+    std::shared_ptr<FMaterialInstance> Material;  // 材质实例
     glm::mat4 TransformMatrix;      // 模型矩阵 (Push Constants)
 };
 ```
@@ -93,18 +93,31 @@ class IRenderPipeline {
 public:
     virtual void Init(VulkanRenderer* renderer) = 0;
     virtual void Cleanup(VulkanRenderer* renderer) = 0;
-    virtual void RecreateResources(VulkanRenderer* renderer) = 0;  // Swapchain 重建触发
+    virtual void RecreateResources(VulkanRenderer* renderer) = 0;
 
     virtual void RecordCommands(
         VkCommandBuffer cmd,
         uint32_t imageIndex,
         VulkanRenderer* renderer,
         const SceneViewData& viewData,
-        const std::vector<RenderPacket>& renderPackets,
-        std::function<void(VkCommandBuffer)> onUIRender
+        const std::vector<RenderPacket>& renderPackets
     ) = 0;
 
     virtual VkRenderPass GetRenderPass() const = 0;
+
+    // G-Buffer 访问器（Deferred 管线 override，Forward 默认返回 VK_NULL_HANDLE）
+    virtual bool SupportsGBuffer() const { return false; }
+    virtual VkImageView GetGBufferAlbedoImageView() const { return VK_NULL_HANDLE; }
+    virtual VkImageView GetGBufferNormalImageView() const { return VK_NULL_HANDLE; }
+    virtual VkImageView GetGBufferDepthImageView() const { return VK_NULL_HANDLE; }
+
+    // 共享辅助（Forward/Deferred 复用）
+    static void DrawMeshPackets(VkCommandBuffer, VulkanRenderer*,
+        ERenderPath, const std::vector<RenderPacket>&);
+    static void CreateFramebuffers(VkDevice, VkRenderPass, VkExtent2D,
+        const std::vector<VkImageView>& swapchainImageViews,
+        const std::vector<VkImageView>& sharedAttachments,
+        std::vector<VkFramebuffer>& out);
 };
 ```
 
