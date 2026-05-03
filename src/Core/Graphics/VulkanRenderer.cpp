@@ -122,10 +122,7 @@ VkImageView VulkanRenderer::GetGBufferAlbedoImageView() const
 {
     auto it = Pipelines.find(ERenderPath::Deferred);
     if (it != Pipelines.end() && it->second) {
-        auto* deferred = dynamic_cast<FDeferredPipeline*>(it->second.get());
-        if (deferred) {
-            return deferred->GetAlbedoImageView();
-        }
+        return it->second->GetGBufferAlbedoImageView();
     }
     return VK_NULL_HANDLE;
 }
@@ -134,10 +131,7 @@ VkImageView VulkanRenderer::GetGBufferNormalImageView() const
 {
     auto it = Pipelines.find(ERenderPath::Deferred);
     if (it != Pipelines.end() && it->second) {
-        auto* deferred = dynamic_cast<FDeferredPipeline*>(it->second.get());
-        if (deferred) {
-            return deferred->GetNormalImageView();
-        }
+        return it->second->GetGBufferNormalImageView();
     }
     return VK_NULL_HANDLE;
 }
@@ -327,7 +321,7 @@ void VulkanRenderer::RecordCommandBuffer(
     // 执行当前选中管线的具体命令录制
     auto it = Pipelines.find(viewData.RenderPath);
     if (it != Pipelines.end() && it->second) {
-        it->second->RecordCommands(cmdBuffer, imageIndex, this, viewData, renderPackets, nullptr);
+        it->second->RecordCommands(cmdBuffer, imageIndex, this, viewData, renderPackets);
     } else {
         LOG_CRITICAL("Selected RenderPath mapped to no active pipeline!");
     }

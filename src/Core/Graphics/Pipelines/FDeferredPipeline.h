@@ -18,13 +18,13 @@ public:
         uint32_t imageIndex,
         VulkanRenderer* renderer,
         const SceneViewData& viewData,
-        const std::vector<RenderPacket>& renderPackets,
-        std::function<void(VkCommandBuffer)> onUIRender) override;
+        const std::vector<RenderPacket>& renderPackets) override;
 
     [[nodiscard]] VkRenderPass GetRenderPass() const override { return RenderPass; }
 
-    [[nodiscard]] VkImageView GetAlbedoImageView() const { return AlbedoImageView; }
-    [[nodiscard]] VkImageView GetNormalImageView() const { return NormalImageView; }
+    [[nodiscard]] bool SupportsGBuffer() const override { return true; }
+    [[nodiscard]] VkImageView GetGBufferAlbedoImageView() const override { return AlbedoImageView; }
+    [[nodiscard]] VkImageView GetGBufferNormalImageView() const override { return NormalImageView; }
 
 private:
     void InitRenderPass(VulkanRenderer* renderer);

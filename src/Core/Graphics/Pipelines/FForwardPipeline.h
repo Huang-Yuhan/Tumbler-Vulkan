@@ -17,8 +17,7 @@ public:
         uint32_t imageIndex,
         VulkanRenderer* renderer,
         const SceneViewData& viewData,
-        const std::vector<RenderPacket>& renderPackets,
-        std::function<void(VkCommandBuffer)> onUIRender) override;
+        const std::vector<RenderPacket>& renderPackets) override;
 
     [[nodiscard]] VkRenderPass GetRenderPass() const override { return RenderPass; }
 

@@ -135,8 +135,7 @@ void FForwardPipeline::RecordCommands(
     uint32_t imageIndex,
     VulkanRenderer* renderer,
     const SceneViewData& viewData,
-    const std::vector<RenderPacket>& renderPackets,
-    std::function<void(VkCommandBuffer)> onUIRender)
+    const std::vector<RenderPacket>& renderPackets)
 {
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;

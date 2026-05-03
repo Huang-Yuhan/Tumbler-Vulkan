@@ -6,13 +6,13 @@
 
 ## 分层违规
 
-### P1 — VulkanRenderer 为 Example 层暴露 G-Buffer 访问器
+### P2 — VulkanRenderer 的 G-Buffer getter 仅被 AppLogic 调用
 
-**位置**：`src/Core/Graphics/VulkanRenderer.h:105-106` / `VulkanRenderer.cpp:125-139`
+**位置**：`src/Core/Graphics/VulkanRenderer.h:105-106`
 
-`GetGBufferAlbedoImageView()` / `GetGBufferNormalImageView()` 的唯一调用者是 AppLogic 中的 G-Buffer 预览面板。Core 类不应为单个 Example 的需求开洞。
+`GetGBufferAlbedoImageView()` / `GetGBufferNormalImageView()` 的唯一调用者是 AppLogic（通过 `DebugTexturePreview::SetImage`）。这两个 getter 本质是调试用途，且调用链仍经过 Example 层。G-Buffer ImageView 的传递路径应该在 Core 内部完成闭环。
 
-**修复方向**：去掉这两个 getter。改为让 G-Buffer 预览通过一个通用的调试纹理注册接口获取 ImageView，或通过 `IRenderPipeline` 多态接口暴露。
+**修复方向**：让 `DebugTexturePreview` 直接接收 `IRenderPipeline*` 自行查询，或通过回调注册机制让管线自行推送调试纹理，AppLogic 不再负责传递 ImageView。
 
 ---
 
@@ -47,30 +47,6 @@ UIManager 拥有自己的 `VkRenderPass`、`VkFramebuffer` 数组，在 `RecordD
 ---
 
 ## 抽象漏洞与策略模式破坏
-
-### P1 — dynamic_cast 穿透管线抽象
-
-**位置**：`src/Core/Graphics/VulkanRenderer.cpp:125-139`
-
-```cpp
-auto* deferred = dynamic_cast<FDeferredPipeline*>(it->second.get());
-```
-
-`IRenderPipeline` 接口没有 G-Buffer 访问器，迫使调用者 downcast 到 `FDeferredPipeline` 具体类型。添加新管线或修改 G-Buffer 结构时，所有 downcast 点都需要同步更新。
-
-**修复方向**：要么把 G-Buffer 查询提升为 `IRenderPipeline` 接口方法，要么通过独立的 `GBufferManager` 对象管理 G-Buffer 资源。
-
----
-
-### P1 — IRenderPipeline 的 onUIRender 参数是死代码
-
-**位置**：`IRenderPipeline.h:44` / `VulkanRenderer.cpp:330`
-
-`RecordCommands` 接口的 `std::function<void(VkCommandBuffer)> onUIRender` 参数在所有调用点均传 `nullptr`。UI 渲染实际由 `VulkanRenderer::RecordCommandBuffer` 在管线完成后自己触发。
-
-**修复方向**：从接口中删除该参数，或者让管线真正接管 UI 回调。
-
----
 
 ### P2 — RenderDevice::CreateImage 缺少内存属性参数
 
@@ -293,7 +269,7 @@ Deferred 管线内联了一个 `loadShader` lambda，而 `ResourceUploadManager:
 
 | 优先级 | 数量 | 核心主题 |
 |--------|------|----------|
-| P1 | 4 | 抽象漏洞（dynamic_cast, 死代码接口）+ 资源悬空 |
+| P1 | 2 | 资源悬空（RenderPacket 原始指针, MeshCache 原始指针 key） |
 | P2 | 9 | 硬编码、代码重复、生命周期管理 |
 | P3 | 10 | 封装不足、可维护性 |
 
