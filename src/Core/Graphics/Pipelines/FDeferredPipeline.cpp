@@ -544,7 +544,7 @@ void FDeferredPipeline::RecordCommands(
             &packet.TransformMatrix
         );
 
-        FVulkanMesh& gpuMesh = renderer->UploadMesh(packet.Mesh);
+        FVulkanMesh& gpuMesh = renderer->UploadMesh(packet.Mesh.get());
         VkBuffer vertexBuffers[] = {gpuMesh.VertexBuffer.Buffer};
         VkDeviceSize offsets[] = {0};
         vkCmdBindVertexBuffers(cmdBuffer, 0, 1, vertexBuffers, offsets);

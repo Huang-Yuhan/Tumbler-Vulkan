@@ -126,24 +126,7 @@ FOV、NearPlane、FarPlane、Color、Intensity 等字段直接暴露为 public�
 
 ## 资源生命周期
 
-### P1 — RenderPacket 中存原始指针
-
-**位置**：`src/Core/Graphics/RenderPacket.h:8-15`
-
-```cpp
-struct RenderPacket {
-    FMesh* Mesh = nullptr;
-    FMaterialInstance* Material = nullptr;
-};
-```
-
-如果材质实例或网格在帧中被销毁，渲染包的指针悬空。渲染层没有帧保护机制（如引用计数、generation check）。
-
-**修复方向**：用 `std::shared_ptr` 或引入"渲染帧锁"机制，保证提取后到渲染完成前资源不被释放。
-
----
-
-### P1 — MeshCache 用原始指针做 key
+### P2 — MeshCache 用原始指针做 key
 
 **位置**：`src/Core/Graphics/ResourceUploadManager.h:129`
 
@@ -151,9 +134,9 @@ struct RenderPacket {
 std::unordered_map<FMesh*, FVulkanMesh> MeshCache;
 ```
 
-如果 FMesh 被释放后新 FMesh 分配到同一地址，缓存命中返回过时的 `FVulkanMesh`（use-after-free）。
+如果 FMesh 被释放后新 FMesh 分配到同一地址，缓存命中返回过时的 `FVulkanMesh`。当前无 UnloadMesh API，Mesh 生命周期等同于应用生命周期，实际不会触发，但未来引入卸载路径后需修复。
 
-**修复方向**：改用 `std::shared_ptr<FMesh>` 作为 key，或在 FMesh 析构时注册缓存清理回调。
+**修复方向**：引入卸载路径时，改为在 FMesh 析构时注册缓存清理回调。
 
 ---
 
@@ -269,8 +252,7 @@ Deferred 管线内联了一个 `loadShader` lambda，而 `ResourceUploadManager:
 
 | 优先级 | 数量 | 核心主题 |
 |--------|------|----------|
-| P1 | 2 | 资源悬空（RenderPacket 原始指针, MeshCache 原始指针 key） |
-| P2 | 9 | 硬编码、代码重复、生命周期管理 |
+| P2 | 8 | 硬编码、代码重复、生命周期管理 |
 | P3 | 10 | 封装不足、可维护性 |
 
 建议修复顺序：P1（策略模式 + 资源安全）→ P2（硬编码消除 + 去重）→ P3（按需修复）。

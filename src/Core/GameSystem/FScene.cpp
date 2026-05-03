@@ -98,8 +98,8 @@ void FScene::ExtractRenderPackets(std::vector<RenderPacket>& outPackets) const {
         if (meshRenderer && meshRenderer->IsVisible() && meshRenderer->GetMesh() && meshRenderer->GetMaterial()) {
 
             RenderPacket packet;
-            packet.Mesh = meshRenderer->GetMesh().get();
-            packet.Material = meshRenderer->GetMaterial().get();
+            packet.Mesh = meshRenderer->GetMesh();
+            packet.Material = meshRenderer->GetMaterial();
             packet.TransformMatrix = actor->Transform.GetLocalToWorldMatrix();
 
             outPackets.push_back(packet);
