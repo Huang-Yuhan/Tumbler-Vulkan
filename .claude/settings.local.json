@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ctest *)",
+      "Bash(./App-Tumbler.exe --hidden-window-smoke-test --test-max-frames=60)",
+      "Bash(cmake --build \"C:/Users/Icecream_Sarkaz/Git-Repository/Tumbler-Vulkan/build\" --config Debug --parallel)",
+      "Bash(./App-Tumbler.exe --hidden-window-smoke-test --test-max-frames=30)",
+      "Bash(git *)"
+    ]
+  }
+}

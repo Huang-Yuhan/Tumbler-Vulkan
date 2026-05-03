@@ -117,10 +117,14 @@ ctest --test-dir build -C Debug -N
 
 ## 文档索引
 
-完整文档地图见 `docs/INDEX.md`。常用文档速查：
-- `docs/01_Architecture_Overview.md` — 设计原则与数据流
-- `docs/09_Rendering_Pipeline_Deep_Dive.md` — 帧循环、G-Buffer、同步细节
-- `docs/RenderingArchitecture.md` — 双管线策略、Deferred 优化、UI 解耦
-- `docs/12_Code_Navigation_Guide.md` — 文件级"功能在哪"速查表
-- `docs/10_Troubleshooting_Guide.md` — 构建、运行时及 Linux/Wayland 问题
-- `docs/13_Testing_and_CI.md` — 测试结构与 CI 流程
+文档入口见 `docs/index.md`。速查：
+- `docs/getting-started/setup.md` — 环境搭建
+- `docs/architecture/overview.md` — 设计原则与数据流
+- `docs/architecture/decisions.md` — 关键设计决策（为什么这样做）
+- `docs/architecture/rendering.md` — 双管线策略、Deferred 优化
+- `docs/reference/rendering-pipeline.md` — 帧循环、G-Buffer、同步细节
+- `docs/reference/shaders.md` — 着色器绑定点与 G-Buffer 布局
+- `docs/guides/editor.md` — 编辑器与调试
+- `docs/guides/console.md` — 控制台命令参考
+- `docs/troubleshooting.md` — 构建、运行时及 Linux/Wayland 问题
+- `docs/code-navigation.md` — 文件级"功能在哪"速查表

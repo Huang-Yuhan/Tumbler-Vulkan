@@ -197,30 +197,30 @@ Render() 方法流程：
 ### 第一阶段：理解整体流程
 1. **`src/Examples/Tumbler/main.cpp`** - 看主循环
 2. **`src/Examples/Tumbler/AppLogic.cpp`** - 看 `InitializeScene()` 和 `Tick()`
-3. **`docs/01_Architecture_Overview.md`** - 读架构文档
+3. **`docs/architecture/overview.md`** - 读架构文档
 
 ### 第二阶段：理解游戏系统
 1. **`src/Core/GameSystem/FActor.h`** - 了解 Actor
 2. **`src/Core/GameSystem/Components/Component.h`** - 了解 Component
 3. **`src/Core/GameSystem/FScene.h`** - 了解 Scene
-4. **`docs/06_Game_System_Architecture.md`** - 读游戏系统文档
+4. **`docs/architecture/ecs.md`** - 读游戏系统文档
 
 ### 第三阶段：理解渲染
 1. **`src/Core/Graphics/RenderPacket.h`** - 看渲染数据包
 2. **`src/Core/Graphics/VulkanRenderer.cpp`** - 看 `Render()` 方法
 3. **`assets/shaders/engine/pbr.vert`** - 看顶点着色器
 4. **`assets/shaders/engine/pbr.frag`** - 看片段着色器
-5. **`docs/09_Rendering_Pipeline_Deep_Dive.md`** - 读渲染管线文档
+5. **`docs/reference/rendering-pipeline.md`** - 读渲染管线文档
 
 ### 第四阶段：理解材质
 1. **`src/Core/Assets/FMaterialInstance.h`** - 看 `FMaterialUBO`
 2. **`src/Core/Assets/FMaterialInstance.cpp`** - 看 `UpdateUBO()` 和 `ApplyChanges()`
-3. **`docs/03_Material_System.md`** - 读材质系统文档
+3. **`docs/architecture/material.md`** - 读材质系统文档
 
 ### 第五阶段：深入 Vulkan
 1. **`src/Core/Graphics/VulkanContext.h`**
 2. **`src/Core/Graphics/VulkanSwapchain.h`**
-3. **`docs/05_Vulkan_Core_Concepts.md`** - 读 Vulkan 文档
+3. **`docs/reference/vulkan-concepts/`** - 读 Vulkan 文档
 
 ---
 

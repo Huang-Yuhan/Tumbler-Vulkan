@@ -39,7 +39,7 @@ cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
 cmake --build build --config Debug --parallel
 ```
 
-For a full Windows setup walkthrough, see [docs/00_Getting_Started.md](docs/00_Getting_Started.md).
+For a full Windows setup walkthrough, see [docs/getting-started/setup.md](docs/getting-started/setup.md).
 
 ## Quick Start (Linux + Ninja + vcpkg)
 
@@ -118,21 +118,18 @@ If CLion/VSCode build output looks garbled, use:
 - UTF-8 file/project encoding
 - `VSLANG=1033` as stable English log fallback
 
-Details: [docs/10_Troubleshooting_Guide.md](docs/10_Troubleshooting_Guide.md)
+Details: [docs/troubleshooting.md](docs/troubleshooting.md)
 
 ## Linux Notes
 
 - On Wayland, the engine now auto-sanitizes Snap Code GTK/GIO environment pollution before GLFW initialization.
-- If Vulkan surface creation or window decorations still fail, see [docs/10_Troubleshooting_Guide.md](docs/10_Troubleshooting_Guide.md).
+- If Vulkan surface creation or window decorations still fail, see [docs/troubleshooting.md](docs/troubleshooting.md).
 
 ## Documentation
 
-- [docs/INDEX.md](docs/INDEX.md)
-- [docs/00_Getting_Started.md](docs/00_Getting_Started.md)
-- [docs/01_Architecture_Overview.md](docs/01_Architecture_Overview.md)
-- [docs/09_Rendering_Pipeline_Deep_Dive.md](docs/09_Rendering_Pipeline_Deep_Dive.md)
-- [docs/10_Troubleshooting_Guide.md](docs/10_Troubleshooting_Guide.md)
-- [docs/13_Testing_and_CI.md](docs/13_Testing_and_CI.md)
+- [文档索引](docs/index.md)
+- [docs/ 目录](docs/) — 入门 / 架构 / 指南 / 参考 四层结构
+- [设计决策](docs/architecture/decisions.md) — 关键架构取舍记录
 - [.codex](.codex) for project-specific contributor and Codex notes
 
 ## Tech Stack

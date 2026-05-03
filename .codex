@@ -62,7 +62,7 @@ Tumbler Vulkan Engine 项目说明
 
 建议优先阅读
 - `README.md`
-- `docs/00_Getting_Started.md`
-- `docs/01_Architecture_Overview.md`
-- `docs/10_Troubleshooting_Guide.md`
-- `docs/13_Testing_and_CI.md`
+- `docs/getting-started/setup.md`
+- `docs/architecture/overview.md`
+- `docs/architecture/decisions.md`
+- `docs/troubleshooting.md`
