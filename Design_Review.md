@@ -66,22 +66,6 @@ else { throw std::invalid_argument("Unsupported layout transition!"); }
 
 ## 硬编码与可配置性
 
-### P2 — 描述符池容量硬编码
-
-**位置**：`src/Core/Graphics/VulkanRenderer.cpp:194-196`
-
-```cpp
-poolSizes[0].descriptorCount = 1000;
-poolSizes[1].descriptorCount = 1000;
-poolInfo.maxSets = 1000;
-```
-
-超出 1000 时 `VK_CHECK(vkAllocateDescriptorSets)` 直接崩溃，无扩容或诊断。
-
-**修复方向**：改为可配置项，池耗尽时检测并给出诊断信息，或支持动态扩容。
-
----
-
 ### P3 — 组件成员全部 public
 
 **位置**：`CCamera.h:12-14` / `CPointLight.h:22-23` / `CDirectionalLight.h:25-26`
@@ -142,26 +126,6 @@ this->~FTexture();
 
 ## 代码重复
 
-### P2 — Forward/Deferred 网格渲染循环完全相同
-
-**位置**：`FForwardPipeline.cpp:174-204` vs `FDeferredPipeline.cpp:526-555`
-
-两者遍历 renderPackets、绑定描述符集、push 变换常量、绑定顶点/索引缓冲、`vkCmdDrawIndexed`。唯一区别是绑定的 pipeline 句柄。
-
-**修复方向**：提取为 `DrawMeshPackets(VkCommandBuffer, renderPackets, pipelineSelector)` 共享函数。
-
----
-
-### P3 — Framebuffer 创建循环重复
-
-**位置**：`FForwardPipeline.cpp:105-131` vs `FDeferredPipeline.cpp:300-329`
-
-两者都循环遍历 `renderer->GetSwapchainImageViews()` 创建 framebuffer，区别仅在于附件数量。
-
-**修复方向**：提取为 `CreateFramebuffers(device, renderPass, attachmentViews, extent)` 公共函数。
-
----
-
 ## ECS 设计
 
 ### P2 — GetComponent 用 dynamic_cast + 线性扫描
@@ -210,7 +174,7 @@ this->~FTexture();
 
 | 优先级 | 数量 | 核心主题 |
 |--------|------|----------|
-| P2 | 8 | 硬编码、代码重复、生命周期管理 |
+| P2 | 2 | MeshCache 原始指针 key + GetComponent dynamic_cast |
 | P3 | 10 | 封装不足、可维护性 |
 
 建议修复顺序：P1（策略模式 + 资源安全）→ P2（硬编码消除 + 去重）→ P3（按需修复）。

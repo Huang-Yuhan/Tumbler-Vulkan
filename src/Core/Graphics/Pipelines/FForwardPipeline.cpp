@@ -1,11 +1,9 @@
 #include "FForwardPipeline.h"
 #include "Core/Graphics/VulkanRenderer.h"
-#include "Core/Assets/FMaterial.h"
-#include "Core/Assets/FMaterialInstance.h"
 #include <array>
 #include <stdexcept>
 #include <glm/glm.hpp>
-#include "Core/Utils/Log.h" // Assuming Log::Get() is available for macros if needed
+#include "Core/Utils/Log.h"
 
 void FForwardPipeline::Init(VulkanRenderer* renderer)
 {
@@ -104,30 +102,10 @@ void FForwardPipeline::InitRenderPass(VulkanRenderer* renderer)
 
 void FForwardPipeline::InitFramebuffers(VulkanRenderer* renderer)
 {
-    const auto& imageViews = renderer->GetSwapchainImageViews();
-    VkExtent2D extent = renderer->GetSwapchainExtent();
-
-    Framebuffers.resize(imageViews.size());
-
-    for (size_t i = 0; i < imageViews.size(); i++) {
-        std::array<VkImageView, 2> attachments = {
-            imageViews[i],
-            renderer->GetSwapchainDepthImageView()
-        };
-
-        VkFramebufferCreateInfo framebufferInfo{};
-        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = RenderPass;
-        framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-        framebufferInfo.pAttachments = attachments.data();
-        framebufferInfo.width = extent.width;
-        framebufferInfo.height = extent.height;
-        framebufferInfo.layers = 1;
-
-        if (vkCreateFramebuffer(renderer->GetDevice(), &framebufferInfo, nullptr, &Framebuffers[i]) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create Forward Framebuffer!");
-        }
-    }
+    const std::vector<VkImageView> sharedAttachments = { renderer->GetSwapchainDepthImageView() };
+    CreateFramebuffers(renderer->GetDevice(), RenderPass,
+        renderer->GetSwapchainExtent(), renderer->GetSwapchainImageViews(),
+        sharedAttachments, Framebuffers);
 }
 
 void FForwardPipeline::RecordCommands(
@@ -171,36 +149,7 @@ void FForwardPipeline::RecordCommands(
     vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 
     // 渲染所有对象
-    for (const auto& packet : renderPackets) {
-        auto parentMaterial = packet.Material->GetParent();
-
-        vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, parentMaterial->GetPipeline(ERenderPath::Forward));
-
-        VkDescriptorSet descSet[] = {renderer->GetGlobalDescriptorSet(), packet.Material->GetDescriptorSet()};
-        vkCmdBindDescriptorSets(
-            cmdBuffer,
-            VK_PIPELINE_BIND_POINT_GRAPHICS,
-            parentMaterial->PipelineLayout,
-            0, 2, descSet,
-            0, nullptr
-        );
-
-        vkCmdPushConstants(
-            cmdBuffer,
-            parentMaterial->PipelineLayout,
-            VK_SHADER_STAGE_VERTEX_BIT,
-            0, sizeof(glm::mat4),
-            &packet.TransformMatrix
-        );
-
-        FVulkanMesh& gpuMesh = renderer->UploadMesh(packet.Mesh.get());
-        VkBuffer vertexBuffers[] = {gpuMesh.VertexBuffer.Buffer};
-        VkDeviceSize offsets[] = {0};
-        vkCmdBindVertexBuffers(cmdBuffer, 0, 1, vertexBuffers, offsets);
-        vkCmdBindIndexBuffer(cmdBuffer, gpuMesh.IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
-
-        vkCmdDrawIndexed(cmdBuffer, gpuMesh.IndexCount, 1, 0, 0, 0);
-    }
+    DrawMeshPackets(cmdBuffer, renderer, ERenderPath::Forward, renderPackets);
 
     vkCmdEndRenderPass(cmdBuffer);
     // Note: vkEndCommandBuffer is called by VulkanRenderer after the UI pass.

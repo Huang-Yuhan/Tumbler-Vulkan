@@ -182,22 +182,23 @@ void VulkanRenderer::InitSyncStructures() {
 void VulkanRenderer::InitDescriptors() {
     VkDevice device = Context.GetDevice();
 
+    static constexpr uint32_t kMaxDescriptorSets = 2000;
     // 创建描述符池
     std::array<VkDescriptorPoolSize, 2> poolSizes{};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[0].descriptorCount = 1000;
+    poolSizes[0].descriptorCount = kMaxDescriptorSets;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[1].descriptorCount = 1000;
+    poolSizes[1].descriptorCount = kMaxDescriptorSets;
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     poolInfo.pPoolSizes = poolSizes.data();
-    poolInfo.maxSets = 1000;
+    poolInfo.maxSets = kMaxDescriptorSets;
 
     VK_CHECK(vkCreateDescriptorPool(device, &poolInfo, nullptr, &DescriptorPool));
-    LOG_INFO("Descriptor Pool Initialized (Capacity: 1000 Sets)");
+    LOG_INFO("Descriptor Pool Initialized (Capacity: {} sets)", kMaxDescriptorSets);
 
     // 创建全局描述符集布局
     VkDescriptorSetLayoutBinding sceneBind{};
