@@ -1,6 +1,5 @@
 #include "InputManager.h"
 #include <GLFW/glfw3.h>
-#include <imgui.h>
 
 #include "KeyCodes.h"
 
@@ -204,13 +203,7 @@ void InputManager::SetGameplayInputBlocked(bool blocked)
     }
 }
 
-bool InputManager::IsUIFocused() const {
-    // 只要 ImGui 想要接管鼠标或键盘，我们就认为 UI 激活了
-    ImGuiIO& io = ImGui::GetIO();
-    return io.WantCaptureMouse || io.WantCaptureKeyboard;
-}
-
 bool InputManager::IsInputBlocked() const
 {
-    return bGameplayInputBlocked || IsUIFocused();
+    return bGameplayInputBlocked || bUIFocused;
 }

@@ -412,7 +412,9 @@ int main(int argc, char** argv) {
                 LOG_INFO("Window resized, recreating swapchain...");
             }
 
-            // 更新输入系统
+            // 更新输入系统（先注入 UI 焦点状态，避免 InputManager 直接依赖 ImGui）
+            ImGuiIO& io = ImGui::GetIO();
+            inputManager.SetUIFocused(io.WantCaptureMouse || io.WantCaptureKeyboard);
             inputManager.Tick();
             ui_manager.TickInput();
 

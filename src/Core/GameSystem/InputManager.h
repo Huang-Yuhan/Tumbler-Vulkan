@@ -47,7 +47,8 @@ public:
     // ==========================================
     // 3. UI 穿透拦截
     // ==========================================
-    bool IsUIFocused() const;
+    void SetUIFocused(bool focused) { bUIFocused = focused; }
+    bool IsUIFocused() const { return bUIFocused; }
     bool IsInputBlocked() const;
 
 private:
@@ -67,4 +68,5 @@ private:
     bool bFirstMouse = true;
     bool bCursorLocked = false;
     bool bGameplayInputBlocked = false;
+    bool bUIFocused = false;
 };
