@@ -13,6 +13,7 @@ class CFirstPersonCamera;
 class FActor;
 class CMeshRenderer;
 struct EditorSessionState;
+struct RenderSettings;
 
 class AppLogic
 {
@@ -21,6 +22,7 @@ private:
     FAssetManager* AssetMgr = nullptr;
     InputManager* InputMgr = nullptr;
     EditorSessionState* SessionState = nullptr;
+    RenderSettings* RenderCfg = nullptr;
     VulkanRenderer* Renderer = nullptr;
 
     // 缓存第一人称漫游相机组件
@@ -56,7 +58,7 @@ public:
     AppLogic() = default;
     ~AppLogic();
 
-    void Init(VulkanRenderer* renderer, FAssetManager* assetMgr, InputManager* inputMgr, EditorSessionState* sessionState);
+    void Init(VulkanRenderer* renderer, FAssetManager* assetMgr, InputManager* inputMgr, EditorSessionState* sessionState, RenderSettings* renderSettings);
     void Tick(float deltaTime);
 
     void DrawEditorUI();

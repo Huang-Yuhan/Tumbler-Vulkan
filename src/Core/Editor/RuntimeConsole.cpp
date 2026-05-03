@@ -164,7 +164,7 @@ void RuntimeConsole::TickInput()
         return;
     }
 
-    if (Input->WasKeyJustPressed(EKeyCode::GraveAccent)) {
+    if (Input->WasKeyJustPressed(ToggleKey)) {
         bIsOpen = !bIsOpen;
         bFocusInput = bIsOpen;
         HistoryIndex = -1;

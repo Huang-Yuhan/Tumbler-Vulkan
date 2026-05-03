@@ -23,7 +23,9 @@ public:
     [[nodiscard]] VkSampler GetSampler() const { return Sampler; }
 
 private:
-    VulkanContext* Context; // 用于释放资源时访问 Device/Allocator
+    void Release();
+
+    VulkanContext* Context;
     AllocatedImage Image;
-    VkSampler Sampler;
+    VkSampler Sampler = VK_NULL_HANDLE;
 };

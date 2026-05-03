@@ -85,10 +85,11 @@ AppLogic::~AppLogic()
 FScene* AppLogic::GetScene() { return Scene.get(); }
 const FScene* AppLogic::GetScene() const { return Scene.get(); }
 
-void AppLogic::Init(VulkanRenderer* renderer, FAssetManager* assetMgr, InputManager* inputMgr, EditorSessionState* sessionState) {
+void AppLogic::Init(VulkanRenderer* renderer, FAssetManager* assetMgr, InputManager* inputMgr, EditorSessionState* sessionState, RenderSettings* renderSettings) {
     AssetMgr = assetMgr;
     InputMgr = inputMgr;
     SessionState = sessionState;
+    RenderCfg = renderSettings;
     Renderer = renderer;
     InitializeScene();
 
@@ -236,7 +237,7 @@ int AppLogic::CountPointLights() const
 }
 
 void AppLogic::DrawPerformanceSection() {
-    const ERenderPath currentPath = SessionState != nullptr ? SessionState->CurrentRenderPath : ERenderPath::Forward;
+    const ERenderPath currentPath = RenderCfg != nullptr ? RenderCfg->CurrentRenderPath : ERenderPath::Forward;
 
     ImGui::Text("FPS: %.1f", Stats.FPS);
     ImGui::Text("Frame Time: %.2f ms", Stats.FrameTimeMs);
@@ -301,7 +302,7 @@ void AppLogic::DrawRenderingSection()
     ImGui::Text("Global Render Pipeline");
     ImGui::Separator();
 
-    const ERenderPath currentPath = SessionState != nullptr ? SessionState->CurrentRenderPath : ERenderPath::Forward;
+    const ERenderPath currentPath = RenderCfg != nullptr ? RenderCfg->CurrentRenderPath : ERenderPath::Forward;
     ImGui::Text("Current: %s", ToRenderPathLabel(currentPath));
 
     if (SessionState != nullptr) {
@@ -312,7 +313,7 @@ void AppLogic::DrawRenderingSection()
             if (requestedPath == ERenderPath::GPUDriven) {
                 LOG_WARN("GPU Driven render path is not implemented yet.");
             } else {
-                SessionState->CurrentRenderPath = requestedPath;
+                RenderCfg->CurrentRenderPath = requestedPath;
             }
         }
     }
@@ -344,7 +345,7 @@ void AppLogic::DrawDebugPanel()
     }
 
     if (SessionState != nullptr
-        && SessionState->CurrentRenderPath == ERenderPath::Deferred
+        && RenderCfg->CurrentRenderPath == ERenderPath::Deferred
         && Renderer != nullptr
         && ImGui::CollapsingHeader("G-Buffer", sectionFlags)) {
         DebugPreview.SetImage(0, Renderer->GetGBufferAlbedoImageView());

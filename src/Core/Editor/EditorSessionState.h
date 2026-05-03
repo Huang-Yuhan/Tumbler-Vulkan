@@ -6,6 +6,9 @@ class FActor;
 
 struct EditorSessionState {
     FActor* SelectedActor = nullptr;
-    ERenderPath CurrentRenderPath = ERenderPath::Forward;
     bool ShowDebugPanel = true;
+};
+
+struct RenderSettings {
+    ERenderPath CurrentRenderPath = ERenderPath::Forward;
 };

@@ -87,6 +87,7 @@ void VulkanRenderer::Cleanup() {
     }
 
     // 4. 清理子系统（按相反顺序）
+    MainCommandBuffer = VK_NULL_HANDLE;
     TheResourceUploadManager.Cleanup();
     TheCommandBufferManager.Cleanup();
     TheRenderDevice.Cleanup();
@@ -96,7 +97,6 @@ void VulkanRenderer::Cleanup() {
     Context.Cleanup();
     Window = nullptr;
     AssetManager = nullptr;
-    MainCommandBuffer = VK_NULL_HANDLE;
     PendingDescriptorSetFrees.Clear();
 }
 

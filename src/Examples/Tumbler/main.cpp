@@ -374,9 +374,10 @@ int main(int argc, char** argv) {
         inputManager.BindAxis("MoveUp", EKeyCode::E, EKeyCode::Q);
 
         EditorSessionState editorSessionState;
+        RenderSettings renderSettings;
 
         AppLogic logic;
-        logic.Init(&renderer, &assetManager, &inputManager, &editorSessionState);
+        logic.Init(&renderer, &assetManager, &inputManager, &editorSessionState, &renderSettings);
 
         DescriptorStressTestRunner descriptorStressTest(runtimeTestOptions, *logic.GetScene(), renderer);
         HiddenWindowSmokeTestRunner hiddenWindowSmokeTest(runtimeTestOptions);
@@ -390,7 +391,7 @@ int main(int argc, char** argv) {
         // 4. UI 系统初始化
         UIManager ui_manager;
         ui_manager.Init(&window, &renderer, &inputManager);
-        RegisterTumblerConsoleCommands(ui_manager.GetConsole(), *logic.GetScene(), *logic.GetMainCamera(), editorSessionState);
+        RegisterTumblerConsoleCommands(ui_manager.GetConsole(), *logic.GetScene(), *logic.GetMainCamera(), editorSessionState, renderSettings);
 
         // ==========================================
         // 核心游戏与渲染主循环
@@ -445,7 +446,7 @@ int main(int argc, char** argv) {
             SceneViewData viewData = logic.GetScene()->GenerateSceneView(cam, &cam->GetOwner()->Transform, aspectRatio);
             
             // 将从 UI 获取的管线枚举注入
-            viewData.RenderPath = editorSessionState.CurrentRenderPath;
+            viewData.RenderPath = renderSettings.CurrentRenderPath;
 
             // --- C. 发送给底层渲染器执行 ---
             // 渲染器同时接收“视图”和“包裹”，并将 UI 录制指令作为回调传入

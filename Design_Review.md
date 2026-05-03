@@ -26,26 +26,6 @@ UIManager 拥有自己的 `VkRenderPass`、`VkFramebuffer` 数组，在 `RecordD
 
 ---
 
-### P3 — 控制台硬编码按键和输入阻断
-
-**位置**：`src/Core/Editor/RuntimeConsole.cpp:167`
-
-控制台开关硬编码为 `EKeyCode::GraveAccent`，且 `TickInput()` 中直接调用 `Input->SetGameplayInputBlocked(bIsOpen)`。按键无法配置，阻断策略无法覆盖。
-
-**修复方向**：控制台的按键绑定改为可注册（例如 `SetToggleKey(EKeyCode)`），输入阻断改为回调通知而非直接 setter。
-
----
-
-### P3 — EditorSessionState 混合编辑状态与渲染配置
-
-**位置**：`src/Core/Editor/EditorSessionState.h:7-11`
-
-`CurrentRenderPath` 是渲染器配置，`SelectedActor` 是编辑器选中状态，`ShowDebugPanel` 是 UI 状态，三者放在同一个 struct 中传递，职责不清晰。
-
-**修复方向**：将 `CurrentRenderPath` 移至独立的 `RenderSettings` 对象，`EditorSessionState` 只保留编辑器选中/聚焦相关状态。
-
----
-
 ## 抽象漏洞与策略模式破坏
 
 ### P3 — TransitionImageLayout 只支持两种转换路径
@@ -88,41 +68,7 @@ FOV、NearPlane、FarPlane、Color、Intensity 等字段直接暴露为 public�
 
 ---
 
-### P3 — MainCommandBuffer 释放由 CommandBufferManager 隐式处理
-
-**位置**：`VulkanRenderer.cpp:99`
-
-`MainCommandBuffer` 在 `Cleanup()` 中只被置为 `VK_NULL_HANDLE`，实际释放依赖 `CommandBufferManager::Cleanup()` 销毁整个命令池。句柄悬空，不显式归还。
-
-**修复方向**：在置空前显式调用 `TheCommandBufferManager.FreeCommandBuffer(MainCommandBuffer)`。
-
----
-
-### P3 — FTexture 移动赋值中显式调用析构函数
-
-**位置**：`src/Core/Assets/FTexture.cpp:46`
-
-```cpp
-this->~FTexture();
-```
-
-技术上属于未定义行为。惯用做法是抽取 `Release()` 私有方法，由析构函数和移动赋值共同调用。
-
----
-
-## 代码重复
-
 ## ECS 设计
-
-### P3 — CMeshRenderer::GetMesh/GetMaterial 每次返回 shared_ptr 副本
-
-**位置**：`CMeshRenderer.h:19, 23`
-
-热路径上每次调用产生原子引用计数开销。
-
-**修复方向**：返回 `const std::shared_ptr<T>&` 或裸指针。
-
----
 
 ### P3 — FMesh 是值类型却强制用 shared_ptr
 
@@ -151,6 +97,6 @@ this->~FTexture();
 | 优先级 | 数量 | 核心主题 |
 |--------|------|----------|
 | P2 | 1 | RenderDevice::Cleanup 不销毁资源 |
-| P3 | 10 | 封装不足、可维护性 |
+| P3 | 4 | TransitionImageLayout, 组件 public, FMesh shared_ptr, 测试 Runner |
 
 建议修复顺序：P1（策略模式 + 资源安全）→ P2（硬编码消除 + 去重）→ P3（按需修复）。

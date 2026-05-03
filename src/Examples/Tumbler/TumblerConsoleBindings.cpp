@@ -163,7 +163,8 @@ void RegisterTumblerConsoleCommands(
     RuntimeConsole& console,
     FScene& scene,
     CFirstPersonCamera& camera,
-    EditorSessionState& editorState)
+    EditorSessionState& editorState,
+    RenderSettings& renderSettings)
 {
     console.RegisterCommand({
         .Name = "actors",
@@ -454,7 +455,7 @@ void RegisterTumblerConsoleCommands(
 
             return std::vector<std::string>{"forward", "deferred", "gpu"};
         },
-        .Handler = [&console, &editorState](const std::vector<std::string>& args) {
+        .Handler = [&console, &renderSettings](const std::vector<std::string>& args) {
             if (args.size() != 1) {
                 AddUsage(console, "render.path <forward|deferred|gpu>");
                 return;
@@ -462,13 +463,13 @@ void RegisterTumblerConsoleCommands(
 
             const std::string path = ToLowerCopy(args[0]);
             if (path == "forward") {
-                editorState.CurrentRenderPath = ERenderPath::Forward;
+                renderSettings.CurrentRenderPath = ERenderPath::Forward;
                 console.AddMessage(EConsoleMessageType::Info, "Render path set to forward.");
                 return;
             }
 
             if (path == "deferred") {
-                editorState.CurrentRenderPath = ERenderPath::Deferred;
+                renderSettings.CurrentRenderPath = ERenderPath::Deferred;
                 console.AddMessage(EConsoleMessageType::Info, "Render path set to deferred.");
                 return;
             }

@@ -6,6 +6,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "Core/GameSystem/KeyCodes.h"
+
 struct ImGuiInputTextCallbackData;
 class InputManager;
 
@@ -38,6 +40,7 @@ public:
     void TickInput();
     void Draw();
     void RegisterCommand(const ConsoleCommandDefinition& def);
+    void SetToggleKey(EKeyCode key) { ToggleKey = key; }
     void AddMessage(EConsoleMessageType type, std::string text);
     [[nodiscard]] bool IsOpen() const { return bIsOpen; }
 
@@ -51,6 +54,7 @@ private:
     static constexpr size_t MAX_MESSAGE_COUNT = 200;
 
     InputManager* Input = nullptr;
+    EKeyCode ToggleKey = EKeyCode::GraveAccent;
     std::array<char, MAX_INPUT_LENGTH> InputBuffer{};
     std::vector<ConsoleMessage> Messages;
     std::vector<std::string> History;
