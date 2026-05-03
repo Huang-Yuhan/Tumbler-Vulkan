@@ -327,6 +327,7 @@ void AppWindow::Init()
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, WindowConfig.Resizable ? GLFW_TRUE : GLFW_FALSE);
+    glfwWindowHint(GLFW_VISIBLE, WindowConfig.Visible ? GLFW_TRUE : GLFW_FALSE);
 
     Handle = glfwCreateWindow(static_cast<int>(WindowConfig.Width),
                               static_cast<int>(WindowConfig.Height),

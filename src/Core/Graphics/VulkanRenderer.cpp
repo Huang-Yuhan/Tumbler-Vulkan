@@ -118,6 +118,30 @@ VkRenderPass VulkanRenderer::GetRenderPass(ERenderPath path) const {
     return VK_NULL_HANDLE;
 }
 
+VkImageView VulkanRenderer::GetGBufferAlbedoImageView() const
+{
+    auto it = Pipelines.find(ERenderPath::Deferred);
+    if (it != Pipelines.end() && it->second) {
+        auto* deferred = dynamic_cast<FDeferredPipeline*>(it->second.get());
+        if (deferred) {
+            return deferred->GetAlbedoImageView();
+        }
+    }
+    return VK_NULL_HANDLE;
+}
+
+VkImageView VulkanRenderer::GetGBufferNormalImageView() const
+{
+    auto it = Pipelines.find(ERenderPath::Deferred);
+    if (it != Pipelines.end() && it->second) {
+        auto* deferred = dynamic_cast<FDeferredPipeline*>(it->second.get());
+        if (deferred) {
+            return deferred->GetNormalImageView();
+        }
+    }
+    return VK_NULL_HANDLE;
+}
+
 bool VulkanRenderer::RecreateSwapchain() {
     if (Window == nullptr) {
         return false;

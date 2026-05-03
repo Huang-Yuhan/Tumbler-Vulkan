@@ -23,6 +23,9 @@ public:
 
     [[nodiscard]] VkRenderPass GetRenderPass() const override { return RenderPass; }
 
+    [[nodiscard]] VkImageView GetAlbedoImageView() const { return AlbedoImageView; }
+    [[nodiscard]] VkImageView GetNormalImageView() const { return NormalImageView; }
+
 private:
     void InitRenderPass(VulkanRenderer* renderer);
     void InitGBuffers(VulkanRenderer* renderer);

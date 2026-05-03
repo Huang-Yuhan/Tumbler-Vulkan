@@ -30,6 +30,7 @@ namespace {
 struct RuntimeTestOptions {
     bool ResizeStressTest = false;
     bool DescriptorStressTest = false;
+    bool HiddenWindowSmokeTest = false;
     int MaxFrames = 240;
     int FramesPerResize = 20;
     int DescriptorStressRounds = 5;
@@ -58,6 +59,8 @@ RuntimeTestOptions ParseRuntimeTestOptions(int argc, char** argv)
             options.ResizeStressTest = true;
         } else if (argument == "--descriptor-stress-test") {
             options.DescriptorStressTest = true;
+        } else if (argument == "--hidden-window-smoke-test") {
+            options.HiddenWindowSmokeTest = true;
         } else if (argument.starts_with("--test-max-frames=")) {
             options.MaxFrames = ParsePositiveIntOption(argument, "--test-max-frames=");
         } else if (argument.starts_with("--test-frames-per-resize=")) {
@@ -71,8 +74,10 @@ RuntimeTestOptions ParseRuntimeTestOptions(int argc, char** argv)
         }
     }
 
-    if (options.ResizeStressTest && options.DescriptorStressTest) {
-        throw std::runtime_error("Resize and descriptor stress test modes are mutually exclusive.");
+    if ((options.ResizeStressTest ? 1 : 0)
+        + (options.DescriptorStressTest ? 1 : 0)
+        + (options.HiddenWindowSmokeTest ? 1 : 0) > 1) {
+        throw std::runtime_error("Runtime test modes are mutually exclusive.");
     }
 
     return options;
@@ -298,6 +303,43 @@ private:
     bool PendingClose = false;
 };
 
+class HiddenWindowSmokeTestRunner {
+public:
+    explicit HiddenWindowSmokeTestRunner(RuntimeTestOptions options)
+        : Options(options)
+    {
+        if (!Options.HiddenWindowSmokeTest) {
+            return;
+        }
+
+        LOG_INFO("Hidden window smoke test enabled. MaxFrames={}", Options.MaxFrames);
+    }
+
+    [[nodiscard]] bool IsEnabled() const
+    {
+        return Options.HiddenWindowSmokeTest;
+    }
+
+    void OnFrameCompleted(AppWindow& window)
+    {
+        if (!IsEnabled() || Completed) {
+            return;
+        }
+
+        ++FrameCount;
+
+        if (FrameCount >= Options.MaxFrames) {
+            Completed = true;
+            LOG_INFO("Hidden window smoke test completed successfully after {} frames.", FrameCount);
+            window.RequestClose();
+        }
+    }
+
+private:
+    RuntimeTestOptions Options;
+    int FrameCount = 0;
+    bool Completed = false;
+};
 }
 
 int main(int argc, char** argv) {
@@ -311,6 +353,9 @@ int main(int argc, char** argv) {
         // 1. 基础系统初始化
         AppWindow::AppWindowConfig config;
         config.Title = "Tumbler Engine - PBR Architecture";
+        if (runtimeTestOptions.HiddenWindowSmokeTest) {
+            config.Visible = false;
+        }
         AppWindow window(config);
 
         VulkanRenderer renderer;
@@ -334,6 +379,7 @@ int main(int argc, char** argv) {
         logic.Init(&renderer, &assetManager, &inputManager, &editorSessionState);
 
         DescriptorStressTestRunner descriptorStressTest(runtimeTestOptions, *logic.GetScene(), renderer);
+        HiddenWindowSmokeTestRunner hiddenWindowSmokeTest(runtimeTestOptions);
 
         // 提前上传共用网格，防止渲染中途卡顿
         renderer.UploadMesh(assetManager.GetOrLoadMesh("DefaultPlane").get());
@@ -408,6 +454,7 @@ int main(int argc, char** argv) {
 
             resizeStressTest.OnFrameCompleted(window);
             descriptorStressTest.OnFrameCompleted(window);
+            hiddenWindowSmokeTest.OnFrameCompleted(window);
         }
 
         // ==========================================

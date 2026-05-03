@@ -102,6 +102,8 @@ public:
     [[nodiscard]] VkImageView GetSwapchainDepthImageView() const { return SwapChain.GetDepthImageView(); }
 
     [[nodiscard]] VkRenderPass GetRenderPass(ERenderPath path = ERenderPath::Forward) const;
+    [[nodiscard]] VkImageView GetGBufferAlbedoImageView() const;
+    [[nodiscard]] VkImageView GetGBufferNormalImageView() const;
     [[nodiscard]] VkExtent2D GetSwapchainExtent() const { return SwapChain.GetExtent(); }
     [[nodiscard]] uint32_t GetSwapchainImageCount() const { return static_cast<uint32_t>(SwapChain.GetImageCount()); }
     [[nodiscard]] VkDescriptorPool GetDescriptorPool() const { return DescriptorPool; }

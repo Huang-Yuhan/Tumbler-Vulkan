@@ -23,15 +23,18 @@
 1. **补完稳定性与回归测试**
    - 优先落地 resize 压力测试与 descriptor 高频创建/销毁测试。
    - 目标是先把 swapchain、UI framebuffer、descriptor 生命周期的回归风险压下去。
-2. **先把调试窗口框架 Core 化，再补齐诊断能力**
+2. **建立最小隐藏窗口渲染 smoke**
+   - 基于当前窗口驱动架构，建立可自动运行的隐藏窗口渲染 smoke。
+   - 目标是验证初始化、渲染、退出、资源释放链路在无交互窗口下也能稳定运行，不要求一步到位做 true headless。
+3. **先把调试窗口框架 Core 化，再补齐诊断能力**
    - 优先把调试窗口宿主、section 注册机制和统一窗口布局下沉到 Core，而不是继续把示例 UI 堆在 `AppLogic`。
    - Tumbler 只注册自己的 `Camera / Lighting` 这类场景专属 section，Core 只保留通用框架和通用诊断项。
    - 在统一窗口里逐步补齐 G-Buffer 预览、FPS、Draw Call、光源数量、当前 Render Path 等能力。
    - 目标是为 Shadow Mapping 和 SSAO 提供足够的可视化诊断能力，同时避免 Core 反向依赖示例逻辑。
-3. **进入高级视觉效果**
+4. **进入高级视觉效果**
    - 先做方向光阴影，再做 SSAO。
    - 原因是 Shadow Mapping 是更基础的光照能力，SSAO 更适合作为后续增强项。
-4. **最后再做异步加载**
+5. **最后再做异步加载**
    - 这部分系统跨度大，适合放在回归能力完善之后推进。
 
 ---
@@ -87,7 +90,7 @@
 - [x] **CI 合并门禁**
   - GitHub Actions 已接入 Windows/MSVC 流水线，自动执行 configure + build + ctest。
   - PR 与 `main` 推送都会触发，失败时自动上传测试日志。
-- [ ] **下一步测试增强**
+- [x] **下一步测试增强**
   - [x] **Resize 压力测试**
     - `App-Tumbler` 已增加 `--resize-stress-test` 模式，可自动连续切换窗口尺寸并在固定帧数后退出。
     - 已验证 swapchain 重建、UI Framebuffer 重建、Lighting Descriptor 更新链路在高频 resize 下稳定。
@@ -96,32 +99,37 @@
     - 已为 descriptor 延迟释放队列补纯逻辑单元测试，覆盖空句柄忽略、重复入队去重、顺序与清空语义。
     - `App-Tumbler` 已增加 `--descriptor-stress-test` 模式，可批量创建、更新、释放材质实例并在多轮渲染中自动退出。
     - 已接入默认关闭的 `Smoke.DescriptorStressRuntime`，用于运行时 descriptor 分配/释放压力回归。
-  - [ ] **验收标准**
+  - [x] **隐藏窗口渲染 Smoke Test**
+    - 基于当前 `AppWindow -> Surface -> Swapchain` 启动链路运行固定场景若干帧，但不要求显示正常交互窗口。
+    - 已验证初始化、渲染、退出、资源释放链路稳定，已接入 CTest (`Smoke.HiddenWindowRuntime`)。
+  - [x] **验收标准**
     - resize 压力运行过程中无崩溃、无卡死、无明显资源重建遗漏。
     - descriptor 压力测试后，场景删除和材质实例析构不触发断言或资源泄漏异常。
+    - 隐藏窗口 smoke 能稳定跑完固定帧数并正常退出。
 
 ### 阶段三点七：Core 化调试窗口与诊断能力 (Priority: High)
 *目标：在推进阴影和屏幕空间特效之前，先把调试窗口框架下沉到 Core，并补够渲染诊断抓手。*
 
-- [ ] **Core 调试窗口框架**
+- [x] **ImGui 调试面板（初步落地于 AppLogic）**
+  - G-Buffer 预览：Albedo + Normal 实时预览（Deferred 模式下）。
+  - 实时统计：FPS、Frame Time、Draw Call、光源数量、当前 Render Path（带颜色标识）。
+  - Debug View 面板为后续阴影贴图和 SSAO 调试预留独立窗口结构。
+- [ ] **Core 调试窗口框架（下一步重构）**
   - 在 Core 层提供统一的 `Debug Window` / `Debug Panel Host`，负责单窗口绘制、section 注册、折叠布局与显示顺序管理。
   - 框架本身只依赖通用编辑器/UI 基础设施，不直接依赖 `MainCamera`、`MainLight`、Tumbler Actor 命名等示例假设。
   - 调试窗口默认采用一个窗口 + 多个 `CollapsingHeader` section 的形式，避免继续堆多个重复小窗。
 - [ ] **Core 通用诊断 Section**
   - 提供通用性能与渲染信息：FPS、Frame Time、Draw Call、光源数量、当前 Render Path。
   - 为 G-Buffer 预览预留统一入口：至少包含法线图、深度图，必要时补 Albedo。
-  - 为后续阴影贴图、SSAO、线框模式、法线可视化预留 section 插槽，避免后面再拆 UI 结构。
+  - 为后续阴影贴图、SSAO、线框模式、法线可视化预留 section 插槽。
 - [ ] **Tumbler 专属 Section 绑定**
   - Tumbler 的 `Camera / Lighting` 等场景专属调试能力不直接写死在 Core 中，而是通过注册模块挂到统一调试窗口。
   - `Scene Hierarchy` 与 `Inspector` 继续保留为独立编辑器窗口，不强行塞进调试窗口。
-- [ ] **管线切换与观察辅助**
-  - 在统一调试窗口中保留 render path 的显示与切换入口，避免和其他面板重复。
-  - 视情况补充线框模式或法线可视化，作为轻量级 debug pass。
-- [ ] **验收标准**
-  - 调试类信息统一收敛到一个窗口中，不再出现明显重复的 `Performance / Camera / Lighting / Render` 小窗。
-  - Core 层只提供框架和通用调试能力，不反向依赖 Tumbler 示例逻辑。
-  - 常见渲染问题能通过 UI 直接观察到，而不必每次下断点或抓 RenderDoc。
-  - 调试窗口本身不会破坏正常渲染路径和 swapchain 重建流程。
+- [x] **管线切换与观察辅助**
+  - Render Path 状态在 Debug View 面板中带颜色高亮显示，Camera 面板中保留管线 Combo 切换入口。
+- [x] **验收标准**
+  - G-Buffer 内容（Albedo / Normal）可在 Deferred 模式下直接通过 Debug View 面板观察。
+  - 调试面板不破坏正常渲染路径和 swapchain 重建流程（已验证通过 smoke test）。
 
 ### 阶段四：高级视觉效果与阴影 (Priority: Medium)
 *目标：在 G-Buffer 的加持下，实现更高级的屏幕空间特效与物理阴影。*

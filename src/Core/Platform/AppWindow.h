@@ -16,6 +16,7 @@ public:
         uint32_t Width = 1280;
         uint32_t Height = 720;
         bool Resizable = true;
+        bool Visible = true;
     };
 
     explicit AppWindow(const AppWindowConfig& config);

@@ -20,6 +20,7 @@ private:
     FAssetManager* AssetMgr = nullptr;
     InputManager* InputMgr = nullptr;
     EditorSessionState* SessionState = nullptr;
+    VulkanRenderer* Renderer = nullptr;
 
     // 缓存第一人称漫游相机组件
     CFirstPersonCamera* MainCamera = nullptr;
@@ -34,16 +35,25 @@ private:
         int HistoryIndex = 0;
     } Stats;
 
+    // GBuffer 调试预览资源
+    VkSampler DebugSampler = VK_NULL_HANDLE;
+    VkDescriptorSetLayout DebugGBufferSetLayout = VK_NULL_HANDLE;
+    VkDescriptorSet DebugAlbedoDescSet = VK_NULL_HANDLE;
+    VkDescriptorSet DebugNormalDescSet = VK_NULL_HANDLE;
+
     void InitializeScene();
     void InitializePlanes() const;
+    void InitDebugResources();
+    void DestroyDebugResources();
 
-    void DrawDebugPanel();
     void DrawPerformanceSection();
     void DrawCameraSection();
     void DrawLightingSection();
     void DrawRenderingSection();
+    void DrawDebugPanel();
     void DrawInspectorPanel();
     void DrawSceneHierarchyPanel();
+    void UpdateDebugGBufferDescriptors();
     bool ValidateSelectedActor();
     [[nodiscard]] int CountPointLights() const;
 
