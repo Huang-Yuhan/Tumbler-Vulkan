@@ -169,17 +169,6 @@ void AppLogic::Init(VulkanRenderer* renderer, FAssetManager* assetMgr, InputMana
     pl->Intensity = 50.0f;
 
     // ==========================================
-    // 8. 创建副光源 (蓝色) 检查多光源系统与层级系统
-    // ==========================================
-    FActor* lightActor2 = Scene->CreateActor("SecondLight_Blue");
-    lightActor2->Transform.SetPosition(glm::vec3(4.0f, 0.0f, 0.0f));
-    auto* pl2 = lightActor2->AddComponent<CPointLight>();
-    pl2->Color = glm::vec3(0.1f, 0.3f, 1.0f);
-    pl2->Intensity = 80.0f;
-
-    // 挂载到剑身上，保持世界绝对坐标属性 (现在会跟着剑一起旋转)
-    lightActor2->Transform.SetParent(&sword->Transform, true);
-
     DebugPreview.Init(Renderer);
     RegisterDebugSections();
 }

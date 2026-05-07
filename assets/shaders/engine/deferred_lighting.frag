@@ -6,18 +6,22 @@ layout(location = 0) out vec4 outFragColor;
 // ==========================================
 // 全局场景数据 (由 FDeferredPipeline 主动传入)
 // ==========================================
-struct PointLightData {
-    vec4 Position;
-    vec4 Color;
+struct LightGPUData {
+    vec4 Position;   // xyz=pos, w=type (0=point, 1=directional)
+    vec4 Color;      // rgb=color, a=intensity
+    vec4 Direction;  // xyz=direction (directional), w=range (point)
 };
 
 layout(set = 0, binding = 0) uniform SceneData {
     mat4 ViewProj;
     mat4 InvViewProj;
     vec4 CameraPos;
-    PointLightData Lights[8];
+    LightGPUData Lights[8];
     int LightCount;
+    mat4 LightViewProj;
 } scene;
+
+layout(set = 0, binding = 1) uniform sampler2DShadow shadowMap;
 
 // ==========================================
 // G-Buffer 局部内存采样 (Input Attachments)
@@ -63,6 +67,19 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0) {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
+float ShadowContribution(vec4 lightSpacePos) {
+    vec3 proj = lightSpacePos.xyz / lightSpacePos.w;
+    proj = proj * 0.5 + 0.5;
+    if (proj.z > 1.0) return 1.0;
+
+    float shadow = 0.0;
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    for (int x = -1; x <= 1; ++x)
+        for (int y = -1; y <= 1; ++y)
+            shadow += texture(shadowMap, vec3(proj.xy + vec2(x, y) * texelSize, proj.z - 0.001));
+    return shadow / 9.0;
+}
+
 void main() {
     // 1. 从片内共享缓存极速拉取 G-Buffer 数据
     float depth = subpassLoad(inDepth).r;
@@ -94,11 +111,26 @@ void main() {
     vec3 Lo = vec3(0.0);
 
     for (int i = 0; i < scene.LightCount; i++) {
-        vec3 L = normalize(scene.Lights[i].Position.xyz - worldPos);
+        int type = int(scene.Lights[i].Position.w);
+        vec3 L;
+        float attenuation;
+
+        if (type == 1) {
+            L = normalize(scene.Lights[i].Direction.xyz);
+            attenuation = 1.0;
+
+            vec4 lightSpacePos = scene.LightViewProj * vec4(worldPos, 1.0);
+            attenuation *= ShadowContribution(lightSpacePos);
+        } else {
+            L = normalize(scene.Lights[i].Position.xyz - worldPos);
+            float dist = length(scene.Lights[i].Position.xyz - worldPos);
+            float range = scene.Lights[i].Direction.w;
+            if (dist > range) continue;
+            attenuation = 1.0 / (dist * dist);
+            attenuation *= max(0.0, 1.0 - dist / range);
+        }
         vec3 H = normalize(V + L);
 
-        float dist = length(scene.Lights[i].Position.xyz - worldPos);
-        float attenuation = 1.0 / (dist * dist);
         vec3 radiance = scene.Lights[i].Color.rgb * scene.Lights[i].Color.a * attenuation;
 
         float NDF = DistributionGGX(N, H, roughness);

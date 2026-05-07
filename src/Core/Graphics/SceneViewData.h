@@ -28,6 +28,9 @@ struct SceneViewData {
     // ==========================================
     std::vector<LightData> Lights;
 
+    // 光源视角投影矩阵（方向光阴影映射）
+    glm::mat4 LightViewProj = glm::mat4(1.0f);
+
     // 选定的渲染管线路径
     ERenderPath RenderPath = ERenderPath::Forward;
 };

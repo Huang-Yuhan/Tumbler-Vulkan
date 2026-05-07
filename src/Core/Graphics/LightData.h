@@ -32,4 +32,5 @@ struct LightData
 
     glm::vec3 Color        = glm::vec3(1.0f, 1.0f, 1.0f);
     float     Intensity    = 50.0f;
+    float     Range        = 20.0f;
 };

@@ -47,6 +47,6 @@ assert_contains("${deferred_pipeline_cpp}" "VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPT
 
 set(vulkan_renderer_cpp "${SOURCE_DIR}/src/Core/Graphics/VulkanRenderer.cpp")
 assert_contains("${vulkan_renderer_cpp}" "std::make_unique<FDeferredPipeline>" "Deferred pipeline wiring")
-assert_contains("${vulkan_renderer_cpp}" "FlushPendingDescriptorSetFrees\\(\\);" "Descriptor deferred-free flush hook")
+assert_contains("${vulkan_renderer_cpp}" "DescMgr.FlushPendingDescriptorSetFrees" "Descriptor deferred-free flush hook")
 
 message(STATUS "Smoke checks passed for deferred pipeline artifacts and integration hooks.")

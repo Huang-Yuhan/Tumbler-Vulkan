@@ -41,11 +41,17 @@ void VulkanRenderer::Init(AppWindow* window) {
     SwapChain.Init(&Context, width, height);
 
     // 4. 初始化描述符与同步机制
-    InitDescriptors();
+    DescMgr.Init(Context.GetDevice(), &TheRenderDevice);
+    SceneDataMgr.Init(&DescMgr);
     InitSyncStructures();
 
     // 5. 初始化渲染管线策略 (必须在 DescriptorLayout 创建后)
     InitPipelines();
+
+    // 6. 初始化 Shadow Renderer + 更新全局描述符集
+    ShadowMgr.Init(this);
+    DescMgr.UpdateShadowBinding(Context.GetDevice(),
+        ShadowMgr.GetShadowSampler(), ShadowMgr.GetShadowMapView());
 
     // 5. 初始化主命令缓冲区
     MainCommandBuffer = TheCommandBufferManager.AllocatePrimaryCommandBuffer();
@@ -58,18 +64,15 @@ void VulkanRenderer::Cleanup() {
     if (device != VK_NULL_HANDLE) {
         vkDeviceWaitIdle(device);
     }
-    FlushPendingDescriptorSetFrees();
+    DescMgr.FlushPendingDescriptorSetFrees(device);
 
     // 1. 清理描述符资源
-    DestroyBuffer(SceneParameterBuffer);
-    if (GlobalSetLayout != VK_NULL_HANDLE) {
-        vkDestroyDescriptorSetLayout(device, std::exchange(GlobalSetLayout, VK_NULL_HANDLE), nullptr);
-    }
-    if (DescriptorPool != VK_NULL_HANDLE) {
-        vkDestroyDescriptorPool(device, std::exchange(DescriptorPool, VK_NULL_HANDLE), nullptr);
-    }
+    DescMgr.Cleanup(device, &TheRenderDevice);
 
-    // 2. 清理渲染管线策略 (Pipelines & Framebuffers)
+    // 2. 清理 ShadowRenderer
+    ShadowMgr.Cleanup(this);
+
+    // 3. 清理渲染管线策略 (Pipelines & Framebuffers)
     for (auto& [path, pipeline] : Pipelines) {
         if (pipeline) pipeline->Cleanup(this);
     }
@@ -97,7 +100,6 @@ void VulkanRenderer::Cleanup() {
     Context.Cleanup();
     Window = nullptr;
     AssetManager = nullptr;
-    PendingDescriptorSetFrees.Clear();
 }
 
 void VulkanRenderer::InitPipelines() {
@@ -179,69 +181,6 @@ void VulkanRenderer::InitSyncStructures() {
     VK_CHECK(vkCreateFence(device, &fenceInfo, nullptr, &RenderFence));
 }
 
-void VulkanRenderer::InitDescriptors() {
-    VkDevice device = Context.GetDevice();
-
-    static constexpr uint32_t kMaxDescriptorSets = 2000;
-    // 创建描述符池
-    std::array<VkDescriptorPoolSize, 2> poolSizes{};
-    poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[0].descriptorCount = kMaxDescriptorSets;
-    poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[1].descriptorCount = kMaxDescriptorSets;
-
-    VkDescriptorPoolCreateInfo poolInfo{};
-    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-    poolInfo.pPoolSizes = poolSizes.data();
-    poolInfo.maxSets = kMaxDescriptorSets;
-
-    VK_CHECK(vkCreateDescriptorPool(device, &poolInfo, nullptr, &DescriptorPool));
-    LOG_INFO("Descriptor Pool Initialized (Capacity: {} sets)", kMaxDescriptorSets);
-
-    // 创建全局描述符集布局
-    VkDescriptorSetLayoutBinding sceneBind{};
-    sceneBind.binding = 0;
-    sceneBind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    sceneBind.descriptorCount = 1;
-    sceneBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    VkDescriptorSetLayoutCreateInfo globalLayoutInfo{};
-    globalLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    globalLayoutInfo.bindingCount = 1;
-    globalLayoutInfo.pBindings = &sceneBind;
-
-    VK_CHECK(vkCreateDescriptorSetLayout(device, &globalLayoutInfo, nullptr, &GlobalSetLayout));
-
-    // 分配全局描述符集
-    GlobalDescriptorSet = AllocateDescriptorSet(GlobalSetLayout);
-
-    // 创建场景参数缓冲区
-    TheRenderDevice.CreateBuffer(
-        sizeof(SceneDataUBO),
-        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-        VMA_MEMORY_USAGE_AUTO_PREFER_HOST,
-        SceneParameterBuffer
-    );
-
-    // 更新描述符集
-    VkDescriptorBufferInfo sceneBufferInfo{};
-    sceneBufferInfo.buffer = SceneParameterBuffer.Buffer;
-    sceneBufferInfo.offset = 0;
-    sceneBufferInfo.range = sizeof(SceneDataUBO);
-
-    VkWriteDescriptorSet setWrite{};
-    setWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    setWrite.dstSet = GlobalDescriptorSet;
-    setWrite.dstBinding = 0;
-    setWrite.descriptorCount = 1;
-    setWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    setWrite.pBufferInfo = &sceneBufferInfo;
-
-    vkUpdateDescriptorSets(device, 1, &setWrite, 0, nullptr);
-}
-
 void VulkanRenderer::Render(
     const SceneViewData& viewData,
     const std::vector<RenderPacket>& renderPackets,
@@ -256,7 +195,7 @@ void VulkanRenderer::Render(
         return;
     }
     VK_CHECK(waitResult);
-    FlushPendingDescriptorSetFrees();
+    DescMgr.FlushPendingDescriptorSetFrees(device);
 
     uint32_t imageIndex;
     VkResult result = SwapChain.AcquireNextImage(ImageAvailableSemaphore, imageIndex);
@@ -305,26 +244,16 @@ void VulkanRenderer::RecordCommandBuffer(
     const std::vector<RenderPacket>& renderPackets,
     std::function<void(VkCommandBuffer, uint32_t)> onUIRender) {
 
-    // 首先更新全局场景参数 UBO (由于它是共用的，放外部更新比放管道更合理)
-    SceneDataUBO sceneData{};
-    glm::mat4 viewProj = viewData.ProjectionMatrix * viewData.ViewMatrix;
-    sceneData.ViewProjection = viewProj;
-    sceneData.InvViewProj = glm::inverse(viewProj);
-    sceneData.CameraPosition = glm::vec4(viewData.CameraPosition, 1.0f);
-    
-    int count = static_cast<int>(viewData.Lights.size());
-    sceneData.LightCount = count < MAX_SCENE_LIGHTS ? count : MAX_SCENE_LIGHTS;
-    
-    for (int i = 0; i < sceneData.LightCount; ++i) {
-        sceneData.Lights[i].Position = glm::vec4(viewData.Lights[i].Position, 1.0f);
-        sceneData.Lights[i].Color = glm::vec4(viewData.Lights[i].Color, viewData.Lights[i].Intensity);
-    }
-    for (int i = sceneData.LightCount; i < MAX_SCENE_LIGHTS; ++i) {
-        sceneData.Lights[i].Position = glm::vec4(0.0f);
-        sceneData.Lights[i].Color = glm::vec4(0.0f);
-    }
-    
-    memcpy(SceneParameterBuffer.Info.pMappedData, &sceneData, sizeof(SceneDataUBO));
+    // Begin command buffer here (moved from pipelines so shadow pass can run first)
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    VK_CHECK(vkBeginCommandBuffer(cmdBuffer, &beginInfo));
+
+    // 更新全局场景参数 UBO
+    SceneDataMgr.Update(viewData);
+
+    // Shadow depth pass (before main pipeline)
+    ShadowMgr.RecordDepthPass(cmdBuffer, this, viewData, renderPackets);
 
     // 执行当前选中管线的具体命令录制
     auto it = Pipelines.find(viewData.RenderPath);
@@ -367,34 +296,9 @@ std::shared_ptr<FTexture> VulkanRenderer::LoadTexture(const std::string& filePat
 }
 
 VkDescriptorSet VulkanRenderer::AllocateDescriptorSet(VkDescriptorSetLayout layout) {
-    VkDescriptorSetAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = DescriptorPool;
-    allocInfo.descriptorSetCount = 1;
-    allocInfo.pSetLayouts = &layout;
-
-    VkDescriptorSet descriptorSet;
-    VK_CHECK(vkAllocateDescriptorSets(Context.GetDevice(), &allocInfo, &descriptorSet));
-    return descriptorSet;
+    return DescMgr.AllocateDescriptorSet(Context.GetDevice(), layout);
 }
 
 void VulkanRenderer::QueueDescriptorSetFree(VkDescriptorSet descriptorSet) {
-    PendingDescriptorSetFrees.Enqueue(descriptorSet);
-}
-
-void VulkanRenderer::FlushPendingDescriptorSetFrees() {
-    if (PendingDescriptorSetFrees.Empty() || DescriptorPool == VK_NULL_HANDLE) {
-        return;
-    }
-
-    const auto& pendingDescriptorSets = PendingDescriptorSetFrees.GetPendingDescriptorSets();
-
-    VK_CHECK(vkFreeDescriptorSets(
-        Context.GetDevice(),
-        DescriptorPool,
-        static_cast<uint32_t>(pendingDescriptorSets.size()),
-        pendingDescriptorSets.data()
-    ));
-
-    PendingDescriptorSetFrees.Clear();
+    DescMgr.QueueDescriptorSetFree(descriptorSet);
 }

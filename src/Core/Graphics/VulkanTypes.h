@@ -19,16 +19,22 @@ struct AllocatedImage {
 
 #define MAX_SCENE_LIGHTS 8
 
-struct PointLightData {
-    glm::vec4 Position; // w is padding or radius
-    glm::vec4 Color;    // w is Intensity
+// GPU-side light data (matches shader LightGPUData)
+// Position.w = ELightType cast to float (0=Point, 1=Directional)
+// Color.w    = Intensity
+// Direction.xyz = light direction (directional), Direction.w = Range (point)
+struct LightGPUData {
+    glm::vec4 Position;
+    glm::vec4 Color;
+    glm::vec4 Direction;
 };
 
 struct SceneDataUBO {
     glm::mat4 ViewProjection;
     glm::mat4 InvViewProj;
     glm::vec4 CameraPosition;
-    PointLightData Lights[MAX_SCENE_LIGHTS];
+    LightGPUData Lights[MAX_SCENE_LIGHTS];
     int LightCount;
     int padding[3];
+    glm::mat4 LightViewProj;
 };

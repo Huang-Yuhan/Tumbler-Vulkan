@@ -5,9 +5,11 @@
 #include <iostream>
 
 #include "Components/CMeshRenderer.h"
+#include "Components/CLightComponent.h"
 #include "Components/CPointLight.h"
 #include "Components/CDirectionalLight.h"
 #include "Core/Graphics/LightData.h"
+#include <glm/gtc/matrix_transform.hpp>
 
 FScene::FScene()=default;
 FScene::~FScene()=default;
@@ -119,25 +121,43 @@ SceneViewData FScene::GenerateSceneView(const CCamera *camera, const CTransform 
     for (const auto& actorPtr : Actors)
     {
         FActor* actor = actorPtr.get();
+        auto* light = actor->GetComponent<CLightComponent>();
+        if (!light) continue;
 
-        if (auto* pl = actor->GetComponent<CPointLight>())
+        LightData data;
+        data.Color     = light->Color;
+        data.Intensity = light->Intensity;
+
+        if (auto* pl = dynamic_cast<CPointLight*>(light))
         {
-            LightData data;
-            data.Type      = ELightType::Point;
-            data.Position  = actor->Transform.GetPosition();
-            data.Color     = pl->Color;
-            data.Intensity = pl->Intensity;
-            viewData.Lights.push_back(data);
+            data.Type     = ELightType::Point;
+            data.Position = actor->Transform.GetPosition();
+            data.Range    = pl->Range;
         }
-
-        if (auto* dl = actor->GetComponent<CDirectionalLight>())
+        else if (dynamic_cast<CDirectionalLight*>(light))
         {
-            LightData data;
             data.Type      = ELightType::Directional;
             data.Direction = actor->Transform.GetForwardVector();
-            data.Color     = dl->Color;
-            data.Intensity = dl->Intensity;
-            viewData.Lights.push_back(data);
+        }
+        viewData.Lights.push_back(data);
+    }
+
+    // 3. Compute shadow LightViewProj from first directional light
+    viewData.LightViewProj = glm::mat4(1.0f);
+    for (const auto& actorPtr : Actors) {
+        FActor* actor = actorPtr.get();
+        if (auto* dl = actor->GetComponent<CDirectionalLight>()) {
+            glm::vec3 lightDir = glm::normalize(actor->Transform.GetForwardVector());
+            glm::vec3 lightPos = viewData.CameraPosition - lightDir * 15.0f;
+            glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+            if (glm::abs(glm::dot(lightDir, up)) > 0.99f)
+                up = glm::vec3(1.0f, 0.0f, 0.0f);
+
+            glm::mat4 lightView = glm::lookAt(lightPos, lightPos + lightDir, up);
+            float half = 20.0f;
+            glm::mat4 lightProj = glm::ortho(-half, half, -half, half, 0.1f, 50.0f);
+            viewData.LightViewProj = lightProj * lightView;
+            break;
         }
     }
 

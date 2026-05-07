@@ -7,7 +7,9 @@
 #include "ResourceUploadManager.h"
 #include "FVulkanMesh.h"
 #include "VulkanTypes.h"
-#include "DescriptorSetFreeQueue.h"
+#include "DescriptorManager.h"
+#include "SceneDataManager.h"
+#include "ShadowRenderer.h"
 #include <vulkan/vulkan.h>
 #include <vector>
 #include <functional>
@@ -85,7 +87,7 @@ public:
     [[nodiscard]] VkDevice GetDevice() const { return Context.GetDevice(); }
     [[nodiscard]] VkPhysicalDevice GetPhysicalDevice() const { return Context.GetPhysicalDevice(); }
     [[nodiscard]] VkQueue GetGraphicsQueue() const { return Context.GetGraphicsQueue(); }
-    [[nodiscard]] VkDescriptorSetLayout GetGlobalSetLayout() const { return GlobalSetLayout; }
+    [[nodiscard]] VkDescriptorSetLayout GetGlobalSetLayout() const { return DescMgr.GetGlobalSetLayout(); }
     [[nodiscard]] const VulkanContext& GetContext() const { return Context; }
     [[nodiscard]] RenderDevice* GetRenderDevice() { return &TheRenderDevice; }
     [[nodiscard]] CommandBufferManager* GetCommandBufferManager() { return &TheCommandBufferManager; }
@@ -106,8 +108,9 @@ public:
     [[nodiscard]] VkImageView GetGBufferNormalImageView() const;
     [[nodiscard]] VkExtent2D GetSwapchainExtent() const { return SwapChain.GetExtent(); }
     [[nodiscard]] uint32_t GetSwapchainImageCount() const { return static_cast<uint32_t>(SwapChain.GetImageCount()); }
-    [[nodiscard]] VkDescriptorPool GetDescriptorPool() const { return DescriptorPool; }
-    [[nodiscard]] VkDescriptorSet GetGlobalDescriptorSet() const { return GlobalDescriptorSet; }
+    [[nodiscard]] VkDescriptorPool GetDescriptorPool() const { return DescMgr.GetPool(); }
+    [[nodiscard]] VkDescriptorSet GetGlobalDescriptorSet() const { return DescMgr.GetGlobalDescriptorSet(); }
+    [[nodiscard]] DescriptorManager* GetDescriptorManager() { return &DescMgr; }
 
     /**
      * @brief 分配描述符集
@@ -115,13 +118,9 @@ public:
      * @return 分配的描述符集
      */
     VkDescriptorSet AllocateDescriptorSet(VkDescriptorSetLayout layout);
-    
-    /**
-     * @brief 延迟释放描述符集（在安全时机统一回收）
-     * @param descriptorSet 要释放的描述符集
-     */
+
     void QueueDescriptorSetFree(VkDescriptorSet descriptorSet);
-    [[nodiscard]] size_t GetPendingDescriptorSetFreeCount() const { return PendingDescriptorSetFrees.Size(); }
+    [[nodiscard]] size_t GetPendingDescriptorSetFreeCount() const { return DescMgr.GetPendingFreeCount(); }
 
     // ==========================================
     // 向后兼容的委托方法
@@ -163,11 +162,9 @@ private:
     // 描述符管理
     // ==========================================
 
-    VkDescriptorPool DescriptorPool = VK_NULL_HANDLE;
-    VkDescriptorSetLayout GlobalSetLayout = VK_NULL_HANDLE;
-    VkDescriptorSet GlobalDescriptorSet = VK_NULL_HANDLE;
-    AllocatedBuffer SceneParameterBuffer{};
-    DescriptorSetFreeQueue PendingDescriptorSetFrees;
+    DescriptorManager DescMgr;
+    SceneDataManager SceneDataMgr;
+    ShadowRenderer ShadowMgr;
 
     // ==========================================
     // 命令缓冲区（每帧重用）
@@ -181,8 +178,6 @@ private:
 
     void InitPipelines();
     void InitSyncStructures();
-    void InitDescriptors();
-    void FlushPendingDescriptorSetFrees();
 
     // ==========================================
     // 渲染方法

@@ -48,17 +48,19 @@
   - Camera / Lighting 通过 `RegisterDebugSections()` lambda 注册到 `DebugWindowHost`
   - Scene Hierarchy / Inspector 保留为独立窗口
 
-### 阶段四：高级视觉效果与阴影 (Priority: Medium)
+### 阶段四：光照统一与阴影映射 (Priority: Medium)
 
-- [ ] **方向光阴影映射 (Shadow Mapping)**
-  - 单方向光 + 单张 Shadow Map 最小闭环
-  - 专属 Depth Pass、Shadow Map 资源、Light View Projection
-  - Lighting Pass 中接入采样，PCF 软阴影作为第二步
-  - 必须配套最小调试预览能力
+- [x] **4.0.1 LightComponent 统一继承** — CLightComponent 基类 (Color, Intensity, OnDrawUI)
+- [x] **4.0.2 DescriptorManager 提取** — 描述符池/布局/分配/延迟回收内聚
+- [x] **4.0.3 SceneDataManager 提取** — UBO CPU→GPU 更新封装
+- [x] **4.0.4 GPU 光照数据扩展 + Shader 类型分发** — LightGPUData (Position+Type, Color+Intensity, Direction+Range)
+- [x] **4.1 方向光阴影映射 (Shadow Mapping)**
+  - ShadowRenderer 子系统 (Depth Pass + 2048² D32 Shadow Map + PCF Sampler)
+  - LightViewProj 矩阵 (从方向光方向计算 LookAt + Ortho)
+  - PCF 3x3 软阴影 (Forward + Deferred 双 shader)
+- [ ] **阴影调试预览** — DebugTexturePreview 接入 Shadow Map
 - [ ] **屏幕空间环境光遮蔽 (SSAO)**
   - Shadow Mapping 跑稳之后再推进
-  - 利用 G-Buffer 深度和法线计算遮蔽率
-  - 最终效果需能通过调试面板观察 raw AO 和合成结果
 
 ### 阶段五：资源异步加载 (Priority: Medium)
 
