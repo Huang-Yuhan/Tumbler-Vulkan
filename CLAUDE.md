@@ -2,6 +2,18 @@
 
 本文件为 Claude Code (claude.ai/code) 在此仓库中工作时提供指导。
 
+## 环境变量
+
+**Linux**:
+```bash
+export VCPKG_ROOT=/home/icecreamsarkaz/.vcpkg-clion/vcpkg
+```
+
+**Windows**:
+```powershell
+$env:VCPKG_ROOT = "D:\vcpkg"  # 根据实际安装路径调整
+```
+
 ## 构建命令
 
 ```powershell
