@@ -6,3 +6,5 @@ build/*
 build-linux/*
 .vscode/*
 Testing/
+compile_commands.json
+.clangd/
