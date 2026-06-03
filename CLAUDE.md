@@ -7,6 +7,9 @@
 **Linux**:
 ```bash
 export VCPKG_ROOT=/home/icecreamsarkaz/.vcpkg-clion/vcpkg
+export VULKAN_SDK=$HOME/.local/vulkan-sdk/1.4.350.1/x86_64
+export LD_LIBRARY_PATH=$VULKAN_SDK/lib/VulkanLoader/lib:$LD_LIBRARY_PATH
+export PATH=$VULKAN_SDK/bin:$PATH
 ```
 
 **Windows**:
