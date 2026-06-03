@@ -62,18 +62,40 @@ TEST(Math, ExtractFrustumPlanes_PointFarBehindCameraOutside) {
 }
 
 TEST(Math, ExtractFrustumPlanes_PointAboveFrustumOutside) {
-    // 90 度 FOV, near=0.1, 近平面半高 = 0.1.
-    // 相机在 z=5, 看向原点, 近平面在 z=4.9, 半高约 0.1.
-    // 所以 y=5 在近平面附近远超视锥体高度。
+    // 相机在 (0,0,5) 看向原点, 距离 5, 半高 = 5, y=10 远超上平面
     auto planes = ExtractFrustumPlanes(MakeTestViewProj());
     glm::vec3 highPoint(0.0f, 10.0f, 0.0f);
 
-    bool outside = false;
+    // 上平面 (index 3) 应该拒绝: dot(n_up, P) + d < 0
+    float sd = SignedDistance(planes[3], highPoint);
+    EXPECT_LT(sd, 0.0f);
+}
+
+TEST(Math, ExtractFrustumPlanes_PointRightOfFrustumOutside) {
+    // 相机在 (0,0,5) 看向原点, 距离 5, 半宽 = 5.
+    // x=10 超出 frustum, 被右平面 (index 1) 拒绝.
+    auto planes = ExtractFrustumPlanes(MakeTestViewProj());
+    glm::vec3 leftPoint(10.0f, 0.0f, 0.0f);
+
+    float sd = SignedDistance(planes[1], leftPoint);
+    EXPECT_LT(sd, 0.0f);
+}
+
+TEST(Math, ExtractFrustumPlanes_PointBeyondFarPlaneOutside) {
+    // 相机在 (0,0,5), far=100, 点 (0,0,-200) 距离相机 205, 远超远平面
+    auto planes = ExtractFrustumPlanes(MakeTestViewProj());
+    glm::vec3 farPoint(0.0f, 0.0f, -200.0f);
+
+    float sd = SignedDistance(planes[5], farPoint);
+    EXPECT_LT(sd, 0.0f);
+}
+
+TEST(Math, ExtractFrustumPlanes_PointWellInsideAllInside) {
+    // 相机在 (0,0,5) 看向原点, 点 (1,-1,-3) 距离 ~8.5, 在视锥体深处
+    auto planes = ExtractFrustumPlanes(MakeTestViewProj());
+    glm::vec3 insidePoint(1.0f, -1.0f, -3.0f);
+
     for (const auto& p : planes) {
-        if (SignedDistance(p, highPoint) < 0.0f) {
-            outside = true;
-            break;
-        }
+        EXPECT_GE(SignedDistance(p, insidePoint), 0.0f);
     }
-    EXPECT_TRUE(outside);
 }

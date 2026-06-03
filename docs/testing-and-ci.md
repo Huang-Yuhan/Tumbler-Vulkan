@@ -45,18 +45,43 @@ ctest --test-dir build -C Debug -N
 
 ### CMake 脚本烟雾测试
 
-- `Smoke.RuntimeArtifacts` — 验证构建产物（exe、assets、shader SPV）
-- `Smoke.DeferredPipeline` — 验证 Deferred 管线关键产物和钩子
+- `Smoke.RuntimeArtifacts` — 验证构建产物（assets、shader 源文件）
 
-### 添加新单元测试
+### 单元测试目录约定
 
-1. 在 `tests/unit/` 下新建或修改文件
-2. 在 `tests/CMakeLists.txt` 中注册
-3. 保持测试确定性（无文件系统/网络依赖，无时序依赖）
-4. 浮点断言使用 `EXPECT_NEAR`
+每个模块一个子目录 + 独立 CMakeLists.txt：
+
+```
+tests/unit/
+├── Math/
+│   ├── CMakeLists.txt          # 独立 target: TumblerMathTests
+│   └── ExtractFrustumPlanesTests.cpp
+└── (future: Scene/, Graphics/, ...)
+```
+
+**好处**：
+- `cmake --build . --target TumblerMathTests` — 只编译 Math 测试
+- `ctest -R Math` — 只跑 Math 测试
+- 模块之间互不干扰
+
+### 添加新模块测试
+
+1. 创建 `tests/unit/<Module>/` 目录
+2. 编写 `CMakeLists.txt`（参考 `tests/unit/Math/CMakeLists.txt`，修改 target 名和标签）
+3. 在 `tests/CMakeLists.txt` 中加一行 `add_subdirectory(unit/<Module>)`
+4. `file(GLOB_RECURSE)` 自动收集 `.cpp` 文件，不需要手动列出
+
+### 编写测试
+
+- 保持确定性（无文件系统/网络依赖，无时序依赖）
+- 浮点断言使用 `EXPECT_NEAR`
 
 ```powershell
+# 运行所有单元测试
 ctest --test-dir build -C Debug -L unit --output-on-failure
+
+# 运行指定模块
+ctest --test-dir build -C Debug -R Math --output-on-failure
 ```
 
 ## 4. CI 流程 (GitHub Actions)
