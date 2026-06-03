@@ -5,3 +5,4 @@ vcpkg_installed/
 build/*
 build-linux/*
 .vscode/*
+Testing/
