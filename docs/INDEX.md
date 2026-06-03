@@ -18,6 +18,7 @@
 
 | 文档 | 内容 |
 |------|------|
+| [数学工具](reference/math.md) | 视锥体平面提取 (Gribb/Hartmann)、常用数学运算 |
 | [着色器参考](reference/shaders.md) | Shader 文件清单、描述符绑定点、G-Buffer 布局 |
 | [Vulkan 核心概念](reference/vulkan-concepts/) | 基础设施 / 资源与内存 / 管线与同步 |
 | [PBR 理论与实现](reference/pbr-theory.md) | Cook-Torrance BRDF、金属工作流 |
