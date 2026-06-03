@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include <glm/glm.hpp>
 #include <array>
+#include <glm/glm.hpp>
 
 namespace Tumbler::Math {
 
@@ -19,46 +19,27 @@ inline std::array<glm::vec4, 6> ExtractFrustumPlanes(const glm::mat4& viewProj) 
     std::array<glm::vec4, 6> planes;
 
     // 左平面:   row3 + row0
-    planes[0] = glm::vec4(
-        viewProj[0][3] + viewProj[0][0],
-        viewProj[1][3] + viewProj[1][0],
-        viewProj[2][3] + viewProj[2][0],
-        viewProj[3][3] + viewProj[3][0]);
+    planes[0] = glm::vec4(viewProj[0][3] + viewProj[0][0], viewProj[1][3] + viewProj[1][0],
+                          viewProj[2][3] + viewProj[2][0], viewProj[3][3] + viewProj[3][0]);
 
     // 右平面:   row3 - row0
-    planes[1] = glm::vec4(
-        viewProj[0][3] - viewProj[0][0],
-        viewProj[1][3] - viewProj[1][0],
-        viewProj[2][3] - viewProj[2][0],
-        viewProj[3][3] - viewProj[3][0]);
+    planes[1] = glm::vec4(viewProj[0][3] - viewProj[0][0], viewProj[1][3] - viewProj[1][0],
+                          viewProj[2][3] - viewProj[2][0], viewProj[3][3] - viewProj[3][0]);
 
     // 下平面:   row3 + row1
-    planes[2] = glm::vec4(
-        viewProj[0][3] + viewProj[0][1],
-        viewProj[1][3] + viewProj[1][1],
-        viewProj[2][3] + viewProj[2][1],
-        viewProj[3][3] + viewProj[3][1]);
+    planes[2] = glm::vec4(viewProj[0][3] + viewProj[0][1], viewProj[1][3] + viewProj[1][1],
+                          viewProj[2][3] + viewProj[2][1], viewProj[3][3] + viewProj[3][1]);
 
     // 上平面:   row3 - row1
-    planes[3] = glm::vec4(
-        viewProj[0][3] - viewProj[0][1],
-        viewProj[1][3] - viewProj[1][1],
-        viewProj[2][3] - viewProj[2][1],
-        viewProj[3][3] - viewProj[3][1]);
+    planes[3] = glm::vec4(viewProj[0][3] - viewProj[0][1], viewProj[1][3] - viewProj[1][1],
+                          viewProj[2][3] - viewProj[2][1], viewProj[3][3] - viewProj[3][1]);
 
     // 近平面:   row2
-    planes[4] = glm::vec4(
-        viewProj[0][2],
-        viewProj[1][2],
-        viewProj[2][2],
-        viewProj[3][2]);
+    planes[4] = glm::vec4(viewProj[0][2], viewProj[1][2], viewProj[2][2], viewProj[3][2]);
 
     // 远平面:   row3 - row2
-    planes[5] = glm::vec4(
-        viewProj[0][3] - viewProj[0][2],
-        viewProj[1][3] - viewProj[1][2],
-        viewProj[2][3] - viewProj[2][2],
-        viewProj[3][3] - viewProj[3][2]);
+    planes[5] = glm::vec4(viewProj[0][3] - viewProj[0][2], viewProj[1][3] - viewProj[1][2],
+                          viewProj[2][3] - viewProj[2][2], viewProj[3][3] - viewProj[3][2]);
 
     // 归一化所有平面
     for (auto& p : planes) {

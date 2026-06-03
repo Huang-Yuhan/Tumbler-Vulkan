@@ -1,18 +1,15 @@
-#include <gtest/gtest.h>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/constants.hpp>
-#include <cmath>
 #include "Core/Utils/Math.h"
+#include <cmath>
+#include <glm/glm.hpp>
+#include <glm/gtc/constants.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <gtest/gtest.h>
 
 using namespace Tumbler::Math;
 
 // 构造一个简单的 ViewProj: 相机在原点看向 -Z, 90 度 FOV, 1:1 宽高比
 static glm::mat4 MakeTestViewProj() {
-    glm::mat4 view = glm::lookAt(
-        glm::vec3(0.0f, 0.0f, 5.0f),
-        glm::vec3(0.0f, 0.0f, 0.0f),
-        glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     glm::mat4 proj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 100.0f);
     return proj * view;
 }
