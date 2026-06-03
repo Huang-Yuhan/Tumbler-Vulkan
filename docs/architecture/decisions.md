@@ -1,68 +1,85 @@
 # 关键设计决策记录
 
-## 为什么双管线（Forward + Deferred）而不是只做 Deferred？
+## 为什么纯 GPU-Driven？
 
-Forward 和 Deferred 各有优势：
+**决策**：所有可视化决策（Frustum Culling、Draw Call 生成）在 GPU Compute Shader 中完成。CPU 只负责上传 Dirty Object 数据和编排 Pass。
 
-| | Forward | Deferred |
-|------|---------|----------|
-| 多光源性能 | O(物体 × 光源) | O(物体) + O(光源 × 像素) |
-| 透明物体 | 天然支持 | 需要额外 pass |
-| 内存带宽 | 低 | 高（G-Buffer 写入） |
-| MSAA | 简单 | 复杂（需额外 resolve） |
-| 简单场景 | 更快 | G-Buffer 开销无必要 |
+**理由**：
+- 传统 CPU-Driven 模式每个物体一次 `vkCmdDrawIndexed`，N 个物体 = N 次 CPU→GPU 调用
+- GPU-Driven 将 N 次调用合并为 1-3 次 `vkCmdDrawIndexedIndirect`
+- Compute Shader 并行处理 Culling，远超 CPU 单线程遍历效率
+- 为后续 GPU Occlusion Culling 和 Mesh Shader 铺路
 
-引擎同时保留两条管线，允许根据场景需求运行时切换。默认 Forward 适合简单场景和透明渲染，Deferred 适合多光源复杂场景。
+**代价**：调试困难（核心逻辑在 Compute Shader 中），需要 Vulkan 1.2 三大特性支持。
 
----
+## 为什么纯 Deferred，不要 Forward？
 
-## 为什么 ECS 变体（FActor 持有 CTransform）而不是纯 ECS？
+**决策**：只保留 Deferred 渲染路径，删除 Forward 路径和策略模式。
 
-纯 ECS（所有数据在数组中按类型连续存储）在 Cache 友好的批量遍历上有优势，但对于当前引擎的规模（< 100 个 Actor），维护纯 ECS 的复杂度不值得。
+**理由**：
+- GPU-Driven 的 Multi-Draw Indirect 与 Deferred 天然亲和——所有几何批处理到一个 Indirect Draw
+- Forward 路径的光照与几何绑定，无法利用 Indirect Draw 的批处理优势
+- 减少代码分支和维护成本
 
-FActor 将 CTransform 作为值成员（避免额外堆分配），其他组件通过 `unique_ptr` 持有。这个折中方案：
-- 避免了纯 ECS 的数据重排布复杂度
-- Actor 之间的 Transform 层级关系表达自然
-- 组件行为组合足够灵活
+**代价**：透明物体渲染需单独处理（未来可通过 Forward Bucket 或 OIT 解决）。
 
----
+## 为什么删除 ECS？
 
-## 为什么 VMA 而不是手动 VkDeviceMemory？
+**决策**：删除 `FActor` / `Component`，`Scene` 直接管理 `vector<ObjectData>`。
 
-Vulkan Memory Allocator (VMA) 由 AMD 维护，在 Vulkan 社区中是事实标准。手动管理 VkDeviceMemory：
-- 受限于 `maxMemoryAllocationCount`（通常 4096）
-- 需要手动处理子分配、碎片整理、内存类型选择
-- 需要为不同用途（staging vs device-local）手动选择堆
+**理由**：
+- GPU-Driven 场景的核心数据是连续 GPU Buffer 中的 Object 数组，不是零散的 Actor 对象
+- ECS 的组件查找和动态分发与 GPU 并行模型不匹配
+- 更简洁的路径：Scene → Object[] → GPUScene SSBO
 
-VMA 提供 `VMA_MEMORY_USAGE_AUTO_PREFER_*` 策略，自动处理上述问题，且零额外成本（header-only）。
+**代价**：失去组件化灵活性。如需复杂游戏逻辑，可在外层再封装。
 
----
+## 为什么 Bindless 纹理数组？
 
-## 为什么渲染与逻辑分离（RenderPacket + SceneViewData）？
+**决策**：所有纹理通过一个 `texture2D[]` 描述符数组访问，材质 ID 索引到数组。
 
-`VulkanRenderer::Render()` 只接收 `vector<RenderPacket>` 和 `SceneViewData`，对 Actor/Scene/Component 一无所知。这个决策的核心原因：
+**理由**：
+- 消除逐材质 DescriptorSet 绑定
+- GPU Culling 和 GBuffer Shader 共享同一个 Set 1
+- 减少 DescriptorPool 容量压力
 
-1. **无法反向依赖**：渲染器不知道 Scene 的存在，确保逻辑层和渲染层的解耦是物理强制的
-2. **多线程友好**：提取 RenderPacket 是只读操作，可以并行执行；渲染器消费数据是无副作用的
-3. **管线无关**：Forward 和 Deferred 管线接收同一份数据，切换管线不需要修改游戏逻辑
-4. **易于测试**：可以构造假的 RenderPacket 列表直接测试渲染，不需要启动完整场景
+**代价**：需要 `descriptorIndexing` 特性，纹理数组大小有限制。
 
----
+## 为什么 Unified Vertex/Index Buffer？
 
-## 为什么母体-实例材质模式？
+**决策**：所有 Mesh 存储在一个大 VB 和一个大 IB 中。
 
-`FMaterial` 持有不可变的管线资源（VkPipeline、VkPipelineLayout、VkDescriptorSetLayout），这些创建成本高、数量少。`FMaterialInstance` 持有可变参数（UBO + DescriptorSet），创建成本低、数量多。
+**理由**：
+- `vkCmdBindVertexBuffers` 一次调用
+- Indirect Draw 通过 `firstIndex` / `vertexOffset` 自动定位
+- GPU Culling 可直接索引 Mesh 数据地址
 
-这个模式的收益：
-- 多个物体共享同一个材质母体时，只需 Bake 一次管线
-- 每个实例可以独立调整颜色、粗糙度等参数
-- 材质母体在两种管线（Forward + Deferred）下各编译一份，实例自动适应
+**代价**：需要 Sub-allocation 管理。
 
----
+## 为什么删除 Material 模板-实例模式？
 
-## 为什么 GLFW 而不是 SDL2 / 纯 Win32+X11？
+**决策**：`FMaterial` / `FMaterialInstance` 简化为 `MaterialDataSSBO` + 纹理索引。
 
-- GLFW 对 Vulkan 的原生支持最成熟（`glfwCreateWindowSurface` 直接接受 `VkInstance`）
-- 项目需要 `glfwGetPlatform` 等新 API（3.4+）
-- vcpkg 的 GLFW 版本支持 Wayland + X11 双后端，Linux 兼容性好
-- SDL2 的 Vulkan 支持较晚加入，能力不如 GLFW 全面
+**理由**：
+- Bindless 下每个材质实例只需一个 MaterialData 结构体
+- 不需要每实例独立的 `VkDescriptorSet` 和 `UBOBuffer`
+- Pipeline 变体通过 Bucket 分组管理
+
+## 为什么 G-Buffer 用 Sampled Image 而非 Input Attachment？
+
+**决策**：Lighting Pass 通过 `VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER` 采样 G-Buffer。
+
+**理由**：
+- Subpass Input Attachment 限制在同一个 RenderPass 内，阻碍未来引入后处理
+- Sampled Image 更灵活，Pass 之间解耦
+- 简化 Barrier 管理
+
+**代价**：Tile-Based GPU 上略微损失带宽优势，但可通过 `VK_ATTACHMENT_STORE_OP_DONT_CARE` 优化。
+
+## 暂缓事项
+
+- SSAO / HBAO — GPU-Driven 跑稳后加入
+- Forward 透明 Pass — 先做 Opaque
+- Mesh Shader — 需评估硬件覆盖率
+- 异步资源加载 — 先同步
+- 多线程命令录制 — 先单线程
