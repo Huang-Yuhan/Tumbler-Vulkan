@@ -35,6 +35,7 @@ private:
     void CreateDevice();
 
     int ScoreDevice(VkPhysicalDevice device) const;
+    bool SupportsRequiredFeatures(VkPhysicalDevice device) const;
 
     VkInstance m_Instance = VK_NULL_HANDLE;
     VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;

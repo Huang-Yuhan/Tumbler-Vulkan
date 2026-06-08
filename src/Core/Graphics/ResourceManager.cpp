@@ -58,16 +58,18 @@ bool ResourceManager::Init(VkDevice device, RenderDevice& renderDevice, CommandM
 }
 
 void ResourceManager::Shutdown() {
-    for (auto& alloc : m_TextureAllocations) {
-        vmaDestroyImage(m_RenderDevice->GetAllocator(), VK_NULL_HANDLE, alloc);
-    }
-    m_TextureAllocations.clear();
-    m_TextureImages.clear();
-
     for (auto& view : m_TextureViews) {
         vkDestroyImageView(m_Device, view, nullptr);
     }
     m_TextureViews.clear();
+
+    for (size_t i = 0; i < m_TextureImages.size(); ++i) {
+        if (m_TextureImages[i]) {
+            vmaDestroyImage(m_RenderDevice->GetAllocator(), m_TextureImages[i], m_TextureAllocations[i]);
+        }
+    }
+    m_TextureAllocations.clear();
+    m_TextureImages.clear();
     m_TextureIndexMap.clear();
 
     if (m_IndexBuffer) {
@@ -152,26 +154,25 @@ MeshHandle ResourceManager::UploadMesh(const std::string& objPath) {
     float radius = glm::length(maxPos - minPos) * 0.5f;
     handle.BoundingSphere = glm::vec4(center, radius);
 
+    uint32_t stagingSize = vertexSize + indexSize;
+    VkBufferCreateInfo stagingInfo{};
+    stagingInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    stagingInfo.size = stagingSize;
+    stagingInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+    VmaAllocationCreateInfo stagingAllocInfo{};
+    stagingAllocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+
+    auto stagingHandle = m_RenderDevice->CreateBuffer(stagingInfo, stagingAllocInfo, "MeshStaging");
+
+    void* data;
+    vmaMapMemory(m_RenderDevice->GetAllocator(), stagingHandle.Allocation, &data);
+    memcpy(data, vertices.data(), vertexSize);
+    memcpy(static_cast<uint8_t*>(data) + vertexSize, indices.data(), indexSize);
+    vmaUnmapMemory(m_RenderDevice->GetAllocator(), stagingHandle.Allocation);
+
     // 通过 staging buffer 上传
     m_CommandManager->ImmediateSubmit([&](VkCommandBuffer cmd) {
-        // Staging buffer for combined vertex+index
-        uint32_t stagingSize = vertexSize + indexSize;
-        VkBufferCreateInfo stagingInfo{};
-        stagingInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        stagingInfo.size = stagingSize;
-        stagingInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-
-        VmaAllocationCreateInfo stagingAllocInfo{};
-        stagingAllocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
-
-        auto stagingHandle = m_RenderDevice->CreateBuffer(stagingInfo, stagingAllocInfo, "MeshStaging");
-
-        void* data;
-        vmaMapMemory(m_RenderDevice->GetAllocator(), stagingHandle.Allocation, &data);
-        memcpy(data, vertices.data(), vertexSize);
-        memcpy(static_cast<uint8_t*>(data) + vertexSize, indices.data(), indexSize);
-        vmaUnmapMemory(m_RenderDevice->GetAllocator(), stagingHandle.Allocation);
-
         // Copy to unified VB
         VkBufferCopy vbCopy{};
         vbCopy.srcOffset = 0;
@@ -185,13 +186,8 @@ MeshHandle ResourceManager::UploadMesh(const std::string& objPath) {
         ibCopy.dstOffset = handle.IndexOffset;
         ibCopy.size = indexSize;
         vkCmdCopyBuffer(cmd, stagingHandle.Buffer, m_IndexBuffer, 1, &ibCopy);
-
-        // 暂存 staging handle 指针, 在 submit 完成后删除
-        // NOTE: 同步 ImmediateSubmit 中 submit 后 waitIdle, 可以直接 safe destroy
-        VmaAllocator allocator = m_RenderDevice->GetAllocator();
-        VkBuffer stagingBuf = stagingHandle.Buffer;
-        VmaAllocation stagingAlloc = stagingHandle.Allocation;
     });
+    m_RenderDevice->DestroyBuffer(stagingHandle);
 
     m_VertexBufferOffset += vertexSize;
     m_IndexBufferOffset += indexSize;

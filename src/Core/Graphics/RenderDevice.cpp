@@ -6,14 +6,17 @@
 
 namespace Tumbler {
 
-bool RenderDevice::Init(VkDevice device, VkPhysicalDevice physicalDevice) {
+bool RenderDevice::Init(VkInstance instance, VkDevice device, VkPhysicalDevice physicalDevice) {
     m_Device = device;
 
     VmaVulkanFunctions vulkanFunctions{};
     vulkanFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
     vulkanFunctions.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
 
-    VmaAllocatorCreateInfo allocatorInfo{};
+    VmaAllocatorCreateInfo allocatorInfo{
+        .flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,
+    };
+    allocatorInfo.instance = instance;
     allocatorInfo.physicalDevice = physicalDevice;
     allocatorInfo.device = device;
     allocatorInfo.pVulkanFunctions = &vulkanFunctions;

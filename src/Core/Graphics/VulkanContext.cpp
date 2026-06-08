@@ -69,6 +69,10 @@ void VulkanContext::SelectPhysicalDevice() {
 }
 
 int VulkanContext::ScoreDevice(VkPhysicalDevice device) const {
+    if (!SupportsRequiredFeatures(device)) {
+        return -1000;
+    }
+
     VkPhysicalDeviceProperties props{};
     VkPhysicalDeviceMemoryProperties memProps{};
     vkGetPhysicalDeviceProperties(device, &props);
@@ -95,6 +99,27 @@ int VulkanContext::ScoreDevice(VkPhysicalDevice device) const {
     score += static_cast<int>(totalVram / (256ULL * 1024 * 1024));
 
     return score;
+}
+
+bool VulkanContext::SupportsRequiredFeatures(VkPhysicalDevice device) const {
+    VkPhysicalDeviceProperties props{};
+    vkGetPhysicalDeviceProperties(device, &props);
+    if (props.apiVersion < VK_API_VERSION_1_4) {
+        return false;
+    }
+
+    VkPhysicalDeviceVulkan12Features features12{};
+    features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+
+    VkPhysicalDeviceFeatures2 features2{};
+    features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    features2.pNext = &features12;
+    vkGetPhysicalDeviceFeatures2(device, &features2);
+
+    return features12.bufferDeviceAddress && features12.descriptorIndexing && features12.drawIndirectCount &&
+           features12.shaderSampledImageArrayNonUniformIndexing &&
+           features12.descriptorBindingSampledImageUpdateAfterBind && features12.descriptorBindingPartiallyBound &&
+           features12.runtimeDescriptorArray;
 }
 
 void VulkanContext::CreateDevice() {
@@ -124,6 +149,10 @@ void VulkanContext::CreateDevice() {
     features12.bufferDeviceAddress = VK_TRUE;
     features12.descriptorIndexing = VK_TRUE;
     features12.drawIndirectCount = VK_TRUE;
+    features12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+    features12.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+    features12.descriptorBindingPartiallyBound = VK_TRUE;
+    features12.runtimeDescriptorArray = VK_TRUE;
 
     VkDeviceCreateInfo deviceCreateInfo{};
     deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;

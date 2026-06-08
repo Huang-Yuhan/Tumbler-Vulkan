@@ -26,7 +26,7 @@ struct ImageHandle {
 
 class RenderDevice {
 public:
-    bool Init(VkDevice device, VkPhysicalDevice physicalDevice);
+    bool Init(VkInstance instance, VkDevice device, VkPhysicalDevice physicalDevice);
     void Shutdown();
 
     VmaAllocator GetAllocator() const { return m_Allocator; }
