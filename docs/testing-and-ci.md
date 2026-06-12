@@ -55,7 +55,8 @@ ctest --test-dir build -C Debug -N
 tests/unit/
 ├── Math/
 │   ├── CMakeLists.txt          # 独立 target: TumblerMathTests
-│   └── ExtractFrustumPlanesTests.cpp
+│   ├── FrustumTests.cpp
+│   └── MathTypesTests.cpp
 └── (future: Scene/, Graphics/, ...)
 ```
 

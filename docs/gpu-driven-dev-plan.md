@@ -153,7 +153,7 @@ lighting.frag          # Deferred Lighting + PBR + PCF 阴影
 |------|----------|
 | `Log.h/.cpp` | spdlog 封装，`LOG_INFO/WARN/ERROR/CRITICAL` 宏 |
 | `AppWindow.h/.cpp` | GLFW 窗口创建、Framebuffer 大小查询、Surface 创建、`glfwPollEvents` |
-| `Math.h` | `ExtractFrustumPlanes(proj * view)` 返回 6 个平面 |
+| `Core/Math/Math.h` | `ExtractFrustumPlanes(proj * view)` 返回 6 个平面，深度约定由 `MathConfig.h` 统一 |
 
 **验证**: 编译通过，无链接错误。
 
@@ -282,7 +282,7 @@ class Scene {
 public:
     uint32_t AddObject(const std::string& name);
     void RemoveObject(uint32_t objectIndex);
-    void SetTransform(uint32_t objectIndex, const glm::mat4& matrix);
+    void SetTransform(uint32_t objectIndex, const Tumbler::Math::Matrix4f& matrix);
     void SetMesh(uint32_t objectIndex, MeshHandle mesh);
     void SetMaterial(uint32_t objectIndex, MaterialHandle material);
 

@@ -1,107 +1,95 @@
-# 数学工具参考
+# Frustum Extraction
 
-## Gribb/Hartmann 视锥体平面提取
-
-### 动机
-
-GPU-Driven 渲染需要做 Frustum Culling — 判断每个物体是否在相机视野内。这需要视锥体的 6 个平面（左、右、下、上、近、远），每个平面表达为 `vec4(nx, ny, nz, d)`，其中 `dot(n, P) + d >= 0` 表示点 P 在平面的"内部"。
-
-传统方法先求 View 和 Proj 的逆矩阵，再算出视锥体的 8 个角点，最后从角点构造平面 — 需要矩阵求逆 + 大量向量运算。
-
-### 原理
-
-ViewProj 矩阵 `M` 将世界坐标变换到裁剪空间：
-
-```
-clipPos = M * worldPos
-```
-
-视锥体在裁剪空间中是 6 个简单平面：
-
-```
-左:   x + w = 0     右:  -x + w = 0
-下:   y + w = 0     上:  -y + w = 0
-近:    z = 0        远:  -z + w = 0
-```
-
-每个平面满足 `dot(plane_clip, clipPos) = 0`。代入 `clipPos = M * worldPos`：
-
-```
-dot(plane_clip, M * worldPos) = 0
-  → dot(M^T * plane_clip, worldPos) = 0
-```
-
-因此世界空间的平面系数 = `M^T * plane_clip`。展开就是 M 的行向量加减：
-
-| 平面 | clip 空间平面 | M^T * plane | 代码 |
-|------|-------------|-------------|------|
-| 左 | `( 1,  0, 0, 1)` | Row0 + Row3 | `row3 + row0` |
-| 右 | `(-1,  0, 0, 1)` | -Row0 + Row3 | `row3 - row0` |
-| 下 | `( 0,  1, 0, 1)` | Row1 + Row3 | `row3 + row1` |
-| 上 | `( 0, -1, 0, 1)` | -Row1 + Row3 | `row3 - row1` |
-| 近 | `( 0,  0, 1, 0)` | Row2 | `row2` |
-| 远 | `( 0,  0,-1, 1)` | -Row2 + Row3 | `row3 - row2` |
-
-### 实现
+Tumbler exposes frustum math through `Core/Math/Math.h`.
 
 ```cpp
-// src/Core/Utils/Math.h
-std::array<glm::vec4, 6> ExtractFrustumPlanes(const glm::mat4& viewProj) {
-    std::array<glm::vec4, 6> planes;
+#include "Core/Math/Math.h"
 
-    planes[0] = glm::vec4(  // 左
-        viewProj[0][3] + viewProj[0][0],
-        viewProj[1][3] + viewProj[1][0],
-        viewProj[2][3] + viewProj[2][0],
-        viewProj[3][3] + viewProj[3][0]);
+using namespace Tumbler::Math;
 
-    planes[1] = glm::vec4(  // 右
-        viewProj[0][3] - viewProj[0][0],
-        viewProj[1][3] - viewProj[1][0],
-        viewProj[2][3] - viewProj[2][0],
-        viewProj[3][3] - viewProj[3][0]);
+const Matrix4f view = MakeLookAt(cameraPosition, cameraTarget, Vector3f::UnitY());
+const Matrix4f projection = MakePerspective(
+    DegreesToRadians(90.0f),
+    aspectRatio,
+    nearZ,
+    farZ);
 
-    planes[2] = glm::vec4(  // 下
-        viewProj[0][3] + viewProj[0][1],
-        viewProj[1][3] + viewProj[1][1],
-        viewProj[2][3] + viewProj[2][1],
-        viewProj[3][3] + viewProj[3][1]);
-
-    planes[3] = glm::vec4(  // 上
-        viewProj[0][3] - viewProj[0][1],
-        viewProj[1][3] - viewProj[1][1],
-        viewProj[2][3] - viewProj[2][1],
-        viewProj[3][3] - viewProj[3][1]);
-
-    planes[4] = glm::vec4(  // 近
-        viewProj[0][2], viewProj[1][2],
-        viewProj[2][2], viewProj[3][2]);
-
-    planes[5] = glm::vec4(  // 远
-        viewProj[0][3] - viewProj[0][2],
-        viewProj[1][3] - viewProj[1][2],
-        viewProj[2][3] - viewProj[2][2],
-        viewProj[3][3] - viewProj[3][2]);
-
-    for (auto& p : planes) {
-        float len = glm::length(glm::vec3(p));
-        p /= len;
-    }
-
-    return planes;
+Frustum frustum;
+if (ExtractFrustumPlanes(projection * view, frustum)) {
+    const FrustumIntersection result = frustum.TestSphere(worldCenter, worldRadius);
 }
 ```
 
-### 归一化
+## Plane Contract
 
-提取出的平面向量长度不一定是 1，需要归一化。归一化后 `dot(normal, P) + d` 就是点 P 到平面的有符号距离，可以直接做 Sphere-Frustum 测试：
+`Planef` stores planes as `dot(normal, point) + D >= 0`, where the non-negative side is inside the frustum.
+All extracted planes are normalized, so `SignedDistance()` returns world-space distance.
 
-```glsl
-// GPU 端 frustum_cull.comp
-float dist = dot(vec4(worldCenter, 1.0), frustumPlanes[p]);
-if (dist < -worldRadius) { /* 不可见 */ }
+`Frustum` always stores planes in this order:
+
+1. `FrustumPlane::Left`
+2. `FrustumPlane::Right`
+3. `FrustumPlane::Bottom`
+4. `FrustumPlane::Top`
+5. `FrustumPlane::Near`
+6. `FrustumPlane::Far`
+
+Callers may depend on this order.
+
+## Depth Convention
+
+Depth convention is shared by C++ and future HLSL through `Core/Math/MathConfig.h`.
+
+```cpp
+enum class DepthConvention {
+    VulkanZeroToOne,
+    ReverseZZeroToOne,
+};
 ```
 
-### 参考
+The default is `kDefaultDepthConvention`, currently `DepthConvention::VulkanZeroToOne`.
+Functions such as `MakePerspective()` and `ExtractFrustumPlanes()` use that default unless a convention is passed explicitly.
 
-Gil Gribb, Klaus Hartmann. *Fast Extraction of Viewing Frustum Planes from the World-View-Projection Matrix* (2001).
+The shared header also defines preprocessor constants for shader code:
+
+```c
+TUMBLER_DEPTH_CONVENTION_VULKAN_ZERO_TO_ONE
+TUMBLER_DEPTH_CONVENTION_REVERSE_Z_ZERO_TO_ONE
+TUMBLER_MATH_DEFAULT_DEPTH_CONVENTION
+```
+
+The project does not use runtime mutable global depth state. Switching to reverse-Z should be done as a coordinated rendering change:
+
+- change the shared default convention;
+- update projection/frustum tests;
+- update Vulkan depth clear and compare state;
+- update shader depth reconstruction.
+
+## Extraction Formula
+
+Tumbler uses row-major `Matrix4f` storage and column-vector transforms:
+
+```cpp
+clipPosition = viewProjection * worldPosition;
+```
+
+For Vulkan/D3D `0..1` depth, clip-space planes are:
+
+| Plane | Clip-space condition | World-space row combination |
+|---|---|---|
+| Left | `x + w >= 0` | `row3 + row0` |
+| Right | `-x + w >= 0` | `row3 - row0` |
+| Bottom | `y + w >= 0` | `row3 + row1` |
+| Top | `-y + w >= 0` | `row3 - row1` |
+| Near | `z >= 0` | `row2` |
+| Far | `-z + w >= 0` | `row3 - row2` |
+
+For reverse-Z `0..1`, near and far swap their depth conditions:
+
+| Plane | Clip-space condition | World-space row combination |
+|---|---|---|
+| Near | `-z + w >= 0` | `row3 - row2` |
+| Far | `z >= 0` | `row2` |
+
+Each plane is normalized before it is stored. If any plane cannot be normalized, `ExtractFrustumPlanes()` returns `false`.
+
