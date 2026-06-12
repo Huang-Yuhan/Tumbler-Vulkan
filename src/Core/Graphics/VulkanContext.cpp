@@ -1,17 +1,32 @@
 #include "VulkanContext.h"
+#include "Core/Platform/AppWindow.h"
 #include "Core/Utils/Log.h"
 #include "VulkanUtils.h"
 
+#include <GLFW/glfw3.h>
+
+#include <set>
 #include <vector>
 
 namespace Tumbler {
 
 bool VulkanContext::Init() {
+    m_Windowed = false;
     CreateInstance();
     SelectPhysicalDevice();
     CreateDevice();
     LOG_INFO("VulkanContext initialized (Vulkan 1.4)");
-    return true;
+    return m_Instance && m_PhysicalDevice && m_Device;
+}
+
+bool VulkanContext::Init(AppWindow* window) {
+    m_Windowed = true;
+    CreateInstance();
+    CreateSurface(window);
+    SelectPhysicalDevice();
+    CreateDevice();
+    LOG_INFO("VulkanContext initialized with window surface (Vulkan 1.4)");
+    return m_Instance && m_Surface && m_PhysicalDevice && m_Device;
 }
 
 void VulkanContext::Shutdown() {
@@ -19,10 +34,22 @@ void VulkanContext::Shutdown() {
         vkDestroyDevice(m_Device, nullptr);
         m_Device = VK_NULL_HANDLE;
     }
+    if (m_Surface) {
+        vkDestroySurfaceKHR(m_Instance, m_Surface, nullptr);
+        m_Surface = VK_NULL_HANDLE;
+    }
     if (m_Instance) {
         vkDestroyInstance(m_Instance, nullptr);
         m_Instance = VK_NULL_HANDLE;
     }
+
+    m_PhysicalDevice = VK_NULL_HANDLE;
+    m_GraphicsQueue = VK_NULL_HANDLE;
+    m_PresentQueue = VK_NULL_HANDLE;
+    m_GraphicsQueueFamily = UINT32_MAX;
+    m_PresentQueueFamily = UINT32_MAX;
+    m_Windowed = false;
+
     LOG_INFO("VulkanContext shutdown");
 }
 
@@ -35,9 +62,22 @@ void VulkanContext::CreateInstance() {
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.apiVersion = VK_API_VERSION_1_4;
 
+    std::vector<const char*> extensions;
+    if (m_Windowed) {
+        uint32_t glfwExtensionCount = 0;
+        const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+        if (glfwExtensions == nullptr || glfwExtensionCount == 0) {
+            LOG_ERROR("GLFW required Vulkan surface extensions are unavailable");
+            return;
+        }
+        extensions.assign(glfwExtensions, glfwExtensions + glfwExtensionCount);
+    }
+
     VkInstanceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
+    createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+    createInfo.ppEnabledExtensionNames = extensions.empty() ? nullptr : extensions.data();
 
     if constexpr (kEnableValidationLayers) {
         const char* validationLayer = "VK_LAYER_KHRONOS_validation";
@@ -48,6 +88,13 @@ void VulkanContext::CreateInstance() {
     VK_CHECK(vkCreateInstance(&createInfo, nullptr, &m_Instance));
 }
 
+void VulkanContext::CreateSurface(AppWindow* window) {
+    m_Surface = window->CreateSurface(m_Instance);
+    if (m_Surface == VK_NULL_HANDLE) {
+        LOG_ERROR("Failed to create Vulkan window surface");
+    }
+}
+
 void VulkanContext::SelectPhysicalDevice() {
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(m_Instance, &deviceCount, nullptr);
@@ -56,11 +103,24 @@ void VulkanContext::SelectPhysicalDevice() {
 
     int bestScore = -1;
     for (auto device : devices) {
+        uint32_t graphicsFamily = UINT32_MAX;
+        uint32_t presentFamily = UINT32_MAX;
+        if (!SupportsRequiredQueues(device, &graphicsFamily, &presentFamily)) {
+            continue;
+        }
+
         int score = ScoreDevice(device);
         if (score > bestScore) {
             bestScore = score;
             m_PhysicalDevice = device;
+            m_GraphicsQueueFamily = graphicsFamily;
+            m_PresentQueueFamily = presentFamily;
         }
+    }
+
+    if (m_PhysicalDevice == VK_NULL_HANDLE) {
+        LOG_ERROR("Failed to find a suitable Vulkan physical device");
+        return;
     }
 
     VkPhysicalDeviceProperties props{};
@@ -79,8 +139,6 @@ int VulkanContext::ScoreDevice(VkPhysicalDevice device) const {
     vkGetPhysicalDeviceMemoryProperties(device, &memProps);
 
     int score = 0;
-
-    // Discrete GPU 优先
     if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
         score += 100;
     } else if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) {
@@ -89,7 +147,6 @@ int VulkanContext::ScoreDevice(VkPhysicalDevice device) const {
         return -1000;
     }
 
-    // VRAM 越大分越高
     VkDeviceSize totalVram = 0;
     for (uint32_t i = 0; i < memProps.memoryHeapCount; i++) {
         if (memProps.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) {
@@ -122,28 +179,54 @@ bool VulkanContext::SupportsRequiredFeatures(VkPhysicalDevice device) const {
            features12.runtimeDescriptorArray;
 }
 
-void VulkanContext::CreateDevice() {
-    // 找到 Graphics Queue 族
+bool VulkanContext::SupportsRequiredQueues(VkPhysicalDevice device, uint32_t* graphicsFamily,
+                                           uint32_t* presentFamily) const {
     uint32_t queueFamilyCount = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(m_PhysicalDevice, &queueFamilyCount, nullptr);
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(m_PhysicalDevice, &queueFamilyCount, queueFamilies.data());
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
     for (uint32_t i = 0; i < queueFamilyCount; i++) {
         if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-            m_GraphicsQueueFamily = i;
-            break;
+            *graphicsFamily = i;
+        }
+
+        if (m_Windowed) {
+            VkBool32 presentSupport = VK_FALSE;
+            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, m_Surface, &presentSupport);
+            if (presentSupport) {
+                *presentFamily = i;
+            }
+        } else {
+            *presentFamily = *graphicsFamily;
+        }
+
+        if (*graphicsFamily != UINT32_MAX && *presentFamily != UINT32_MAX) {
+            return true;
         }
     }
 
-    float queuePriority = 1.0f;
-    VkDeviceQueueCreateInfo queueCreateInfo{};
-    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queueCreateInfo.queueFamilyIndex = m_GraphicsQueueFamily;
-    queueCreateInfo.queueCount = 1;
-    queueCreateInfo.pQueuePriorities = &queuePriority;
+    return false;
+}
 
-    // Vulkan 1.2 特性
+void VulkanContext::CreateDevice() {
+    float queuePriority = 1.0f;
+    std::set<uint32_t> uniqueQueueFamilies = {m_GraphicsQueueFamily};
+    if (m_Windowed) {
+        uniqueQueueFamilies.insert(m_PresentQueueFamily);
+    }
+
+    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+    queueCreateInfos.reserve(uniqueQueueFamilies.size());
+    for (uint32_t queueFamily : uniqueQueueFamilies) {
+        VkDeviceQueueCreateInfo queueCreateInfo{};
+        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queueCreateInfo.queueFamilyIndex = queueFamily;
+        queueCreateInfo.queueCount = 1;
+        queueCreateInfo.pQueuePriorities = &queuePriority;
+        queueCreateInfos.push_back(queueCreateInfo);
+    }
+
     VkPhysicalDeviceVulkan12Features features12{};
     features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
     features12.bufferDeviceAddress = VK_TRUE;
@@ -154,15 +237,23 @@ void VulkanContext::CreateDevice() {
     features12.descriptorBindingPartiallyBound = VK_TRUE;
     features12.runtimeDescriptorArray = VK_TRUE;
 
+    std::vector<const char*> deviceExtensions;
+    if (m_Windowed) {
+        deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    }
+
     VkDeviceCreateInfo deviceCreateInfo{};
     deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     deviceCreateInfo.pNext = &features12;
-    deviceCreateInfo.queueCreateInfoCount = 1;
-    deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
+    deviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
+    deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
+    deviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
+    deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.empty() ? nullptr : deviceExtensions.data();
 
     VK_CHECK(vkCreateDevice(m_PhysicalDevice, &deviceCreateInfo, nullptr, &m_Device));
 
     vkGetDeviceQueue(m_Device, m_GraphicsQueueFamily, 0, &m_GraphicsQueue);
+    vkGetDeviceQueue(m_Device, m_PresentQueueFamily, 0, &m_PresentQueue);
 }
 
 } // namespace Tumbler

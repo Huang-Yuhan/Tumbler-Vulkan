@@ -12,6 +12,8 @@ bool AppWindow::Init(const Config& cfg) {
     }
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_VISIBLE, cfg.Visible ? GLFW_TRUE : GLFW_FALSE);
+    glfwWindowHint(GLFW_RESIZABLE, cfg.Resizable ? GLFW_TRUE : GLFW_FALSE);
 
     m_Window = glfwCreateWindow(cfg.Width, cfg.Height, cfg.Title, nullptr, nullptr);
     if (!m_Window) {

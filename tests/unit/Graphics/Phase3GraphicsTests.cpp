@@ -3,7 +3,10 @@
 #include "Core/Graphics/RenderDevice.h"
 #include "Core/Graphics/ResourceManager.h"
 #include "Core/Graphics/VulkanContext.h"
+#include "Core/Graphics/VulkanSwapchain.h"
+#include "Core/Platform/AppWindow.h"
 
+#include <GLFW/glfw3.h>
 #include <gtest/gtest.h>
 #include <vulkan/vulkan.h>
 
@@ -113,8 +116,52 @@ void SkipIfPhase3VulkanUnavailable() {
     }
 }
 
+std::optional<std::string> DetectWindowedVulkanSkipReason() {
+    if (auto reason = DetectPhase3VulkanSkipReason()) {
+        return reason;
+    }
+
+    if (!glfwInit()) {
+        return "GLFW initialization failed";
+    }
+
+    bool vulkanSupported = glfwVulkanSupported() == GLFW_TRUE;
+
+    uint32_t extensionCount = 0;
+    const char** extensions = glfwGetRequiredInstanceExtensions(&extensionCount);
+    bool hasSurfaceExtensions = extensions != nullptr && extensionCount > 0;
+
+    glfwTerminate();
+
+    if (!vulkanSupported) {
+        return "GLFW reports Vulkan is unsupported";
+    }
+    if (!hasSurfaceExtensions) {
+        return "GLFW required Vulkan surface extensions are unavailable";
+    }
+
+    return std::nullopt;
+}
+
+void SkipIfWindowedVulkanUnavailable() {
+    static const std::optional<std::string> reason = DetectWindowedVulkanSkipReason();
+    if (reason.has_value()) {
+        GTEST_SKIP() << *reason;
+    }
+}
+
 std::filesystem::path SourcePath(const char* relativePath) {
     return std::filesystem::path(TUMBLER_SOURCE_DIR) / relativePath;
+}
+
+Tumbler::AppWindow::Config HiddenWindowConfig() {
+    Tumbler::AppWindow::Config config{};
+    config.Width = 64;
+    config.Height = 64;
+    config.Title = "TumblerPhase3WindowedTests";
+    config.Visible = false;
+    config.Resizable = true;
+    return config;
 }
 
 class VulkanPhase3Fixture : public ::testing::Test {
@@ -138,6 +185,54 @@ protected:
     Tumbler::VulkanContext Context;
     Tumbler::RenderDevice Device;
     Tumbler::CommandManager Commands;
+};
+
+class VulkanWindowedPhase3Fixture : public ::testing::Test {
+protected:
+    void SetUp() override {
+        SkipIfWindowedVulkanUnavailable();
+
+        if (!Window.Init(HiddenWindowConfig())) {
+            GTEST_SKIP() << "Hidden GLFW window creation failed";
+        }
+
+        int width = 0;
+        int height = 0;
+        Window.GetFramebufferSize(&width, &height);
+        if (width <= 0 || height <= 0) {
+            GTEST_SKIP() << "Hidden GLFW window has zero framebuffer extent";
+        }
+
+        ASSERT_TRUE(Context.Init(&Window));
+        ASSERT_TRUE(Device.Init(Context.GetInstance(), Context.GetDevice(), Context.GetPhysicalDevice()));
+        ASSERT_TRUE(Commands.Init(Context.GetDevice(), Context.GetGraphicsQueueFamily()));
+    }
+
+    void TearDown() override {
+        if (Context.GetDevice() != VK_NULL_HANDLE) {
+            vkDeviceWaitIdle(Context.GetDevice());
+        }
+        Swapchain.Shutdown();
+        Commands.Shutdown();
+        Device.Shutdown();
+        Context.Shutdown();
+        Window.Shutdown();
+    }
+
+    bool InitSwapchain() {
+        int width = 0;
+        int height = 0;
+        Window.GetFramebufferSize(&width, &height);
+        return Swapchain.Init(Context.GetInstance(), Context.GetPhysicalDevice(), Context.GetDevice(),
+                              Context.GetSurface(), Context.GetGraphicsQueueFamily(), Context.GetPresentQueueFamily(),
+                              Device, width, height);
+    }
+
+    Tumbler::AppWindow Window;
+    Tumbler::VulkanContext Context;
+    Tumbler::RenderDevice Device;
+    Tumbler::CommandManager Commands;
+    Tumbler::VulkanSwapchain Swapchain;
 };
 
 VkImageView CreateImageView(VkDevice device, VkImage image, VkFormat format, VkImageAspectFlags aspectMask) {
@@ -171,6 +266,125 @@ TEST(VulkanContextPhase3, InitializesRequiredHandles) {
     EXPECT_NE(context.GetGraphicsQueue(), VK_NULL_HANDLE);
 
     context.Shutdown();
+}
+
+TEST(AppWindowPhase3, CreatesHiddenWindowForVulkanSurface) {
+    SkipIfWindowedVulkanUnavailable();
+
+    Tumbler::AppWindow window;
+    if (!window.Init(HiddenWindowConfig())) {
+        GTEST_SKIP() << "Hidden GLFW window creation failed";
+    }
+
+    int width = 0;
+    int height = 0;
+    window.GetFramebufferSize(&width, &height);
+    EXPECT_GT(width, 0);
+    EXPECT_GT(height, 0);
+
+    window.Shutdown();
+}
+
+TEST_F(VulkanWindowedPhase3Fixture, VulkanContextInitializesSurfaceAndPresentQueue) {
+    EXPECT_NE(Context.GetInstance(), VK_NULL_HANDLE);
+    EXPECT_NE(Context.GetSurface(), VK_NULL_HANDLE);
+    EXPECT_NE(Context.GetPhysicalDevice(), VK_NULL_HANDLE);
+    EXPECT_NE(Context.GetDevice(), VK_NULL_HANDLE);
+    EXPECT_NE(Context.GetGraphicsQueue(), VK_NULL_HANDLE);
+    EXPECT_NE(Context.GetPresentQueue(), VK_NULL_HANDLE);
+    EXPECT_NE(Context.GetGraphicsQueueFamily(), UINT32_MAX);
+    EXPECT_NE(Context.GetPresentQueueFamily(), UINT32_MAX);
+}
+
+TEST_F(VulkanWindowedPhase3Fixture, VulkanSwapchainCreatesAndRecreates) {
+    ASSERT_TRUE(InitSwapchain());
+
+    EXPECT_GT(Swapchain.GetImageCount(), 0u);
+    EXPECT_NE(Swapchain.GetFormat(), VK_FORMAT_UNDEFINED);
+    EXPECT_GT(Swapchain.GetExtent().width, 0u);
+    EXPECT_GT(Swapchain.GetExtent().height, 0u);
+    EXPECT_NE(Swapchain.GetDepthImageView(), VK_NULL_HANDLE);
+    for (uint32_t i = 0; i < Swapchain.GetImageCount(); ++i) {
+        EXPECT_NE(Swapchain.GetImage(i), VK_NULL_HANDLE);
+        EXPECT_NE(Swapchain.GetImageView(i), VK_NULL_HANDLE);
+    }
+
+    int width = 0;
+    int height = 0;
+    Window.GetFramebufferSize(&width, &height);
+    Swapchain.Recreate(width, height);
+
+    EXPECT_GT(Swapchain.GetImageCount(), 0u);
+    EXPECT_NE(Swapchain.GetFormat(), VK_FORMAT_UNDEFINED);
+    EXPECT_GT(Swapchain.GetExtent().width, 0u);
+    EXPECT_GT(Swapchain.GetExtent().height, 0u);
+    EXPECT_NE(Swapchain.GetDepthImageView(), VK_NULL_HANDLE);
+}
+
+TEST_F(VulkanWindowedPhase3Fixture, VulkanSwapchainAcquirePresentSmoke) {
+    ASSERT_TRUE(InitSwapchain());
+
+    VkSemaphoreCreateInfo semaphoreInfo{};
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    VkFenceCreateInfo fenceInfo{};
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+
+    VkSemaphore imageAvailable = VK_NULL_HANDLE;
+    VkSemaphore renderFinished = VK_NULL_HANDLE;
+    VkFence renderFence = VK_NULL_HANDLE;
+    ASSERT_EQ(vkCreateSemaphore(Context.GetDevice(), &semaphoreInfo, nullptr, &imageAvailable), VK_SUCCESS);
+    ASSERT_EQ(vkCreateSemaphore(Context.GetDevice(), &semaphoreInfo, nullptr, &renderFinished), VK_SUCCESS);
+    ASSERT_EQ(vkCreateFence(Context.GetDevice(), &fenceInfo, nullptr, &renderFence), VK_SUCCESS);
+
+    uint32_t imageIndex = 0;
+    VkResult acquireResult = Swapchain.AcquireNextImage(&imageIndex, imageAvailable, VK_NULL_HANDLE);
+    if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR) {
+        vkDestroyFence(Context.GetDevice(), renderFence, nullptr);
+        vkDestroySemaphore(Context.GetDevice(), renderFinished, nullptr);
+        vkDestroySemaphore(Context.GetDevice(), imageAvailable, nullptr);
+        GTEST_SKIP() << "Swapchain was out of date during acquire";
+    }
+    ASSERT_TRUE(acquireResult == VK_SUCCESS || acquireResult == VK_SUBOPTIMAL_KHR)
+        << "vkAcquireNextImageKHR returned " << acquireResult;
+    ASSERT_LT(imageIndex, Swapchain.GetImageCount());
+
+    VkCommandBuffer cmd = Commands.AllocatePrimaryCB();
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    ASSERT_EQ(vkBeginCommandBuffer(cmd, &beginInfo), VK_SUCCESS);
+    Commands.TransitionImageLayout(cmd, Swapchain.GetImage(imageIndex), VK_IMAGE_LAYOUT_UNDEFINED,
+                                   VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    ASSERT_EQ(vkEndCommandBuffer(cmd), VK_SUCCESS);
+
+    VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = &imageAvailable;
+    submitInfo.pWaitDstStageMask = &waitStage;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &cmd;
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = &renderFinished;
+
+    ASSERT_EQ(vkQueueSubmit(Context.GetGraphicsQueue(), 1, &submitInfo, renderFence), VK_SUCCESS);
+    ASSERT_EQ(vkWaitForFences(Context.GetDevice(), 1, &renderFence, VK_TRUE, 5'000'000'000ull), VK_SUCCESS);
+
+    VkResult presentResult = Swapchain.Present(Context.GetPresentQueue(), imageIndex, renderFinished);
+    vkQueueWaitIdle(Context.GetPresentQueue());
+    vkQueueWaitIdle(Context.GetGraphicsQueue());
+
+    vkDestroyFence(Context.GetDevice(), renderFence, nullptr);
+    vkDestroySemaphore(Context.GetDevice(), renderFinished, nullptr);
+    vkDestroySemaphore(Context.GetDevice(), imageAvailable, nullptr);
+
+    if (presentResult == VK_ERROR_OUT_OF_DATE_KHR) {
+        GTEST_SKIP() << "Swapchain was out of date during present";
+    }
+    EXPECT_TRUE(presentResult == VK_SUCCESS || presentResult == VK_SUBOPTIMAL_KHR)
+        << "vkQueuePresentKHR returned " << presentResult;
 }
 
 TEST_F(VulkanPhase3Fixture, RenderDeviceCreatesAndDestroysBuffers) {

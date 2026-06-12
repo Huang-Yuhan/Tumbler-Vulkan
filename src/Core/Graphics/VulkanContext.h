@@ -13,16 +13,22 @@
 
 namespace Tumbler {
 
+class AppWindow;
+
 class VulkanContext {
 public:
     bool Init();
+    bool Init(AppWindow* window);
     void Shutdown();
 
     VkInstance GetInstance() const { return m_Instance; }
     VkPhysicalDevice GetPhysicalDevice() const { return m_PhysicalDevice; }
     VkDevice GetDevice() const { return m_Device; }
     VkQueue GetGraphicsQueue() const { return m_GraphicsQueue; }
+    VkQueue GetPresentQueue() const { return m_PresentQueue; }
     uint32_t GetGraphicsQueueFamily() const { return m_GraphicsQueueFamily; }
+    uint32_t GetPresentQueueFamily() const { return m_PresentQueueFamily; }
+    VkSurfaceKHR GetSurface() const { return m_Surface; }
 
     VulkanContext() = default;
     ~VulkanContext() = default;
@@ -33,15 +39,21 @@ private:
     void CreateInstance();
     void SelectPhysicalDevice();
     void CreateDevice();
+    void CreateSurface(AppWindow* window);
 
     int ScoreDevice(VkPhysicalDevice device) const;
     bool SupportsRequiredFeatures(VkPhysicalDevice device) const;
+    bool SupportsRequiredQueues(VkPhysicalDevice device, uint32_t* graphicsFamily, uint32_t* presentFamily) const;
 
     VkInstance m_Instance = VK_NULL_HANDLE;
+    VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
     VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
     VkDevice m_Device = VK_NULL_HANDLE;
     VkQueue m_GraphicsQueue = VK_NULL_HANDLE;
-    uint32_t m_GraphicsQueueFamily = 0;
+    VkQueue m_PresentQueue = VK_NULL_HANDLE;
+    uint32_t m_GraphicsQueueFamily = UINT32_MAX;
+    uint32_t m_PresentQueueFamily = UINT32_MAX;
+    bool m_Windowed = false;
 
 #ifdef NDEBUG
     static constexpr bool kEnableValidationLayers = false;

@@ -9,17 +9,19 @@
 namespace Tumbler {
 
 bool VulkanSwapchain::Init(VkInstance instance, VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface,
-                           uint32_t graphicsQueueFamily, RenderDevice& renderDevice, int width, int height) {
+                           uint32_t graphicsQueueFamily, uint32_t presentQueueFamily, RenderDevice& renderDevice,
+                           int width, int height) {
     m_Instance = instance;
     m_PhysicalDevice = physicalDevice;
     m_Device = device;
     m_Surface = surface;
     m_RenderDevice = &renderDevice;
+    m_GraphicsQueueFamily = graphicsQueueFamily;
+    m_PresentQueueFamily = presentQueueFamily;
 
     Recreate(width, height);
 
     // 查找 Present Queue 族 (通常和 Graphics 相同)
-    m_PresentQueueFamily = graphicsQueueFamily;
 
     LOG_INFO("VulkanSwapchain initialized ({}x{})", width, height);
     return true;
@@ -90,6 +92,14 @@ void VulkanSwapchain::Recreate(int width, int height) {
     swapchainInfo.imageExtent = m_Extent;
     swapchainInfo.imageArrayLayers = 1;
     swapchainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    uint32_t queueFamilyIndices[] = {m_GraphicsQueueFamily, m_PresentQueueFamily};
+    if (m_GraphicsQueueFamily != m_PresentQueueFamily) {
+        swapchainInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+        swapchainInfo.queueFamilyIndexCount = 2;
+        swapchainInfo.pQueueFamilyIndices = queueFamilyIndices;
+    } else {
+        swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
     swapchainInfo.preTransform = capabilities.currentTransform;
     swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     swapchainInfo.presentMode = presentMode;

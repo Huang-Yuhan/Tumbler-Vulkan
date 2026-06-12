@@ -20,7 +20,8 @@ class RenderDevice;
 class VulkanSwapchain {
 public:
     bool Init(VkInstance instance, VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface,
-              uint32_t graphicsQueueFamily, RenderDevice& renderDevice, int width, int height);
+              uint32_t graphicsQueueFamily, uint32_t presentQueueFamily, RenderDevice& renderDevice, int width,
+              int height);
     void Shutdown();
     void Recreate(int width, int height);
 
@@ -63,6 +64,7 @@ private:
     VmaAllocation m_DepthAllocation = VK_NULL_HANDLE;
 
     bool m_NeedsRecreate = false;
+    uint32_t m_GraphicsQueueFamily = 0;
     uint32_t m_PresentQueueFamily = 0;
 };
 
