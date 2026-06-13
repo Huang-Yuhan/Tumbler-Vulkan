@@ -2,51 +2,53 @@
 
 #include "Core/GameSystem/Components/CTransform.h"
 
+using namespace Tumbler::Math;
+
 namespace {
 
 constexpr float kEpsilon = 1e-4f;
 
-void ExpectVecNear(const glm::vec3& actual, const glm::vec3& expected, float eps = kEpsilon) {
-    EXPECT_NEAR(actual.x, expected.x, eps);
-    EXPECT_NEAR(actual.y, expected.y, eps);
-    EXPECT_NEAR(actual.z, expected.z, eps);
+void ExpectVecNear(const Vector3f& actual, const Vector3f& expected, float eps = kEpsilon) {
+    EXPECT_NEAR(actual.X, expected.X, eps);
+    EXPECT_NEAR(actual.Y, expected.Y, eps);
+    EXPECT_NEAR(actual.Z, expected.Z, eps);
 }
 
 } // namespace
 
 TEST(CTransformTests, TransformPointAppliesScaleThenTranslation) {
     CTransform transform;
-    transform.SetPosition(glm::vec3(1.0f, 2.0f, 3.0f));
-    transform.SetScale(glm::vec3(2.0f, 2.0f, 2.0f));
+    transform.SetPosition(Vector3f{1.0f, 2.0f, 3.0f});
+    transform.SetScale(Vector3f{2.0f, 2.0f, 2.0f});
 
-    const glm::vec3 worldPoint = transform.TransformPoint(glm::vec3(1.0f, 0.0f, 0.0f));
-    ExpectVecNear(worldPoint, glm::vec3(3.0f, 2.0f, 3.0f));
+    const Vector3f worldPoint = transform.TransformPoint(Vector3f{1.0f, 0.0f, 0.0f});
+    ExpectVecNear(worldPoint, Vector3f{3.0f, 2.0f, 3.0f});
 }
 
 TEST(CTransformTests, SetParentWithStayWorldKeepsWorldPosition) {
     CTransform parent;
-    parent.SetPosition(glm::vec3(10.0f, 0.0f, 0.0f));
+    parent.SetPosition(Vector3f{10.0f, 0.0f, 0.0f});
 
     CTransform child;
-    child.SetPosition(glm::vec3(1.0f, 0.0f, 0.0f));
-    const glm::vec3 before = child.TransformPoint(glm::vec3(0.0f));
+    child.SetPosition(Vector3f{1.0f, 0.0f, 0.0f});
+    const Vector3f before = child.TransformPoint(Vector3f{0.0f});
 
     child.SetParent(&parent, true);
 
-    const glm::vec3 after = child.TransformPoint(glm::vec3(0.0f));
+    const Vector3f after = child.TransformPoint(Vector3f{0.0f});
     ExpectVecNear(after, before);
 }
 
 TEST(CTransformTests, SetParentWithoutStayWorldChangesWorldByParentTransform) {
     CTransform parent;
-    parent.SetPosition(glm::vec3(10.0f, 0.0f, 0.0f));
+    parent.SetPosition(Vector3f{10.0f, 0.0f, 0.0f});
 
     CTransform child;
-    child.SetPosition(glm::vec3(1.0f, 0.0f, 0.0f));
+    child.SetPosition(Vector3f{1.0f, 0.0f, 0.0f});
     child.SetParent(&parent, false);
 
-    const glm::vec3 worldOrigin = child.TransformPoint(glm::vec3(0.0f));
-    ExpectVecNear(worldOrigin, glm::vec3(11.0f, 0.0f, 0.0f));
+    const Vector3f worldOrigin = child.TransformPoint(Vector3f{0.0f});
+    ExpectVecNear(worldOrigin, Vector3f{11.0f, 0.0f, 0.0f});
 }
 
 TEST(CTransformTests, ReparentUpdatesChildrenCollections) {
@@ -68,22 +70,22 @@ TEST(CTransformTests, ReparentUpdatesChildrenCollections) {
 
 TEST(CTransformTests, TransformDirectionIgnoresTranslation) {
     CTransform transform;
-    transform.SetPosition(glm::vec3(100.0f, -50.0f, 25.0f));
-    transform.SetRotation(glm::vec3(0.0f, 90.0f, 0.0f));
+    transform.SetPosition(Vector3f{100.0f, -50.0f, 25.0f});
+    transform.SetRotation(Vector3f{0.0f, 90.0f, 0.0f});
 
-    const glm::vec3 dir = glm::normalize(transform.TransformDirection(glm::vec3(0.0f, 0.0f, 1.0f)));
-    EXPECT_NEAR(glm::abs(dir.x), 1.0f, 1e-3f);
-    EXPECT_NEAR(dir.y, 0.0f, 1e-3f);
-    EXPECT_NEAR(glm::abs(dir.z), 0.0f, 1e-3f);
+    const Vector3f dir = transform.TransformDirection(Vector3f{0.0f, 0.0f, 1.0f}).GetNormalized();
+    EXPECT_NEAR(std::abs(dir.X), 1.0f, 1e-3f);
+    EXPECT_NEAR(dir.Y, 0.0f, 1e-3f);
+    EXPECT_NEAR(std::abs(dir.Z), 0.0f, 1e-3f);
 }
 
 TEST(CTransformTests, ChildWorldPositionUpdatesWhenParentMoves) {
     CTransform parent;
     CTransform child;
-    child.SetPosition(glm::vec3(1.0f, 0.0f, 0.0f));
+    child.SetPosition(Vector3f{1.0f, 0.0f, 0.0f});
     child.SetParent(&parent, false);
 
-    parent.SetPosition(glm::vec3(5.0f, 0.0f, 0.0f));
-    const glm::vec3 world = child.TransformPoint(glm::vec3(0.0f));
-    ExpectVecNear(world, glm::vec3(6.0f, 0.0f, 0.0f));
+    parent.SetPosition(Vector3f{5.0f, 0.0f, 0.0f});
+    const Vector3f world = child.TransformPoint(Vector3f{0.0f});
+    ExpectVecNear(world, Vector3f{6.0f, 0.0f, 0.0f});
 }

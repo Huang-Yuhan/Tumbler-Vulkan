@@ -4,7 +4,8 @@
 #include "Core/Graphics/VulkanRenderer.h"
 #include "Core/Utils/Log.h"
 
-#include <glm/vec3.hpp>
+#include <Core/Math/Math.h>
+using namespace Tumbler::Math;
 #include <imgui.h>
 
 #include "Core/GameSystem/Components/CFirstPersonCamera.h"
@@ -46,32 +47,32 @@ void AppLogic::InitializePlanes() const
 
     // 添加5个平面,组成康奈尔盒子
     FActor* Floor = Scene->CreateActor("Floor");
-    Floor->Transform.SetPosition(glm::vec3(0.0f, -5.0f, 0.0f));
-    Floor->Transform.SetScale(glm::vec3(10.0f, 1.0f, 10.0f));
+    Floor->Transform.SetPosition(Vector3f{0.0f, -5.0f, 0.0f});
+    Floor->Transform.SetScale(Vector3f{10.0f, 1.0f, 10.0f});
     Floor->AddComponent<CMeshRenderer>()->SetMesh(planeMesh); 
 
     FActor* Ceiling = Scene->CreateActor("Ceiling");
-    Ceiling->Transform.SetPosition(glm::vec3(0.0f, 5.0f, 0.0f));
-    Ceiling->Transform.SetScale(glm::vec3(10.0f, 1.0f, 10.0f));
-    Ceiling->Transform.SetRotation(glm::vec3(0.0f, 0.0f, -180.0f));
+    Ceiling->Transform.SetPosition(Vector3f{0.0f, 5.0f, 0.0f});
+    Ceiling->Transform.SetScale(Vector3f{10.0f, 1.0f, 10.0f});
+    Ceiling->Transform.SetRotation(Vector3f{0.0f, 0.0f, -180.0f});
     Ceiling->AddComponent<CMeshRenderer>()->SetMesh(planeMesh);
 
     FActor* BackWall = Scene->CreateActor("BackWall");
-    BackWall->Transform.SetPosition(glm::vec3(0.0f, 0.0f, -5.0f));
-    BackWall->Transform.SetScale(glm::vec3(10.0f, 1.0f,10.0f));
-    BackWall->Transform.SetRotation(glm::vec3(90.0f, 0.0f, 0.0f));
+    BackWall->Transform.SetPosition(Vector3f{0.0f, 0.0f, -5.0f});
+    BackWall->Transform.SetScale(Vector3f{10.0f, 1.0f,10.0f});
+    BackWall->Transform.SetRotation(Vector3f{90.0f, 0.0f, 0.0f});
     BackWall->AddComponent<CMeshRenderer>()->SetMesh(planeMesh);
 
     FActor* LeftWall = Scene->CreateActor("LeftWall");
-    LeftWall->Transform.SetPosition(glm::vec3(-5.0f, 0.0f, 0.0f));
-    LeftWall->Transform.SetScale(glm::vec3(10.0f, 1.0f,10.0f));
-    LeftWall->Transform.SetRotation(glm::vec3(0.0f, 0.0f, -90.0f));
+    LeftWall->Transform.SetPosition(Vector3f{-5.0f, 0.0f, 0.0f});
+    LeftWall->Transform.SetScale(Vector3f{10.0f, 1.0f,10.0f});
+    LeftWall->Transform.SetRotation(Vector3f{0.0f, 0.0f, -90.0f});
     LeftWall->AddComponent<CMeshRenderer>()->SetMesh(planeMesh);
 
     FActor* RightWall = Scene->CreateActor("RightWall");
-    RightWall->Transform.SetPosition(glm::vec3(5.0f, 0.0f, 0.0f));
-    RightWall->Transform.SetScale(glm::vec3(10.0f, 1.0f,10.0f));
-    RightWall->Transform.SetRotation(glm::vec3(0.0f, 0.0f, 90.0f));
+    RightWall->Transform.SetPosition(Vector3f{5.0f, 0.0f, 0.0f});
+    RightWall->Transform.SetScale(Vector3f{10.0f, 1.0f,10.0f});
+    RightWall->Transform.SetRotation(Vector3f{0.0f, 0.0f, 90.0f});
     RightWall->AddComponent<CMeshRenderer>()->SetMesh(planeMesh);
 }
 
@@ -95,8 +96,8 @@ void AppLogic::Init(VulkanRenderer* renderer, FAssetManager* assetMgr, InputMana
 
     // 0. 创建相机实体与漫游组件
     FActor* cameraActor = Scene->CreateActor("MainCamera");
-    cameraActor->Transform.SetPosition(glm::vec3(0.0f, -1.0f, 16.0f));
-    cameraActor->Transform.SetRotation(glm::vec3(0.0f, 180.0f, 0.0f));
+    cameraActor->Transform.SetPosition(Vector3f{0.0f, -1.0f, 16.0f});
+    cameraActor->Transform.SetRotation(Vector3f{0.0f, 180.0f, 0.0f});
     MainCamera = cameraActor->AddComponent<CFirstPersonCamera>();
     MainCamera->Fov = 60.0f;
     MainCamera->Init(InputMgr);
@@ -106,17 +107,17 @@ void AppLogic::Init(VulkanRenderer* renderer, FAssetManager* assetMgr, InputMana
 
     // 2. 康奈尔经典红 (左墙)
     auto matRed = pbrMaterial->CreateInstance();
-    matRed->SetVector("BaseColorTint", glm::vec4(0.63f, 0.06f, 0.05f, 1.0f));
+    matRed->SetVector("BaseColorTint", Vector4f{0.63f, 0.06f, 0.05f, 1.0f});
     matRed->SetTwoSided(true);
 
     // 3. 康奈尔经典绿 (右墙)
     auto matGreen = pbrMaterial->CreateInstance();
-    matGreen->SetVector("BaseColorTint", glm::vec4(0.15f, 0.48f, 0.09f, 1.0f));
+    matGreen->SetVector("BaseColorTint", Vector4f{0.15f, 0.48f, 0.09f, 1.0f});
     matGreen->SetTwoSided(true);
 
     // 4. 康奈尔经典白 (天花板、地板、后墙)
     auto matWhite = pbrMaterial->CreateInstance();
-    matWhite->SetVector("BaseColorTint", glm::vec4(0.73f, 0.73f, 0.73f, 1.0f));
+    matWhite->SetVector("BaseColorTint", Vector4f{0.73f, 0.73f, 0.73f, 1.0f});
     matWhite->SetTwoSided(true);
     matWhite->ApplyChanges();
 
@@ -146,13 +147,13 @@ void AppLogic::Init(VulkanRenderer* renderer, FAssetManager* assetMgr, InputMana
     sword->AddComponent<CMeshRenderer>()->SetMesh(swordMesh);
 
     // 摆放在场景中央，竖直摆放，缩放到合适大小
-    sword->Transform.SetPosition(glm::vec3(0.0f, -3.0f, 0.0f));
-    sword->Transform.SetScale(glm::vec3(0.5f, 0.5f, 0.5f));
-    sword->Transform.SetRotation(glm::vec3(0.0f, 90.0f, 0.0f));
+    sword->Transform.SetPosition(Vector3f{0.0f, -3.0f, 0.0f});
+    sword->Transform.SetScale(Vector3f{0.5f, 0.5f, 0.5f});
+    sword->Transform.SetRotation(Vector3f{0.0f, 90.0f, 0.0f});
 
     // 钢铁金属质感
     auto matSword = pbrMaterial->CreateInstance();
-    matSword->SetVector("BaseColorTint", glm::vec4(0.80f, 0.77f, 0.70f, 1.0f)); 
+    matSword->SetVector("BaseColorTint", Vector4f{0.80f, 0.77f, 0.70f, 1.0f}); 
     matSword->SetFloat("Roughness", 0.3f);  
     matSword->SetFloat("Metallic", 1.0f);   
     matSword->ApplyChanges();
@@ -163,9 +164,9 @@ void AppLogic::Init(VulkanRenderer* renderer, FAssetManager* assetMgr, InputMana
     // 7. 创建主光源 (使用新组件系统)
     // ==========================================
     FActor* lightActor = Scene->CreateActor("MainLight");
-    lightActor->Transform.SetPosition(glm::vec3(0.0f, 4.0f, 0.0f));
+    lightActor->Transform.SetPosition(Vector3f{0.0f, 4.0f, 0.0f});
     auto* pl = lightActor->AddComponent<CPointLight>();
-    pl->Color = glm::vec3(1.0f, 1.0f, 1.0f);
+    pl->Color = Vector3f{1.0f, 1.0f, 1.0f};
     pl->Intensity = 50.0f;
 
     // ==========================================
@@ -177,7 +178,7 @@ void AppLogic::Tick(float deltaTime) {
     if (FActor* sword = Scene->FindActorByName("StingSword")) {
         // [修复] 切勿使用 ToEuler() 获取再倒装，因为每帧欧拉角-四元数互转极其容易造成万向节死锁或符号翻转(导致疯狂抽搐)
         // 应该直接在已有四元数基础上累加一个旋转四元数:
-        FQuaternion deltaRot = FQuaternion::FromAxisAngle(glm::vec3(0.0f, 1.0f, 0.0f), 90.0f * deltaTime);
+        FQuaternion deltaRot = FQuaternion::FromAxisAngle(Vector3f{0.0f, 1.0f, 0.0f}, 90.0f * deltaTime);
         sword->Transform.SetRotation(sword->Transform.GetRotation() * deltaRot);
     }
 
@@ -247,12 +248,12 @@ void AppLogic::DrawLightingSection() {
             ImGui::Text("Main Light");
             ImGui::Separator();
 
-            glm::vec3 pos = mainLight->Transform.GetPosition();
-            if (ImGui::DragFloat3("Position", &pos.x, 0.1f, -20.0f, 20.0f)) {
+            Vector3f pos = mainLight->Transform.GetPosition();
+            if (ImGui::DragFloat3("Position", &pos.X, 0.1f, -20.0f, 20.0f)) {
                 mainLight->Transform.SetPosition(pos);
             }
 
-            ImGui::ColorEdit3("Color", &pl->Color.x);
+            ImGui::ColorEdit3("Color", &pl->Color.X);
             ImGui::SliderFloat("Intensity", &pl->Intensity, 0.0f, 200.0f);
         }
     } else {
@@ -267,13 +268,13 @@ void AppLogic::DrawCameraSection() {
         ImGui::Text("Camera Settings");
         ImGui::Separator();
 
-        glm::vec3 pos = cameraActor->Transform.GetPosition();
-        if (ImGui::DragFloat3("Position", &pos.x, 0.1f, -50.0f, 50.0f)) {
+        Vector3f pos = cameraActor->Transform.GetPosition();
+        if (ImGui::DragFloat3("Position", &pos.X, 0.1f, -50.0f, 50.0f)) {
             cameraActor->Transform.SetPosition(pos);
         }
 
-        glm::vec3 rot = cameraActor->Transform.GetEulerAngles();
-        if (ImGui::DragFloat3("Rotation", &rot.x, 1.0f, -180.0f, 180.0f)) {
+        Vector3f rot = cameraActor->Transform.GetEulerAngles();
+        if (ImGui::DragFloat3("Rotation", &rot.X, 1.0f, -180.0f, 180.0f)) {
             MainCamera->SetLookEuler(rot);
         }
 

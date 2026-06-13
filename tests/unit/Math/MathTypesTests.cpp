@@ -378,6 +378,28 @@ TEST(MathPlane, ComputesSignedDistanceAndNormalizesSafely) {
     EXPECT_FALSE(invalid.Normalize());
 }
 
+TEST(MathMatrix, InverseIdentityIsIdentity) {
+    const Matrix4f inv = Inverse(Matrix4f::Identity());
+    ExpectMatrixNear(inv, Matrix4f::Identity());
+}
+
+TEST(MathMatrix, InverseRoundTrip) {
+    const Vector3f trans{1.0f, 2.0f, 3.0f};
+    const Matrix4f m = MakeTranslation(trans);
+    const Matrix4f inv = Inverse(m);
+    const Matrix4f product = m * inv;
+    ExpectMatrixNear(product, Matrix4f::Identity());
+}
+
+TEST(MathMatrix, MakeOrthoProducesCorrectProjection) {
+    const Matrix4f ortho = MakeOrtho(-10.0f, 10.0f, -10.0f, 10.0f, 0.1f, 100.0f);
+
+    // Center of ortho view should map to origin in clip space
+    const Vector4f origin = ortho.TransformPosition(Vector3f{0.0f, 0.0f, -50.0f});
+    EXPECT_NEAR(origin.X, 0.0f, 1e-4f);
+    EXPECT_NEAR(origin.Y, 0.0f, 1e-4f);
+}
+
 TEST(MathUtility, SharedDepthConventionDefaultsToVulkanZeroToOne) {
     EXPECT_EQ(kDefaultDepthConvention, DepthConvention::VulkanZeroToOne);
     EXPECT_EQ(TUMBLER_MATH_DEFAULT_DEPTH_CONVENTION, TUMBLER_DEPTH_CONVENTION_VULKAN_ZERO_TO_ONE);

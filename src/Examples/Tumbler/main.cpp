@@ -234,7 +234,7 @@ public:
                 ? 0.0f
                 : static_cast<float>(index) / static_cast<float>(Options.DescriptorInstancesPerRound - 1);
 
-            instance->SetVector("BaseColorTint", glm::vec4(1.0f - ratio, 0.35f + ratio * 0.4f, ratio, 1.0f));
+            instance->SetVector("BaseColorTint", Tumbler::Math::Vector4f{1.0f - ratio, 0.35f + ratio * 0.4f, ratio, 1.0f});
             instance->SetFloat("Roughness", 0.05f + ratio * 0.9f);
             instance->SetFloat("Metallic", (index % 2 == 0) ? 1.0f : 0.0f);
             instance->SetTwoSided((index % 3) == 0);

@@ -117,4 +117,73 @@ inline Matrix4f MakeScale(const Vector3f& scale) {
                     0.0f,    0.0f,    0.0f,    1.0f};
 }
 
+inline Matrix4f MakeOrtho(float left, float right, float bottom, float top, float nearZ, float farZ,
+                          DepthConvention convention = kDefaultDepthConvention) {
+    const float rl = 1.0f / (right - left);
+    const float tb = 1.0f / (top - bottom);
+
+    if (convention == DepthConvention::ReverseZZeroToOne) {
+        const float fn = 1.0f / (nearZ - farZ);
+        return Matrix4f{2.0f * rl, 0.0f,      0.0f,       -(right + left) * rl,
+                        0.0f,      2.0f * tb, 0.0f,       -(top + bottom) * tb,
+                        0.0f,      0.0f,      fn,          nearZ * fn,
+                        0.0f,      0.0f,      0.0f,       1.0f};
+    }
+
+    const float fn = 1.0f / (farZ - nearZ);
+    return Matrix4f{2.0f * rl, 0.0f,      0.0f,      -(right + left) * rl,
+                    0.0f,      2.0f * tb, 0.0f,      -(top + bottom) * tb,
+                    0.0f,      0.0f,      -fn,        -nearZ * fn,
+                    0.0f,      0.0f,      0.0f,       1.0f};
+}
+
+inline Matrix4f Inverse(const Matrix4f& m) {
+    const float m00 = m[0][0], m01 = m[0][1], m02 = m[0][2], m03 = m[0][3];
+    const float m10 = m[1][0], m11 = m[1][1], m12 = m[1][2], m13 = m[1][3];
+    const float m20 = m[2][0], m21 = m[2][1], m22 = m[2][2], m23 = m[2][3];
+    const float m30 = m[3][0], m31 = m[3][1], m32 = m[3][2], m33 = m[3][3];
+
+    const float s0 = m00 * m11 - m10 * m01;
+    const float s1 = m00 * m12 - m10 * m02;
+    const float s2 = m00 * m13 - m10 * m03;
+    const float s3 = m01 * m12 - m11 * m02;
+    const float s4 = m01 * m13 - m11 * m03;
+    const float s5 = m02 * m13 - m12 * m03;
+
+    const float c0 = m20 * m31 - m30 * m21;
+    const float c1 = m20 * m32 - m30 * m22;
+    const float c2 = m20 * m33 - m30 * m23;
+    const float c3 = m21 * m32 - m31 * m22;
+    const float c4 = m21 * m33 - m31 * m23;
+    const float c5 = m22 * m33 - m32 * m23;
+
+    const float det = s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0;
+    if (IsNearlyZero(det)) {
+        return Matrix4f::Identity();
+    }
+
+    const float invDet = 1.0f / det;
+    return Matrix4f{
+        (m11 * c5 - m12 * c4 + m13 * c3) * invDet,
+        (-m01 * c5 + m02 * c4 - m03 * c3) * invDet,
+        (m31 * s5 - m32 * s4 + m33 * s3) * invDet,
+        (-m21 * s5 + m22 * s4 - m23 * s3) * invDet,
+
+        (-m10 * c5 + m12 * c2 - m13 * c1) * invDet,
+        (m00 * c5 - m02 * c2 + m03 * c1) * invDet,
+        (-m30 * s5 + m32 * s2 - m33 * s1) * invDet,
+        (m20 * s5 - m22 * s2 + m23 * s1) * invDet,
+
+        (m10 * c4 - m11 * c2 + m13 * c0) * invDet,
+        (-m00 * c4 + m01 * c2 - m03 * c0) * invDet,
+        (m30 * s4 - m31 * s2 + m33 * s0) * invDet,
+        (-m20 * s4 + m21 * s2 - m23 * s0) * invDet,
+
+        (-m10 * c3 + m11 * c1 - m12 * c0) * invDet,
+        (m00 * c3 - m01 * c1 + m02 * c0) * invDet,
+        (-m30 * s3 + m31 * s1 - m32 * s0) * invDet,
+        (m20 * s3 - m21 * s1 + m22 * s0) * invDet,
+    };
+}
+
 } // namespace Tumbler::Math

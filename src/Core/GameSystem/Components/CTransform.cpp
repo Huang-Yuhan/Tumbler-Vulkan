@@ -2,15 +2,14 @@
 #include <algorithm>
 #include <imgui.h>
 
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/matrix_decompose.hpp>
+using namespace Tumbler::Math;
 
 void CTransform::SetParent(CTransform* newParent, bool bStayWorldPos)
 {
     if (Parent == newParent) return;
 
     // Capture current world matrix if staying in place
-    glm::mat4 currentWorldMatrix = GetLocalToWorldMatrix();
+    Matrix4f currentWorldMatrix = GetLocalToWorldMatrix();
 
     // Remove from old parent
     if (Parent)
@@ -28,27 +27,25 @@ void CTransform::SetParent(CTransform* newParent, bool bStayWorldPos)
     // Keep world position?
     if (bStayWorldPos)
     {
-        glm::mat4 newLocalMatrix = currentWorldMatrix;
+        Matrix4f newLocalMatrix = currentWorldMatrix;
         if (Parent)
         {
-            glm::mat4 parentWorldInv = glm::inverse(Parent->GetLocalToWorldMatrix());
+            Matrix4f parentWorldInv = Inverse(Parent->GetLocalToWorldMatrix());
             newLocalMatrix = parentWorldInv * currentWorldMatrix;
         }
 
-        glm::vec3 scale;
-        glm::quat rotation;
-        glm::vec3 translation;
-        glm::vec3 skew;
-        glm::vec4 perspective;
+        Vector3f scale;
+        Quaternionf rotation;
+        Vector3f translation;
 
-        if (glm::decompose(newLocalMatrix, scale, rotation, translation, skew, perspective))
+        if (Decompose(newLocalMatrix, translation, rotation, scale))
         {
             Position = translation;
             Rotation = FQuaternion(rotation);
             Scale = scale;
         }
     }
-    
+
     bIsLocalDirty = true;
     MarkWorldDirty();
 }
@@ -82,20 +79,20 @@ void CTransform::MarkWorldDirty()
     }
 }
 
-const glm::mat4& CTransform::GetLocalMatrix() const
+const Matrix4f& CTransform::GetLocalMatrix() const
 {
     if (bIsLocalDirty)
     {
-        glm::mat4 translationMatrix = glm::translate(glm::mat4(1.0f), Position);
-        glm::mat4 rotationMatrix = Rotation.ToMatrix();
-        glm::mat4 scaleMatrix = glm::scale(glm::mat4(1.0f), Scale);
+        Matrix4f translationMatrix = MakeTranslation(Position);
+        Matrix4f rotationMatrix = Rotation.Raw.ToMatrix();
+        Matrix4f scaleMatrix = MakeScale(Scale);
         CachedLocalMatrix = translationMatrix * rotationMatrix * scaleMatrix;
         bIsLocalDirty = false;
     }
     return CachedLocalMatrix;
 }
 
-const glm::mat4& CTransform::GetLocalToWorldMatrix() const
+const Matrix4f& CTransform::GetLocalToWorldMatrix() const
 {
     if (bIsWorldDirty)
     {
@@ -115,18 +112,18 @@ const glm::mat4& CTransform::GetLocalToWorldMatrix() const
 void CTransform::OnDrawUI()
 {
     if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
-        glm::vec3 pos = GetPosition();
-        if (ImGui::DragFloat3("Position", &pos.x, 0.1f)) {
+        Vector3f pos = GetPosition();
+        if (ImGui::DragFloat3("Position", &pos.X, 0.1f)) {
             SetPosition(pos);
         }
 
-        glm::vec3 rot = GetEulerAngles();
-        if (ImGui::DragFloat3("Rotation", &rot.x, 1.0f)) {
+        Vector3f rot = GetEulerAngles();
+        if (ImGui::DragFloat3("Rotation", &rot.X, 1.0f)) {
             SetRotation(rot);
         }
 
-        glm::vec3 scale = GetScale();
-        if (ImGui::DragFloat3("Scale", &scale.x, 0.1f)) {
+        Vector3f scale = GetScale();
+        if (ImGui::DragFloat3("Scale", &scale.X, 0.1f)) {
             SetScale(scale);
         }
     }

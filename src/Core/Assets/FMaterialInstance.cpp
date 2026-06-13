@@ -35,8 +35,8 @@ void FMaterialInstance::SetTexture(const std::string& name, std::shared_ptr<FTex
     if (texture) Textures[name] = std::move(texture);
 }
 
-void FMaterialInstance::SetVector(const std::string& name, const glm::vec4& value) {
-    if (name == "BaseColorTint") ParameterData.BaseColorTint = value;
+void FMaterialInstance::SetVector(const std::string& name, const Tumbler::Math::Vector4f& value) {
+    if (name == "BaseColorTint") ParameterData.BaseColorTint = glm::vec4(value.X, value.Y, value.Z, value.W);
 }
 
 void FMaterialInstance::SetFloat(const std::string& name, float value) {

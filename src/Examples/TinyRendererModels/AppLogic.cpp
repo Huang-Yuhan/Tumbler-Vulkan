@@ -1,5 +1,6 @@
 #include "AppLogic.h"
-#include <glm/vec3.hpp>
+#include <Core/Math/Math.h>
+using namespace Tumbler::Math;
 #include <imgui.h>
 
 #include "Core/GameSystem/Components/CFirstPersonCamera.h"
@@ -23,7 +24,7 @@ void AppLogic::LoadTinyRendererModels() const
     auto pbrMaterial = AssetMgr->GetOrLoadMaterial("PBR_Base", "assets/shaders/engine/pbr.vert.spv", "assets/shaders/engine/pbr.frag.spv");
 
     auto floorMat = pbrMaterial->CreateInstance();
-    floorMat->SetVector("BaseColorTint", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    floorMat->SetVector("BaseColorTint", Vector4f{1.0f, 1.0f, 1.0f, 1.0f});
     floorMat->SetFloat("Roughness", 0.8f);
     floorMat->SetFloat("Metallic", 0.0f);
     auto floorDiffuse = AssetMgr->GetOrLoadTexture("Floor_Diffuse", "assets/models/tiny-renderer-obj/floor_diffuse.tga");
@@ -34,13 +35,13 @@ void AppLogic::LoadTinyRendererModels() const
 
     auto floorMesh = AssetMgr->GetOrLoadMesh("Floor", "assets/models/tiny-renderer-obj/floor.obj");
     FActor* floor = Scene->CreateActor("Floor");
-    floor->Transform.SetPosition(glm::vec3(0.0f, -1.0f, 0.0f));
-    floor->Transform.SetScale(glm::vec3(1.0f, 1.0f, 1.0f));
+    floor->Transform.SetPosition(Vector3f{0.0f, -1.0f, 0.0f});
+    floor->Transform.SetScale(Vector3f{1.0f, 1.0f, 1.0f});
     floor->AddComponent<CMeshRenderer>()->SetMesh(floorMesh);
     floor->GetComponent<CMeshRenderer>()->SetMaterial(floorMat);
 
     auto diabloMat = pbrMaterial->CreateInstance();
-    diabloMat->SetVector("BaseColorTint", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    diabloMat->SetVector("BaseColorTint", Vector4f{1.0f, 1.0f, 1.0f, 1.0f});
     diabloMat->SetFloat("Roughness", 0.4f);
     diabloMat->SetFloat("Metallic", 0.3f);
     auto diabloDiffuse = AssetMgr->GetOrLoadTexture("Diablo_Diffuse", "assets/models/tiny-renderer-obj/diablo3_pose/diablo3_pose_diffuse.tga");
@@ -51,13 +52,13 @@ void AppLogic::LoadTinyRendererModels() const
 
     auto diabloMesh = AssetMgr->GetOrLoadMesh("Diablo", "assets/models/tiny-renderer-obj/diablo3_pose/diablo3_pose.obj");
     FActor* diablo = Scene->CreateActor("Diablo");
-    diablo->Transform.SetPosition(glm::vec3(0.0f, 0.0f, 0.0f));
-    diablo->Transform.SetScale(glm::vec3(1.0f, 1.0f, 1.0f));
+    diablo->Transform.SetPosition(Vector3f{0.0f, 0.0f, 0.0f});
+    diablo->Transform.SetScale(Vector3f{1.0f, 1.0f, 1.0f});
     diablo->AddComponent<CMeshRenderer>()->SetMesh(diabloMesh);
     diablo->GetComponent<CMeshRenderer>()->SetMaterial(diabloMat);
 
     auto africanHeadMat = pbrMaterial->CreateInstance();
-    africanHeadMat->SetVector("BaseColorTint", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    africanHeadMat->SetVector("BaseColorTint", Vector4f{1.0f, 1.0f, 1.0f, 1.0f});
     africanHeadMat->SetFloat("Roughness", 0.5f);
     africanHeadMat->SetFloat("Metallic", 0.0f);
     auto africanDiffuse = AssetMgr->GetOrLoadTexture("African_Diffuse", "assets/models/tiny-renderer-obj/african_head/african_head_diffuse.tga");
@@ -68,13 +69,13 @@ void AppLogic::LoadTinyRendererModels() const
 
     auto africanHeadMesh = AssetMgr->GetOrLoadMesh("AfricanHead", "assets/models/tiny-renderer-obj/african_head/african_head.obj");
     FActor* africanHead = Scene->CreateActor("AfricanHead");
-    africanHead->Transform.SetPosition(glm::vec3(-3.0f, 0.0f, 0.0f));
-    africanHead->Transform.SetScale(glm::vec3(1.0f, 1.0f, 1.0f));
+    africanHead->Transform.SetPosition(Vector3f{-3.0f, 0.0f, 0.0f});
+    africanHead->Transform.SetScale(Vector3f{1.0f, 1.0f, 1.0f});
     africanHead->AddComponent<CMeshRenderer>()->SetMesh(africanHeadMesh);
     africanHead->GetComponent<CMeshRenderer>()->SetMaterial(africanHeadMat);
 
     auto africanEyeInnerMat = pbrMaterial->CreateInstance();
-    africanEyeInnerMat->SetVector("BaseColorTint", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    africanEyeInnerMat->SetVector("BaseColorTint", Vector4f{1.0f, 1.0f, 1.0f, 1.0f});
     africanEyeInnerMat->SetFloat("Roughness", 0.2f);
     africanEyeInnerMat->SetFloat("Metallic", 0.0f);
     auto africanEyeInnerDiffuse = AssetMgr->GetOrLoadTexture("AfricanEyeInner_Diffuse", "assets/models/tiny-renderer-obj/african_head/african_head_eye_inner_diffuse.tga");
@@ -85,13 +86,13 @@ void AppLogic::LoadTinyRendererModels() const
 
     auto africanEyeInnerMesh = AssetMgr->GetOrLoadMesh("AfricanEyeInner", "assets/models/tiny-renderer-obj/african_head/african_head_eye_inner.obj");
     FActor* africanEyeInner = Scene->CreateActor("AfricanEyeInner");
-    africanEyeInner->Transform.SetPosition(glm::vec3(-3.0f, 0.0f, 0.0f));
-    africanEyeInner->Transform.SetScale(glm::vec3(1.0f, 1.0f, 1.0f));
+    africanEyeInner->Transform.SetPosition(Vector3f{-3.0f, 0.0f, 0.0f});
+    africanEyeInner->Transform.SetScale(Vector3f{1.0f, 1.0f, 1.0f});
     africanEyeInner->AddComponent<CMeshRenderer>()->SetMesh(africanEyeInnerMesh);
     africanEyeInner->GetComponent<CMeshRenderer>()->SetMaterial(africanEyeInnerMat);
 
     auto africanEyeOuterMat = pbrMaterial->CreateInstance();
-    africanEyeOuterMat->SetVector("BaseColorTint", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    africanEyeOuterMat->SetVector("BaseColorTint", Vector4f{1.0f, 1.0f, 1.0f, 1.0f});
     africanEyeOuterMat->SetFloat("Roughness", 0.1f);
     africanEyeOuterMat->SetFloat("Metallic", 0.0f);
     auto africanEyeOuterDiffuse = AssetMgr->GetOrLoadTexture("AfricanEyeOuter_Diffuse", "assets/models/tiny-renderer-obj/african_head/african_head_eye_outer_diffuse.tga");
@@ -102,13 +103,13 @@ void AppLogic::LoadTinyRendererModels() const
 
     auto africanEyeOuterMesh = AssetMgr->GetOrLoadMesh("AfricanEyeOuter", "assets/models/tiny-renderer-obj/african_head/african_head_eye_outer.obj");
     FActor* africanEyeOuter = Scene->CreateActor("AfricanEyeOuter");
-    africanEyeOuter->Transform.SetPosition(glm::vec3(-3.0f, 0.0f, 0.0f));
-    africanEyeOuter->Transform.SetScale(glm::vec3(1.0f, 1.0f, 1.0f));
+    africanEyeOuter->Transform.SetPosition(Vector3f{-3.0f, 0.0f, 0.0f});
+    africanEyeOuter->Transform.SetScale(Vector3f{1.0f, 1.0f, 1.0f});
     africanEyeOuter->AddComponent<CMeshRenderer>()->SetMesh(africanEyeOuterMesh);
     africanEyeOuter->GetComponent<CMeshRenderer>()->SetMaterial(africanEyeOuterMat);
 
     auto boggieHeadMat = pbrMaterial->CreateInstance();
-    boggieHeadMat->SetVector("BaseColorTint", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    boggieHeadMat->SetVector("BaseColorTint", Vector4f{1.0f, 1.0f, 1.0f, 1.0f});
     boggieHeadMat->SetFloat("Roughness", 0.6f);
     boggieHeadMat->SetFloat("Metallic", 0.0f);
     auto boggieHeadDiffuse = AssetMgr->GetOrLoadTexture("BoggieHead_Diffuse", "assets/models/tiny-renderer-obj/boggie/head_diffuse.tga");
@@ -119,13 +120,13 @@ void AppLogic::LoadTinyRendererModels() const
 
     auto boggieHeadMesh = AssetMgr->GetOrLoadMesh("BoggieHead", "assets/models/tiny-renderer-obj/boggie/head.obj");
     FActor* boggieHead = Scene->CreateActor("BoggieHead");
-    boggieHead->Transform.SetPosition(glm::vec3(3.0f, 0.0f, 0.0f));
-    boggieHead->Transform.SetScale(glm::vec3(1.0f, 1.0f, 1.0f));
+    boggieHead->Transform.SetPosition(Vector3f{3.0f, 0.0f, 0.0f});
+    boggieHead->Transform.SetScale(Vector3f{1.0f, 1.0f, 1.0f});
     boggieHead->AddComponent<CMeshRenderer>()->SetMesh(boggieHeadMesh);
     boggieHead->GetComponent<CMeshRenderer>()->SetMaterial(boggieHeadMat);
 
     auto boggieBodyMat = pbrMaterial->CreateInstance();
-    boggieBodyMat->SetVector("BaseColorTint", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    boggieBodyMat->SetVector("BaseColorTint", Vector4f{1.0f, 1.0f, 1.0f, 1.0f});
     boggieBodyMat->SetFloat("Roughness", 0.7f);
     boggieBodyMat->SetFloat("Metallic", 0.0f);
     auto boggieBodyDiffuse = AssetMgr->GetOrLoadTexture("BoggieBody_Diffuse", "assets/models/tiny-renderer-obj/boggie/body_diffuse.tga");
@@ -136,13 +137,13 @@ void AppLogic::LoadTinyRendererModels() const
 
     auto boggieBodyMesh = AssetMgr->GetOrLoadMesh("BoggieBody", "assets/models/tiny-renderer-obj/boggie/body.obj");
     FActor* boggieBody = Scene->CreateActor("BoggieBody");
-    boggieBody->Transform.SetPosition(glm::vec3(3.0f, 0.0f, 0.0f));
-    boggieBody->Transform.SetScale(glm::vec3(1.0f, 1.0f, 1.0f));
+    boggieBody->Transform.SetPosition(Vector3f{3.0f, 0.0f, 0.0f});
+    boggieBody->Transform.SetScale(Vector3f{1.0f, 1.0f, 1.0f});
     boggieBody->AddComponent<CMeshRenderer>()->SetMesh(boggieBodyMesh);
     boggieBody->GetComponent<CMeshRenderer>()->SetMaterial(boggieBodyMat);
 
     auto boggieEyesMat = pbrMaterial->CreateInstance();
-    boggieEyesMat->SetVector("BaseColorTint", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    boggieEyesMat->SetVector("BaseColorTint", Vector4f{1.0f, 1.0f, 1.0f, 1.0f});
     boggieEyesMat->SetFloat("Roughness", 0.3f);
     boggieEyesMat->SetFloat("Metallic", 0.0f);
     auto boggieEyesDiffuse = AssetMgr->GetOrLoadTexture("BoggieEyes_Diffuse", "assets/models/tiny-renderer-obj/boggie/eyes_diffuse.tga");
@@ -153,15 +154,15 @@ void AppLogic::LoadTinyRendererModels() const
 
     auto boggieEyesMesh = AssetMgr->GetOrLoadMesh("BoggieEyes", "assets/models/tiny-renderer-obj/boggie/eyes.obj");
     FActor* boggieEyes = Scene->CreateActor("BoggieEyes");
-    boggieEyes->Transform.SetPosition(glm::vec3(3.0f, 0.0f, 0.0f));
-    boggieEyes->Transform.SetScale(glm::vec3(1.0f, 1.0f, 1.0f));
+    boggieEyes->Transform.SetPosition(Vector3f{3.0f, 0.0f, 0.0f});
+    boggieEyes->Transform.SetScale(Vector3f{1.0f, 1.0f, 1.0f});
     boggieEyes->AddComponent<CMeshRenderer>()->SetMesh(boggieEyesMesh);
     boggieEyes->GetComponent<CMeshRenderer>()->SetMaterial(boggieEyesMat);
 
     FActor* lightActor = Scene->CreateActor("MainLight");
-    lightActor->Transform.SetPosition(glm::vec3(0.0f, 5.0f, 5.0f));
+    lightActor->Transform.SetPosition(Vector3f{0.0f, 5.0f, 5.0f});
     auto* pl = lightActor->AddComponent<CPointLight>();
-    pl->Color = glm::vec3(1.0f, 1.0f, 1.0f);
+    pl->Color = Vector3f{1.0f, 1.0f, 1.0f};
     pl->Intensity = 100.0f;
 }
 
@@ -176,8 +177,8 @@ void AppLogic::Init(VulkanRenderer* renderer, FAssetManager* assetMgr, InputMana
     InitializeScene();
 
     FActor* cameraActor = Scene->CreateActor("MainCamera");
-    cameraActor->Transform.SetPosition(glm::vec3(0.0f, 2.0f, 8.0f));
-    cameraActor->Transform.SetRotation(glm::vec3(0.0f, 180.0f, 0.0f));
+    cameraActor->Transform.SetPosition(Vector3f{0.0f, 2.0f, 8.0f});
+    cameraActor->Transform.SetRotation(Vector3f{0.0f, 180.0f, 0.0f});
     MainCamera = cameraActor->AddComponent<CFirstPersonCamera>();
     MainCamera->Fov = 60.0f;
     MainCamera->Init(InputMgr);
@@ -221,12 +222,12 @@ void AppLogic::DrawLightPanel() {
             ImGui::Text("Main Light");
             ImGui::Separator();
             
-            glm::vec3 pos = mainLight->Transform.GetPosition();
-            if (ImGui::DragFloat3("Position", &pos.x, 0.1f, -20.0f, 20.0f)) {
+            Vector3f pos = mainLight->Transform.GetPosition();
+            if (ImGui::DragFloat3("Position", &pos.X, 0.1f, -20.0f, 20.0f)) {
                 mainLight->Transform.SetPosition(pos);
             }
             
-            ImGui::ColorEdit3("Color", &pl->Color.x);
+            ImGui::ColorEdit3("Color", &pl->Color.X);
             ImGui::SliderFloat("Intensity", &pl->Intensity, 0.0f, 500.0f);
         }
     } else {
@@ -245,13 +246,13 @@ void AppLogic::DrawCameraPanel() {
         ImGui::Text("Camera Settings");
         ImGui::Separator();
         
-        glm::vec3 pos = cameraActor->Transform.GetPosition();
-        if (ImGui::DragFloat3("Position", &pos.x, 0.1f, -50.0f, 50.0f)) {
+        Vector3f pos = cameraActor->Transform.GetPosition();
+        if (ImGui::DragFloat3("Position", &pos.X, 0.1f, -50.0f, 50.0f)) {
             cameraActor->Transform.SetPosition(pos);
         }
         
-        glm::vec3 rot = cameraActor->Transform.GetEulerAngles();
-        if (ImGui::DragFloat3("Rotation", &rot.x, 1.0f, -180.0f, 180.0f)) {
+        Vector3f rot = cameraActor->Transform.GetEulerAngles();
+        if (ImGui::DragFloat3("Rotation", &rot.X, 1.0f, -180.0f, 180.0f)) {
             cameraActor->Transform.SetRotation(rot);
         }
         
@@ -315,7 +316,7 @@ void AppLogic::DrawMaterialPanel() {
     
     bool materialChanged = false;
     
-    glm::vec4 baseColor = material->GetBaseColorTint();
+    Vector4f baseColor = material->GetBaseColorTint();
     float roughness = material->GetRoughness();
     float metallic = material->GetMetallic();
     float normalStrength = material->GetNormalMapStrength();
@@ -324,7 +325,7 @@ void AppLogic::DrawMaterialPanel() {
     ImGui::Text("Material Parameters");
     ImGui::Separator();
     
-    if (ImGui::ColorEdit4("Base Color", &baseColor.x)) {
+    if (ImGui::ColorEdit4("Base Color", &baseColor.X)) {
         material->SetVector("BaseColorTint", baseColor);
         materialChanged = true;
     }

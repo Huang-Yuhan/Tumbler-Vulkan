@@ -8,9 +8,11 @@
 #include "Core/GameSystem/Components/CMeshRenderer.h"
 #include "Core/GameSystem/Components/CPointLight.h"
 
-#include <glm/vec3.hpp>
+#include <Core/Math/Math.h>
 
 #include <algorithm>
+
+using namespace Tumbler::Math;
 #include <cctype>
 #include <exception>
 #include <string>
@@ -78,7 +80,7 @@ bool ParseVec3Arguments(
     const std::vector<std::string>& args,
     size_t startIndex,
     const std::string& usage,
-    glm::vec3& outVector)
+    Vector3f& outVector)
 {
     if (args.size() < startIndex + 3) {
         console.AddMessage(EConsoleMessageType::Error, "Usage: " + usage);
@@ -93,11 +95,11 @@ bool ParseVec3Arguments(
         }
     }
 
-    outVector = glm::vec3(values[0], values[1], values[2]);
+    outVector = Vector3f{values[0], values[1], values[2]};
     return true;
 }
 
-void SetActorEulerRotation(FActor* actor, const glm::vec3& eulerDegrees)
+void SetActorEulerRotation(FActor* actor, const Vector3f& eulerDegrees)
 {
     if (actor == nullptr) {
         return;
@@ -240,7 +242,7 @@ void RegisterTumblerConsoleCommands(
                 return;
             }
 
-            glm::vec3 position{};
+            Vector3f position{};
             if (!ParseVec3Arguments(console, args, 1, "actor.move <ActorName|selected> <x> <y> <z>", position)) {
                 return;
             }
@@ -272,7 +274,7 @@ void RegisterTumblerConsoleCommands(
                 return;
             }
 
-            glm::vec3 rotation{};
+            Vector3f rotation{};
             if (!ParseVec3Arguments(console, args, 1, "actor.rotate <ActorName|selected> <pitch> <yaw> <roll>", rotation)) {
                 return;
             }
@@ -304,7 +306,7 @@ void RegisterTumblerConsoleCommands(
                 return;
             }
 
-            glm::vec3 scale{};
+            Vector3f scale{};
             if (!ParseVec3Arguments(console, args, 1, "actor.scale <ActorName|selected> <x> <y> <z>", scale)) {
                 return;
             }
@@ -324,7 +326,7 @@ void RegisterTumblerConsoleCommands(
                 return;
             }
 
-            glm::vec3 position{};
+            Vector3f position{};
             if (!ParseVec3Arguments(console, args, 0, "camera.pos <x> <y> <z>", position)) {
                 return;
             }
@@ -434,7 +436,7 @@ void RegisterTumblerConsoleCommands(
                 return;
             }
 
-            glm::vec3 color{};
+            Vector3f color{};
             if (!ParseVec3Arguments(console, args, 1, "light.color <ActorName> <r> <g> <b>", color)) {
                 return;
             }
@@ -498,7 +500,7 @@ void RegisterTumblerConsoleCommands(
                 return;
             }
 
-            glm::vec3 position{};
+            Vector3f position{};
             if (!ParseVec3Arguments(console, args, 1, "spawn.light <Name> <x> <y> <z> <intensity>", position)) {
                 return;
             }
@@ -517,7 +519,7 @@ void RegisterTumblerConsoleCommands(
             FActor* lightActor = scene.CreateActor(args[0]);
             lightActor->Transform.SetPosition(position);
             auto* pointLight = lightActor->AddComponent<CPointLight>();
-            pointLight->Color = glm::vec3(1.0f, 1.0f, 1.0f);
+            pointLight->Color = Vector3f{1.0f, 1.0f, 1.0f};
             pointLight->Intensity = intensity;
 
             console.AddMessage(EConsoleMessageType::Info, "Spawned light: " + lightActor->Name);

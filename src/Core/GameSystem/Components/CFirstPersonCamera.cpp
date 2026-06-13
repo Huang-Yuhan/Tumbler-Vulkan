@@ -3,14 +3,16 @@
 #include "Core/GameSystem/InputManager.h"
 #include <algorithm>
 
+using namespace Tumbler::Math;
+
 void CFirstPersonCamera::Init(InputManager* input) {
     Input = input;
 }
 
-void CFirstPersonCamera::SetLookEuler(const glm::vec3& eulerDegrees)
+void CFirstPersonCamera::SetLookEuler(const Vector3f& eulerDegrees)
 {
-    Pitch = -eulerDegrees.x;
-    Yaw = -eulerDegrees.y + 90.0f;
+    Pitch = -eulerDegrees.X;
+    Yaw = -eulerDegrees.Y + 90.0f;
 
     if (Owner) {
         Owner->Transform.SetRotation(eulerDegrees);
@@ -27,21 +29,21 @@ void CFirstPersonCamera::Update(float deltaTime) {
         Pitch -= mouseDelta.y * MouseSensitivity;
         Pitch = std::clamp(Pitch, -89.0f, 89.0f);
     }
-    Owner->Transform.SetRotation(glm::vec3(-Pitch, -Yaw + 90.0f, 0.0f));
+    Owner->Transform.SetRotation(Vector3f{-Pitch, -Yaw + 90.0f, 0.0f});
 
-    // 2. 直接从 Transform 白嫖算好的方向向量！极其优雅！
-    glm::vec3 front = Owner->Transform.GetForwardVector();
-    glm::vec3 right = Owner->Transform.GetRightVector();
+    // 2. 直接从 Transform 获取算好的方向向量
+    Vector3f front = Owner->Transform.GetForwardVector();
+    Vector3f right = Owner->Transform.GetRightVector();
 
     // 3. 空间位移
     float forwardInput = Input->GetAxis("MoveForward");
     float rightInput = Input->GetAxis("MoveRight");
     float upInput = Input->GetAxis("MoveUp");
-    
-    glm::vec3 pos = Owner->Transform.GetPosition();
+
+    Vector3f pos = Owner->Transform.GetPosition();
     pos += front * forwardInput * MoveSpeed * deltaTime;
     pos += right * (-rightInput) * MoveSpeed * deltaTime;
-    pos += glm::vec3(0.0f, 1.0f, 0.0f) * upInput * MoveSpeed * deltaTime;
-    
+    pos += Vector3f{0.0f, 1.0f, 0.0f} * upInput * MoveSpeed * deltaTime;
+
     Owner->Transform.SetPosition(pos);
 }

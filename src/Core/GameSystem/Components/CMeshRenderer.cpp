@@ -15,14 +15,14 @@ void CMeshRenderer::OnDrawUI()
         if (MaterialPtr) {
             bool materialChanged = false;
             
-            glm::vec4 baseColor = MaterialPtr->GetBaseColorTint();
+            Tumbler::Math::Vector4f baseColor = MaterialPtr->GetBaseColorTint();
             float roughness = MaterialPtr->GetRoughness();
             float metallic = MaterialPtr->GetMetallic();
             float normalStrength = MaterialPtr->GetNormalMapStrength();
             bool twoSided = MaterialPtr->IsTwoSided();
             
             ImGui::Text("Material Parameters");
-            if (ImGui::ColorEdit4("Base Color", &baseColor.x)) {
+            if (ImGui::ColorEdit4("Base Color", &baseColor.X)) {
                 MaterialPtr->SetVector("BaseColorTint", baseColor);
                 materialChanged = true;
             }

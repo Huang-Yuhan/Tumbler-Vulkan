@@ -5,19 +5,20 @@
 #include <string>
 #include <unordered_map>
 #include <glm/glm.hpp>
+#include <Core/Math/Math.h>
 #include "Core/Graphics/VulkanTypes.h"
 
 class FMaterial;
 class FTexture;
 class VulkanRenderer;
 
-// 【关键】必须和 pbr.frag 中的 MaterialParams 保持绝对一致 (std140 对齐)
+// GPU UBO 结构 — 保持 glm 以保证 std140 对齐
 struct FMaterialUBO {
-    glm::vec4 BaseColorTint = glm::vec4(1.0f); // 默认白色，不染色
+    glm::vec4 BaseColorTint = glm::vec4(1.0f);
     float Roughness = 0.5f;
     float Metallic = 0.0f;
     float NormalMapStrength = 1.0f;
-    int32_t TwoSided = 0; // 0 = 单面, 1 = 双面
+    int32_t TwoSided = 0;
 };
 
 class FAssetManager;
@@ -31,7 +32,7 @@ public:
     // 材质参数 API
     // ==========================================
     void SetTexture(const std::string& name, std::shared_ptr<FTexture> texture);
-    void SetVector(const std::string& name, const glm::vec4& value);
+    void SetVector(const std::string& name, const Tumbler::Math::Vector4f& value);
     void SetFloat(const std::string& name, float value);
     void SetTwoSided(bool twoSided);
 
@@ -50,7 +51,10 @@ public:
     // 材质参数 Getter
     // ==========================================
     [[nodiscard]] const FMaterialUBO& GetParameters() const { return ParameterData; }
-    [[nodiscard]] glm::vec4 GetBaseColorTint() const { return ParameterData.BaseColorTint; }
+    [[nodiscard]] Tumbler::Math::Vector4f GetBaseColorTint() const {
+        return Tumbler::Math::Vector4f{ParameterData.BaseColorTint.x, ParameterData.BaseColorTint.y,
+                                       ParameterData.BaseColorTint.z, ParameterData.BaseColorTint.w};
+    }
     [[nodiscard]] float GetRoughness() const { return ParameterData.Roughness; }
     [[nodiscard]] float GetMetallic() const { return ParameterData.Metallic; }
     [[nodiscard]] float GetNormalMapStrength() const { return ParameterData.NormalMapStrength; }

@@ -1,21 +1,24 @@
 #pragma once
 #include "Component.h"
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp> // 必须包含这个才能用 translate/scale
+#include <Core/Math/Math.h>
 #include <Core/Utils/FQuaternion.hpp>
+
+namespace Tumbler::Math {
+// Forward — declared in MathFwd.h
+} // namespace Tumbler::Math
 
 class CTransform final : public Component
 {
 private:
-    glm::vec3 Position{0.0f, 0.0f, 0.0f};
-    glm::vec3 Scale{1.0f, 1.0f, 1.0f};
+    Tumbler::Math::Vector3f Position{0.0f, 0.0f, 0.0f};
+    Tumbler::Math::Vector3f Scale{1.0f, 1.0f, 1.0f};
     FQuaternion Rotation;
 
     CTransform* Parent = nullptr;
     std::vector<CTransform*> Children;
 
-    mutable glm::mat4 CachedLocalMatrix{1.0f};
-    mutable glm::mat4 CachedWorldMatrix{1.0f};
+    mutable Tumbler::Math::Matrix4f CachedLocalMatrix{Tumbler::Math::Matrix4f::Identity()};
+    mutable Tumbler::Math::Matrix4f CachedWorldMatrix{Tumbler::Math::Matrix4f::Identity()};
     mutable bool bIsLocalDirty = true;
     mutable bool bIsWorldDirty = true;
 
@@ -44,21 +47,21 @@ public:
         MarkWorldDirty();
     }
 
-    void SetRotation(const glm::vec3& eulerDegrees)
+    void SetRotation(const Tumbler::Math::Vector3f& eulerDegrees)
     {
-        Rotation = FQuaternion(eulerDegrees);
+        Rotation = FQuaternion(Tumbler::Math::Quaternionf::FromEulerDegrees(eulerDegrees));
         bIsLocalDirty = true;
         MarkWorldDirty();
     }
 
-    void SetPosition(const glm::vec3& position)
+    void SetPosition(const Tumbler::Math::Vector3f& position)
     {
         Position = position;
         bIsLocalDirty = true;
         MarkWorldDirty();
     }
 
-    void SetScale(const glm::vec3& scale)
+    void SetScale(const Tumbler::Math::Vector3f& scale)
     {
         Scale = scale;
         bIsLocalDirty = true;
@@ -68,33 +71,35 @@ public:
     // ==========================================
     // Getters
     // ==========================================
-    glm::vec3 GetPosition() const { return Position; }
-    glm::vec3 GetScale() const { return Scale; }
+    Tumbler::Math::Vector3f GetPosition() const { return Position; }
+    Tumbler::Math::Vector3f GetScale() const { return Scale; }
     FQuaternion GetRotation() const { return Rotation; }
 
-    glm::vec3 GetEulerAngles() const { return Rotation.ToEuler(); }
+    Tumbler::Math::Vector3f GetEulerAngles() const { return Rotation.Raw.ToEulerDegrees(); }
 
     // ==========================================
     // 核心矩阵获取 (Implemented in CTransform.cpp)
     // ==========================================
-    const glm::mat4& GetLocalMatrix() const;
-    const glm::mat4& GetLocalToWorldMatrix() const;
+    const Tumbler::Math::Matrix4f& GetLocalMatrix() const;
+    const Tumbler::Math::Matrix4f& GetLocalToWorldMatrix() const;
 
     // ==========================================
     // 辅助计算
     // ==========================================
-    glm::vec3 GetForwardVector() const { return Rotation.GetForwardVector(); }
-    glm::vec3 GetRightVector() const   { return Rotation.GetRightVector(); }
-    glm::vec3 GetUpVector() const      { return Rotation.GetUpVector(); }
+    Tumbler::Math::Vector3f GetForwardVector() const { return Rotation.Raw.GetForwardVector(); }
+    Tumbler::Math::Vector3f GetRightVector() const { return Rotation.Raw.GetRightVector(); }
+    Tumbler::Math::Vector3f GetUpVector() const { return Rotation.Raw.GetUpVector(); }
 
-    glm::vec3 TransformDirection(const glm::vec3& localDirection) const
+    Tumbler::Math::Vector3f TransformDirection(const Tumbler::Math::Vector3f& localDirection) const
     {
-        return glm::vec3(GetLocalToWorldMatrix() * glm::vec4(localDirection, 0.0f));
+        const Tumbler::Math::Vector4f result = GetLocalToWorldMatrix().TransformVector(localDirection);
+        return result.XYZ();
     }
 
-    glm::vec3 TransformPoint(const glm::vec3& localPoint) const
+    Tumbler::Math::Vector3f TransformPoint(const Tumbler::Math::Vector3f& localPoint) const
     {
-        return glm::vec3(GetLocalToWorldMatrix() * glm::vec4(localPoint, 1.0f));
+        const Tumbler::Math::Vector4f result = GetLocalToWorldMatrix().TransformPosition(localPoint);
+        return result.XYZ();
     }
 };
 
