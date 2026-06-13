@@ -215,12 +215,7 @@ VUID-vkCmdBindDescriptorSets-pipelineLayout-00316
 **原因：** Pipeline 使用的 DescriptorSetLayout 与实际绑定的 DescriptorSet 布局不一致。
 
 **解决方案：**
-确保：
-1. `FMaterial` 创建 Pipeline 时使用的 Layout
-2. `FMaterialInstance` 分配 DescriptorSet 时使用的 Layout
-3. `vkCmdBindDescriptorSets` 时传入的 Layout
-
-三者必须是同一个！
+确保 `DescriptorManager` 创建的 Set 布局与 Shader 中声明的绑定一致，且 `vkCmdBindDescriptorSets` 时传入的 Layout 与 Pipeline 的 Layout 匹配。
 
 ### 2.5 黑屏 / 看不到任何东西
 
@@ -402,7 +397,7 @@ tinyobjloader error: ...
 **常见泄漏点：**
 - Vulkan 对象（Buffer, Image, Pipeline 等）未正确销毁
 - 描述符集未返回 Pool
-- 资源加载后未释放（应该由 `FAssetManager` 管理）
+- 资源加载后未释放（应由 `ResourceManager` 管理生命周期）
 
 ---
 
@@ -448,7 +443,7 @@ void Render() {
 避免在主循环中进行大量动态内存分配。
 
 **3. 场景中物体过多**
-考虑实现视锥体剔除（Frustum Culling）。
+检查 GPU Frustum Culling 是否正常工作（DebugUI 面板查看可见实例数）。
 
 ---
 
@@ -506,7 +501,6 @@ LOG_CRITICAL("Critical message");
 3. **参考官方文档**：
    - [Vulkan 规范](https://www.khronos.org/registry/vulkan/)
    - [Vulkan Tutorial](https://vulkan-tutorial.com/)
-4. **检查开发路线图**：查看 `Tumbler_Dev_Plan.md`，问题可能已在计划中解决
 
 ---
 

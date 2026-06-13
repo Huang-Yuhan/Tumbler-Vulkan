@@ -2,6 +2,21 @@
 
 本文件为 Claude Code (claude.ai/code) 在此仓库中工作时提供指导。
 
+## 环境变量
+
+**Linux**:
+```bash
+export VCPKG_ROOT=/home/icecreamsarkaz/.vcpkg-clion/vcpkg
+export VULKAN_SDK=$HOME/.local/vulkan-sdk/1.4.350.1/x86_64
+export LD_LIBRARY_PATH=$VULKAN_SDK/lib/VulkanLoader/lib:$LD_LIBRARY_PATH
+export PATH=$VULKAN_SDK/bin:$PATH
+```
+
+**Windows**:
+```powershell
+$env:VCPKG_ROOT = "D:\vcpkg"  # 根据实际安装路径调整
+```
+
 ## 构建命令
 
 ```powershell
@@ -43,6 +58,28 @@ ctest --test-dir build -C Debug -N
 ```
 
 运行时冒烟测试需要开启 `-DTUMBLER_ENABLE_RUNTIME_SMOKE_TESTS=ON`。着色器产物冒烟检查依赖 `glslc`，如果 CI 环境中没有 `glslc`，着色器断言会被自动跳过。
+
+## Pre-commit Hook
+
+每次提交前自动运行：格式检查 → 编译 → 测试。配置：
+
+```bash
+git config core.hooksPath .githooks
+```
+
+脚本位于 `.githooks/pre-commit`。如需跳过（不推荐）：`git commit --no-verify`
+
+## 代码格式化
+
+```bash
+# 格式化所有 C++ 文件
+find src tests -name "*.h" -o -name "*.cpp" | xargs clang-format -i
+
+# 检查但不修改
+find src tests -name "*.h" -o -name "*.cpp" | xargs clang-format --dry-run -Werror
+```
+
+配置文件: `.clang-format` (LLVM 风格, 4 空格缩进, C++20, 120 列宽)
 
 ## 架构
 

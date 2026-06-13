@@ -1,102 +1,96 @@
-# Testing and CI Guide
+# 测试与 CI
 
-This document summarizes how to run tests locally, what CI validates, and how to add new unit tests safely.
-
-## 1. Build with Tests Enabled
+## 1. 构建时启用测试
 
 ```powershell
+# Windows
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
   -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
   -DVCPKG_TARGET_TRIPLET=x64-windows `
-  -DBUILD_TESTING=ON `
-  -DTUMBLER_ENABLE_RUNTIME_SMOKE_TESTS=ON
-```
+  -DBUILD_TESTING=ON
 
-```powershell
 cmake --build build --config Debug --parallel
 ```
 
-## 2. Run Tests
+```bash
+# Linux
+cmake -S . -B build-linux -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+  -DBUILD_TESTING=ON
 
-Run all tests (smoke + unit):
+cmake --build build-linux --target App-Tumbler
+```
+
+## 2. 运行测试
 
 ```powershell
+# 全部测试
 ctest --test-dir build -C Debug --output-on-failure
-```
 
-Run unit tests only:
-
-```powershell
+# 仅单元测试
 ctest --test-dir build -C Debug -L unit --output-on-failure
-```
 
-List registered tests without running:
+# 按名称运行单个测试
+ctest --test-dir build -C Debug -R "Scene" --output-on-failure
 
-```powershell
+# 列出所有已注册测试
 ctest --test-dir build -C Debug -N
 ```
 
-## 3. Test Types in This Repository
+## 3. 测试类型
 
-- `Smoke.*` tests: validate key assets, executable outputs, and deferred pipeline integration hooks.
-- `unit` label tests: pure C++ behavior checks powered by GoogleTest.
+- **Smoke 测试**: 验证关键构建产物（可执行文件、资产目录、Shader `.spv`）存在
+- **Unit 测试** (GoogleTest): 纯 C++ 行为测试，链接 `TumblerCore`
 
-### CMake 脚本烟雾测试（始终注册）
+### CMake 脚本烟雾测试
 
-- `Smoke.RuntimeArtifacts` — 验证关键构建产物（exe、资产目录、着色器 `.spv`）存在
-- `Smoke.DeferredPipeline` — 验证 Deferred 管线关键产物和钩子
+- `Smoke.RuntimeArtifacts` — 验证构建产物（assets、shader 源文件）
 
-### 运行时烟雾测试（需 `TUMBLER_ENABLE_RUNTIME_SMOKE_TESTS=ON`）
+### 单元测试目录约定
 
-启动 `App-Tumbler` 自动执行固定帧数后退出：
+每个模块一个子目录 + 独立 CMakeLists.txt：
 
-- `Smoke.ResizeStressRuntime` — 连续切换窗口尺寸，验证 swapchain/UI Framebuffer 稳定性
-- `Smoke.DescriptorStressRuntime` — 批量创建/销毁材质实例，验证描述符生命周期
-- `Smoke.HiddenWindowRuntime` — 隐藏窗口渲染固定帧数，验证初始化/渲染/退出全链路
-
-着色器产物检查依赖 `glslc`，不可用时自动跳过。
-
-## 4. Add a New Unit Test
-
-现有单元测试文件（`tests/unit/`）：
-
-| 文件 | 覆盖内容 |
-|------|----------|
-| `DescriptorSetFreeQueueTests.cpp` | 描述符延迟释放队列 |
-| `FQuaternionTests.cpp` | 四元数运算 |
-| `CTransformTests.cpp` | Transform 层级变换 |
-| `FActorTests.cpp` | Actor 创建/组件管理 |
-| `FSceneTests.cpp` | 场景生命周期/延迟销毁 |
-
-添加新测试：
-
-1. 在对应文件中添加 `TEST(...)` 用例，或新建文件后在 `tests/CMakeLists.txt` 中注册
-2. 保持测试确定性
-3. 重新配置后运行：
-
-Deterministic checklist:
-
-- avoid filesystem/network dependence
-- avoid timing-sensitive sleeps
-- keep assertions strict but numerically stable (`EXPECT_NEAR` for float math)
-
-```powershell
-ctest --test-dir build -C Debug -N
-ctest --test-dir build -C Debug -L unit --output-on-failure
+```
+tests/unit/
+├── Math/
+│   ├── CMakeLists.txt          # 独立 target: TumblerMathTests
+│   ├── FrustumTests.cpp
+│   └── MathTypesTests.cpp
+└── (future: Scene/, Graphics/, ...)
 ```
 
-If tests are not discovered, confirm `tests/CMakeLists.txt` includes the file and `BUILD_TESTING=ON` is set at configure time.
+**好处**：
+- `cmake --build . --target TumblerMathTests` — 只编译 Math 测试
+- `ctest -R Math` — 只跑 Math 测试
+- 模块之间互不干扰
 
-## 5. CI Overview (Windows)
+### 添加新模块测试
 
-Workflow file: `.github/workflows/windows-ci.yml`
+1. 创建 `tests/unit/<Module>/` 目录
+2. 编写 `CMakeLists.txt`（参考 `tests/unit/Math/CMakeLists.txt`，修改 target 名和标签）
+3. 在 `tests/CMakeLists.txt` 中加一行 `add_subdirectory(unit/<Module>)`
+4. `file(GLOB_RECURSE)` 自动收集 `.cpp` 文件，不需要手动列出
 
-Current CI stages:
+### 编写测试
 
-1. Setup MSVC + bootstrap pinned vcpkg
+- 保持确定性（无文件系统/网络依赖，无时序依赖）
+- 浮点断言使用 `EXPECT_NEAR`
+
+```powershell
+# 运行所有单元测试
+ctest --test-dir build -C Debug -L unit --output-on-failure
+
+# 运行指定模块
+ctest --test-dir build -C Debug -R Math --output-on-failure
+```
+
+## 4. CI 流程 (GitHub Actions)
+
+Workflow: `.github/workflows/windows-ci.yml`
+
+1. Setup MSVC + bootstrap vcpkg
 2. Install dependencies from `vcpkg.json`
 3. CMake configure (`BUILD_TESTING=ON`)
 4. Debug build
 5. `ctest --test-dir build -C Debug --output-on-failure`
-
-Runtime note: CI prepends vcpkg runtime directories for test execution to avoid missing-DLL failures on Windows.

@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-06-03 — GPU-Driven 重写: 分支清理
+
+### 破坏性变更
+- 创建 `gpu-driven-rewrite` 分支，删除全部 `src/` 源码（10972 行）
+- 删除 `Design_Review.md`、`Tumbler_Dev_Plan.md`（旧计划文档）
+- `build-linux/` 加入 `.gitignore`
+
+### 保留
+- 构建系统（CMake + vcpkg）、资产（模型/纹理/Shader 源码）、文档
+- CI 配置、测试目录、`CLAUDE.md`
+
+### 架构方向
+- 新引擎目标：纯 GPU-Driven + Deferred，无 ECS，Bindless 纹理
+- 开发计划：`GPU-Driven 引擎开发计划`（`.claude/plans/lazy-wandering-owl.md`）
+
+---
+
 ## 2026-05-03 — 代码质量与设计审查
 
 ### 分层修复

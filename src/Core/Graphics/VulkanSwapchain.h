@@ -1,67 +1,71 @@
+// VulkanSwapchain.h — 交换链与深度缓冲管理
+//
+// 职责: 管理 VkSwapchainKHR 生命周期, 创建/销毁 ImageView 和深度缓冲,
+//       处理窗口 resize 重建, 提供 Acquire/Present 接口.
+//
+// 依赖: VulkanContext, RenderDevice
+// 层级: 图形基础设施 (Phase 3)
+
 #pragma once
 
+#include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
-#include <Core/Graphics/VulkanTypes.h>
+
 #include <vector>
 
+namespace Tumbler {
 
-// 前置声明
-class VulkanContext;
-
+class RenderDevice;
 
 class VulkanSwapchain {
 public:
+    bool Init(VkInstance instance, VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface,
+              uint32_t graphicsQueueFamily, uint32_t presentQueueFamily, RenderDevice& renderDevice, int width,
+              int height);
+    void Shutdown();
+    void Recreate(int width, int height);
+
+    VkResult AcquireNextImage(uint32_t* imageIndex, VkSemaphore semaphore, VkFence fence);
+    VkResult Present(VkQueue queue, uint32_t imageIndex, VkSemaphore waitSemaphore);
+
+    bool NeedsRecreate() const { return m_NeedsRecreate; }
+
+    VkExtent2D GetExtent() const { return m_Extent; }
+    VkFormat GetFormat() const { return m_ImageFormat; }
+    uint32_t GetImageCount() const { return static_cast<uint32_t>(m_Images.size()); }
+    VkImage GetImage(uint32_t index) const { return m_Images[index]; }
+    VkImageView GetImageView(uint32_t index) const { return m_ImageViews[index]; }
+    VkImageView GetDepthImageView() const { return m_DepthImageView; }
+    uint32_t GetPresentQueueFamily() const { return m_PresentQueueFamily; }
+
     VulkanSwapchain() = default;
-    ~VulkanSwapchain() { Cleanup(); }
-
-    // 初始化：需要 Context 和窗口大小
-    void Init(VulkanContext* context, uint32_t width, uint32_t height);
-    void Cleanup();
-
-    // ==========================================
-    // 核心流程：每一帧都要调用
-    // ==========================================
-
-    // 1. 索取一张空闲的画布 (返回 imageIndex)
-    VkResult AcquireNextImage(VkSemaphore imageAvailableSemaphore, uint32_t& outImageIndex) const;
-
-    // 2. 把画好的画布推送到屏幕
-    VkResult PresentImage(VkSemaphore renderFinishedSemaphore, uint32_t imageIndex) const;
-
-    // ==========================================
-    // Getters
-    // ==========================================
-    [[nodiscard]] VkFormat GetImageFormat() const { return ImageFormat; }
-    [[nodiscard]] VkExtent2D GetExtent() const { return Extent; }
-    [[nodiscard]] const std::vector<VkImageView>& GetImageViews() const { return ImageViews; }
-    [[nodiscard]] size_t GetImageCount() const { return Images.size(); }
-    [[nodiscard]] VkFormat GetDepthFormat() const { return DepthFormat; }
-    [[nodiscard]] VkImageView GetDepthImageView() const { return DepthImage.ImageView; }
+    ~VulkanSwapchain() = default;
+    VulkanSwapchain(const VulkanSwapchain&) = delete;
+    VulkanSwapchain& operator=(const VulkanSwapchain&) = delete;
 
 private:
-    // 持有 Context 的指针，方便调用 vkDevice
-    VulkanContext* ContextRef = nullptr;
+    void DestroySwapchainObjects();
 
-    VkSwapchainKHR Swapchain = VK_NULL_HANDLE;
+    VkInstance m_Instance = VK_NULL_HANDLE;
+    VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
+    VkDevice m_Device = VK_NULL_HANDLE;
+    VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
+    VkSwapchainKHR m_Swapchain = VK_NULL_HANDLE;
+    RenderDevice* m_RenderDevice = nullptr;
 
-    // 交换链里的图片 (由 Vulkan 自动创建)
-    std::vector<VkImage> Images;
+    VkFormat m_ImageFormat = VK_FORMAT_UNDEFINED;
+    VkExtent2D m_Extent{};
 
-    // 图片的“身份证” (我们需要手动创建)
-    std::vector<VkImageView> ImageViews;
+    std::vector<VkImage> m_Images;
+    std::vector<VkImageView> m_ImageViews;
 
-    VkFormat ImageFormat{};
-    VkExtent2D Extent{};
+    VkImage m_DepthImage = VK_NULL_HANDLE;
+    VkImageView m_DepthImageView = VK_NULL_HANDLE;
+    VmaAllocation m_DepthAllocation = VK_NULL_HANDLE;
 
-    AllocatedImage DepthImage{};
-    VkFormat DepthFormat{};
-
-    void CreateImageViews();
-    void CreateDepthResources();
-
-    // 内部辅助函数
-    static VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
-    static VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
-
-    static VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, uint32_t width, uint32_t height);
+    bool m_NeedsRecreate = false;
+    uint32_t m_GraphicsQueueFamily = 0;
+    uint32_t m_PresentQueueFamily = 0;
 };
+
+} // namespace Tumbler

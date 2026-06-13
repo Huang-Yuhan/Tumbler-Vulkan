@@ -16,7 +16,7 @@
 #include "Core/GameSystem/Components/CFirstPersonCamera.h"
 
 int main() {
-    Log::Get().Init();
+    Tumbler::LogInit();
     LOG_INFO("Tumbler Engine - Tiny Renderer Models Starting...");
 
     try {

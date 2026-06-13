@@ -1,34 +1,26 @@
+// Log.h — spdlog 日志封装
+//
+// 职责: 提供统一的日志宏 (LOG_TRACE/DEBUG/INFO/WARN/ERROR/CRITICAL)，
+//       对 spdlog 做一层薄封装，隔离第三方日志库的 include。
+//
+// 依赖: spdlog (通过 vcpkg)
+// 层级: 平台/工具层 (Phase 1)，无项目内部依赖，被所有模块使用
+
 #pragma once
 
 #include <memory>
 #include <spdlog/spdlog.h>
-#include <Core/Utils/DesignPattern/Singleton.h>
 
-// 1. 继承 Singleton<Log>
-class Log : public Singleton<Log> {
-    // 允许基类调用 Log 的私有构造函数 (如果是私有的话)
-    friend class Singleton<Log>;
+namespace Tumbler {
 
-public:
-    // 初始化函数 (不再是 static)
-    void Init();
+void LogInit();
+void LogShutdown();
 
-    // Getter (不再是 static)
-    std::shared_ptr<spdlog::logger>& GetCoreLogger() { return CoreLogger; }
+} // namespace Tumbler
 
-private:
-    // 私有构造 (防止外部 Log log;)
-    Log() = default;
-
-    std::shared_ptr<spdlog::logger> CoreLogger;
-};
-
-// ==========================================
-// 宏定义更新
-// ==========================================
-// 注意：现在需要通过 Log::Get() 来访问实例
-#define LOG_TRACE(...)    ::Log::Get().GetCoreLogger()->trace(__VA_ARGS__)
-#define LOG_INFO(...)     ::Log::Get().GetCoreLogger()->info(__VA_ARGS__)
-#define LOG_WARN(...)     ::Log::Get().GetCoreLogger()->warn(__VA_ARGS__)
-#define LOG_ERROR(...)    ::Log::Get().GetCoreLogger()->error(__VA_ARGS__)
-#define LOG_CRITICAL(...) ::Log::Get().GetCoreLogger()->critical(__VA_ARGS__)
+#define LOG_TRACE(...) ::spdlog::trace(__VA_ARGS__)
+#define LOG_DEBUG(...) ::spdlog::debug(__VA_ARGS__)
+#define LOG_INFO(...) ::spdlog::info(__VA_ARGS__)
+#define LOG_WARN(...) ::spdlog::warn(__VA_ARGS__)
+#define LOG_ERROR(...) ::spdlog::error(__VA_ARGS__)
+#define LOG_CRITICAL(...) ::spdlog::critical(__VA_ARGS__)

@@ -343,7 +343,7 @@ private:
 }
 
 int main(int argc, char** argv) {
-    Log::Get().Init();
+    Tumbler::LogInit();
     LOG_INFO("Tumbler Engine Starting...");
 
     try {

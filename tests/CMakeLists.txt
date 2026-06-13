@@ -1,3 +1,8 @@
+# New modular tests (from gpu-driven-rewrite)
+add_subdirectory(unit/Math)
+add_subdirectory(unit/Graphics)
+
+# Legacy flat tests (from main)
 add_executable(TumblerUnitTests
         unit/DescriptorSetFreeQueueTests.cpp
         unit/FQuaternionTests.cpp
@@ -20,7 +25,6 @@ gtest_add_tests(
 )
 
 if(WIN32)
-    # Keep runtime DLLs next to the test executable for direct invocation.
     add_custom_command(TARGET TumblerUnitTests POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
             $<TARGET_RUNTIME_DLLS:TumblerUnitTests>

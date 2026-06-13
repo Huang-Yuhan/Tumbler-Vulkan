@@ -3,4 +3,9 @@ cmake-build-debug/
 vcpkg_installed/
 /assets/shaders/**/*.spv
 build/*
+build-linux/*
+build-phase3-*/
 .vscode/*
+Testing/
+compile_commands.json
+.clangd/
