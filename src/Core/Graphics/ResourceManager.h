@@ -4,7 +4,7 @@
 //       纹理上传 (stb_image + Mipmap), Shader Module 加载,
 //       建纹理索引表为 Bindless 做准备.
 //
-// 依赖: RenderDevice, CommandManager
+// 依赖: GpuDevice, CommandManager
 // 层级: 图形基础设施 (Phase 3)
 
 #pragma once
@@ -20,7 +20,7 @@
 
 namespace Tumbler {
 
-class RenderDevice;
+class GpuDevice;
 class CommandManager;
 
 struct MeshHandle {
@@ -39,7 +39,7 @@ struct TextureHandle {
 
 class ResourceManager {
 public:
-    bool Init(VkDevice device, RenderDevice& renderDevice, CommandManager& commandManager);
+    bool Init(VkDevice device, GpuDevice& renderDevice, CommandManager& commandManager);
     void Shutdown();
 
     // Mesh
@@ -65,7 +65,7 @@ public:
 
 private:
     VkDevice m_Device = VK_NULL_HANDLE;
-    RenderDevice* m_RenderDevice = nullptr;
+    GpuDevice* m_GpuDevice = nullptr;
     CommandManager* m_CommandManager = nullptr;
 
     // Unified buffers

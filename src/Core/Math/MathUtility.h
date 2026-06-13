@@ -36,4 +36,9 @@ inline float InvSqrt(float value) {
     return 1.0f / std::sqrt(value);
 }
 
+template <typename T>
+constexpr T Lerp(const T& a, const T& b, float t) {
+    return a + (b - a) * t;
+}
+
 } // namespace Tumbler::Math

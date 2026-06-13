@@ -103,4 +103,18 @@ inline Matrix4f MakePerspective(float verticalFovRadians, float aspectRatio, flo
                     0.0f,   0.0f,   -1.0f, 0.0f};
 }
 
+inline Matrix4f MakeTranslation(const Vector3f& translation) {
+    return Matrix4f{1.0f, 0.0f, 0.0f, translation.X,
+                    0.0f, 1.0f, 0.0f, translation.Y,
+                    0.0f, 0.0f, 1.0f, translation.Z,
+                    0.0f, 0.0f, 0.0f, 1.0f};
+}
+
+inline Matrix4f MakeScale(const Vector3f& scale) {
+    return Matrix4f{scale.X, 0.0f,    0.0f,    0.0f,
+                    0.0f,    scale.Y, 0.0f,    0.0f,
+                    0.0f,    0.0f,    scale.Z, 0.0f,
+                    0.0f,    0.0f,    0.0f,    1.0f};
+}
+
 } // namespace Tumbler::Math
