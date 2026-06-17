@@ -1,7 +1,8 @@
 #include "AssetDatabase.h"
 
+#include "Core/Utils/Log.h"
+
 #include <fstream>
-#include <iostream>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -11,7 +12,7 @@ namespace Tumbler {
 bool AssetDatabase::LoadAssetMap(const std::string& assetMapPath) {
     std::ifstream file(assetMapPath);
     if (!file.is_open()) {
-        std::cerr << "[AssetDatabase] Failed to open asset_map: " << assetMapPath << std::endl;
+        LOG_ERROR("Failed to open asset_map: {}", assetMapPath);
         return false;
     }
 
@@ -62,11 +63,11 @@ bool AssetDatabase::LoadAssetMap(const std::string& assetMapPath) {
         }
 
         m_bLoaded = true;
-        std::cout << "[AssetDatabase] Loaded asset_map: " << m_Meshes.size() << " meshes, " << m_Textures.size()
-                  << " textures, " << m_Materials.size() << " materials" << std::endl;
+        LOG_INFO("Loaded asset_map: {} meshes, {} textures, {} materials", m_Meshes.size(), m_Textures.size(),
+                  m_Materials.size());
         return true;
     } catch (const json::exception& e) {
-        std::cerr << "[AssetDatabase] JSON parse error: " << e.what() << std::endl;
+        LOG_ERROR("JSON parse error: {}", e.what());
         return false;
     }
 }

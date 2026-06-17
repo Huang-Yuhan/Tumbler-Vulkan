@@ -1,7 +1,8 @@
 #include "EngineConfig.h"
 
+#include "Core/Utils/Log.h"
+
 #include <fstream>
-#include <iostream>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -11,7 +12,7 @@ namespace Tumbler {
 bool EngineConfig::LoadFromFile(const std::string& configPath) {
     std::ifstream file(configPath);
     if (!file.is_open()) {
-        std::cerr << "[EngineConfig] Failed to open config file: " << configPath << std::endl;
+        LOG_ERROR("Failed to open config file: {}", configPath);
         return false;
     }
 
@@ -31,11 +32,10 @@ bool EngineConfig::LoadFromFile(const std::string& configPath) {
             AssetMapPath = r.value("assetMap", "cooked/asset_map.json");
         }
 
-        std::cout << "[EngineConfig] Loaded: " << WindowWidth << "x" << WindowHeight << " '" << WindowTitle << "'"
-                  << std::endl;
+        LOG_INFO("Loaded: {}x{} '{}'", WindowWidth, WindowHeight, WindowTitle);
         return true;
     } catch (const json::exception& e) {
-        std::cerr << "[EngineConfig] JSON parse error: " << e.what() << std::endl;
+        LOG_ERROR("JSON parse error: {}", e.what());
         return false;
     }
 }

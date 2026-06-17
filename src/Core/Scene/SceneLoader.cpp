@@ -1,5 +1,7 @@
 #include "SceneLoader.h"
 
+#include "Core/Utils/Log.h"
+
 #include "Core/Assets/AssetDatabase.h"
 #include "Core/GameSystem/Components/CCamera.h"
 #include "Core/GameSystem/Components/CDirectionalLight.h"
@@ -10,7 +12,6 @@
 #include "Core/Math/Quaternion.h"
 
 #include <fstream>
-#include <iostream>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -22,7 +23,7 @@ bool SceneLoader::LoadFromFile(::FScene& scene, const std::string& jsonPath, con
                                Result& outResult) {
     std::ifstream file(jsonPath);
     if (!file.is_open()) {
-        std::cerr << "[SceneLoader] Failed to open scene file: " << jsonPath << std::endl;
+        LOG_ERROR("Failed to open scene file: {}", jsonPath);
         return false;
     }
 
@@ -30,7 +31,7 @@ bool SceneLoader::LoadFromFile(::FScene& scene, const std::string& jsonPath, con
     try {
         doc = json::parse(file);
     } catch (const json::exception& e) {
-        std::cerr << "[SceneLoader] JSON parse error: " << e.what() << std::endl;
+        LOG_ERROR("JSON parse error: {}", e.what());
         return false;
     }
 
@@ -68,14 +69,13 @@ bool SceneLoader::LoadFromFile(::FScene& scene, const std::string& jsonPath, con
             std::string meshSourcePath = objJson.value("mesh", "");
 
             if (meshSourcePath.empty()) {
-                std::cerr << "[SceneLoader] Object '" << name << "' has no mesh path, skipping." << std::endl;
+                LOG_WARN("Object '{}' has no mesh path, skipping.", name);
                 continue;
             }
 
             std::string cookedMeshPath = assetDb.GetCookedPath(meshSourcePath, "meshes");
             if (cookedMeshPath.empty()) {
-                std::cerr << "[SceneLoader] Mesh source path not in AssetDatabase: " << meshSourcePath << " (object '"
-                          << name << "'), skipping." << std::endl;
+                LOG_WARN("Mesh source path not in AssetDatabase: {} (object '{}'), skipping.", meshSourcePath, name);
                 continue;
             }
 
@@ -159,13 +159,13 @@ bool SceneLoader::LoadFromFile(::FScene& scene, const std::string& jsonPath, con
 
                 outResult.LightActors.push_back(actor);
             } else {
-                std::cerr << "[SceneLoader] Unknown light type: " << lightType << std::endl;
+                LOG_WARN("Unknown light type: {}", lightType);
             }
         }
     }
 
-    std::cout << "[SceneLoader] Loaded scene '" << sceneName << "': " << outResult.MeshActors.size() << " meshes, "
-              << outResult.LightActors.size() << " lights" << std::endl;
+    LOG_INFO("Loaded scene '{}': {} meshes, {} lights", sceneName, outResult.MeshActors.size(),
+              outResult.LightActors.size());
 
     return true;
 }
