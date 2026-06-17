@@ -1,0 +1,9 @@
+{
+    "name": "Sword",
+    "albedo": "assets/textures/1.jpg",
+    "normal": "",
+    "metallicRoughness": "",
+    "baseColorTint": [1.0, 1.0, 1.0],
+    "roughness": 0.5,
+    "metallic": 0.1
+}

@@ -1,0 +1,11 @@
+{
+    "window": {
+        "width": 1280,
+        "height": 720,
+        "title": "Tumbler"
+    },
+    "render": {
+        "cookedPath": "cooked/",
+        "assetMap": "cooked/asset_map.json"
+    }
+}

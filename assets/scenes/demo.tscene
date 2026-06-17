@@ -1,0 +1,30 @@
+{
+    "name": "Demo",
+    "camera": {
+        "fov": 60.0,
+        "nearPlane": 0.1,
+        "farPlane": 1000.0,
+        "position": [0.0, 2.0, 8.0],
+        "lookAt": [0.0, 1.0, 0.0]
+    },
+    "objects": [
+        {
+            "name": "Sword",
+            "mesh": "assets/models/Sting-Sword-lowpoly.obj",
+            "materials": ["assets/materials/sword.tmat"],
+            "transform": {
+                "position": [0.0, 1.5, 0.0],
+                "scale": [1.0, 1.0, 1.0],
+                "rotation": [0.0, 0.0, 0.0, 1.0]
+            }
+        }
+    ],
+    "lights": [
+        {
+            "type": "directional",
+            "direction": [0.5, -1.0, -0.3],
+            "color": [1.0, 0.95, 0.8],
+            "intensity": 1.5
+        }
+    ]
+}
