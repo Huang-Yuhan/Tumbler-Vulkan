@@ -4,6 +4,8 @@
 
 #include <cstdint>
 
+using namespace Tumbler;
+
 namespace {
 VkDescriptorSet MakeFakeDescriptorSet(uint64_t value)
 {

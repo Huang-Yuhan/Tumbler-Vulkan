@@ -7,6 +7,7 @@
 #include "Core/GameSystem/FScene.h"
 #include "Core/Scene/SceneLoader.h"
 
+#include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
 
@@ -18,7 +19,7 @@ class SceneLoaderTests : public ::testing::Test {
 protected:
     void SetUp() override {
         // 写入临时 asset_map.json
-        m_AssetMapPath = "/tmp/tumbler_test_scene_asset_map.json";
+        m_AssetMapPath = (std::filesystem::temp_directory_path() / "tumbler_test_scene_asset_map.json").string();
         std::ofstream amFile(m_AssetMapPath);
         amFile << R"({
   "version": 1,
@@ -45,7 +46,7 @@ protected:
         m_AssetDb.LoadAssetMap(m_AssetMapPath);
 
         // 写入 Scene JSON
-        m_ScenePath = "/tmp/tumbler_test_scene.json";
+        m_ScenePath = (std::filesystem::temp_directory_path() / "tumbler_test_scene.json").string();
         std::ofstream sceneFile(m_ScenePath);
         sceneFile << R"({
   "version": 1,
@@ -179,12 +180,12 @@ TEST_F(SceneLoaderTests, MissingFileReturnsFalse) {
     SceneLoader loader;
     SceneLoader::Result result;
 
-    EXPECT_FALSE(loader.LoadFromFile(scene, "/tmp/nonexistent_scene.json", m_AssetDb, result));
+    EXPECT_FALSE(loader.LoadFromFile(scene, (std::filesystem::temp_directory_path() / "nonexistent_scene.json").string(), m_AssetDb, result));
 }
 
 TEST_F(SceneLoaderTests, MeshNotInAssetDatabaseSkipsObject) {
     // 写一个引用未知 mesh 的 scene
-    std::string badScenePath = "/tmp/tumbler_test_bad_scene.json";
+    std::string badScenePath = (std::filesystem::temp_directory_path() / "tumbler_test_bad_scene.json").string();
     std::ofstream f(badScenePath);
     f << R"({
   "version": 1,
@@ -211,7 +212,7 @@ TEST_F(SceneLoaderTests, MeshNotInAssetDatabaseSkipsObject) {
 }
 
 TEST_F(SceneLoaderTests, CameraDefaultsWhenNotProvided) {
-    std::string noCamPath = "/tmp/tumbler_test_no_cam.json";
+    std::string noCamPath = (std::filesystem::temp_directory_path() / "tumbler_test_no_cam.json").string();
     std::ofstream f(noCamPath);
     f << R"({"version":1,"name":"NoCamera","objects":[]})";
     f.close();

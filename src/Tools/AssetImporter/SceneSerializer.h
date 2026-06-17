@@ -6,10 +6,7 @@
 #include <string>
 #include <vector>
 
-// 前置声明，避免头文件暴露 nlohmann/json
-namespace nlohmann {
-class json;
-}
+#include <nlohmann/json_fwd.hpp>
 
 namespace Tumbler {
 

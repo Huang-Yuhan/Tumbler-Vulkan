@@ -1,5 +1,6 @@
 #include "Core/Engine/EngineConfig.h"
 
+#include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
 
@@ -9,7 +10,7 @@ namespace {
 
 class EngineConfigTests : public ::testing::Test {
 protected:
-    void SetUp() override { m_TestPath = "/tmp/tumbler_test_engine.json"; }
+    void SetUp() override { m_TestPath = (std::filesystem::temp_directory_path() / "tumbler_test_engine.json").string(); }
 
     void TearDown() override { std::remove(m_TestPath.c_str()); }
 

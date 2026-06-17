@@ -2,6 +2,7 @@
 
 #include "Core/GameSystem/Components/CTransform.h"
 
+using namespace Tumbler;
 using namespace Tumbler::Math;
 
 namespace {

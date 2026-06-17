@@ -1,5 +1,6 @@
 #include "Core/Assets/AssetDatabase.h"
 
+#include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
 
@@ -11,7 +12,7 @@ class AssetDatabaseTests : public ::testing::Test {
 protected:
     void SetUp() override {
         // 创建临时 asset_map.json
-        m_TestPath = "/tmp/tumbler_test_asset_map.json";
+        m_TestPath = (std::filesystem::temp_directory_path() / "tumbler_test_asset_map.json").string();
         WriteTestAssetMap();
     }
 
@@ -72,7 +73,7 @@ TEST_F(AssetDatabaseTests, LoadsAssetMapAndReturnsIsLoaded) {
 
 TEST_F(AssetDatabaseTests, MissingFileReturnsFalse) {
     AssetDatabase db;
-    EXPECT_FALSE(db.LoadAssetMap("/tmp/nonexistent_file.json"));
+    EXPECT_FALSE(db.LoadAssetMap((std::filesystem::temp_directory_path() / "nonexistent_file.json").string()));
     EXPECT_FALSE(db.IsLoaded());
 }
 

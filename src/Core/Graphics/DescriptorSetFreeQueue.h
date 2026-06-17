@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <vector>
 
+namespace Tumbler {
+
 class DescriptorSetFreeQueue {
 public:
     bool Enqueue(VkDescriptorSet descriptorSet) {
@@ -31,3 +33,5 @@ public:
 private:
     std::vector<VkDescriptorSet> PendingDescriptorSets;
 };
+
+} // namespace Tumbler

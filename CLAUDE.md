@@ -14,9 +14,16 @@ export LD_LIBRARY_PATH=$VULKAN_SDK/lib/VulkanLoader/lib:$LD_LIBRARY_PATH
 export PATH=$VULKAN_SDK/bin:$PATH
 ```
 
-**Windows**:
+**Windows (机器 B — LAPTOP-LMLQIAPM)**:
 ```powershell
-$env:VCPKG_ROOT = "D:\vcpkg"  # 根据实际安装路径调整
+$env:VCPKG_ROOT = "F:\vcpkg"
+# Visual Studio 2022: F:\VS2022\ (MSVC 14.44.35207)
+# 需要先执行 vcvars 或通过 CLion Toolchain 自动配置
+```
+
+**Windows (机器 A — IcecreamSarkaz-Desktop)**:
+```powershell
+$env:VCPKG_ROOT = "C:\Users\Icecream_Sarkaz\.vcpkg-clion\vcpkg"
 ```
 
 ## 构建命令
