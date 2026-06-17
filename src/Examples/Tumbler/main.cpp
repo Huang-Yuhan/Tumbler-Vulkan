@@ -3,6 +3,7 @@
 #include "Core/Scene/SceneLoader.h"
 #include "Core/Assets/AssetDatabase.h"
 #include "Core/GameSystem/Components/CStaticMesh.h"
+#include "Core/GameSystem/FActor.h"
 #include "Core/GameSystem/FScene.h"
 #include "Core/Utils/Log.h"
 
@@ -36,7 +37,7 @@ int main() {
         LOG_INFO("Scene loaded: {} mesh actors, {} light actors", result.MeshActors.size(), result.LightActors.size());
 
         // 输出每个 Mesh Actor 的信息
-        for (const auto* actor : result.MeshActors) {
+        for (auto* actor : result.MeshActors) {
             auto* mesh = actor->GetComponent<CStaticMesh>();
             if (mesh) {
                 LOG_INFO("  Mesh: '{}' source='{}' cooked='{}'", actor->Name, mesh->MeshSourcePath,
