@@ -4,6 +4,8 @@
 
 ## 环境变量
 
+不同机器的配置差异较大，参见 **`docs/machine-setups.md`**。当前机器配置摘要：
+
 **Linux**:
 ```bash
 export VCPKG_ROOT=/home/icecreamsarkaz/.vcpkg-clion/vcpkg
@@ -38,13 +40,18 @@ cmake --build build --config Debug --parallel
 ```
 
 **资产导入工具**:
-```bash
-# 导入单个网格
-./build-linux/src/Tools/AssetImporter/TumblerImporter mesh assets/models/bunny.obj --output cooked/
-# 导入单个纹理
-./build-linux/src/Tools/AssetImporter/TumblerImporter texture assets/textures/wood.png --output cooked/
-# 导入完整场景
-./build-linux/src/Tools/AssetImporter/TumblerImporter --input assets/scenes/cornell_box.json --output cooked/
+```powershell
+# 导入完整场景（含所有依赖的 mesh + texture）
+.\build\src\Tools\AssetImporter\Debug\TumblerImporter.exe --input assets/scenes/demo.tscene --output cooked/
+
+# 导入单个网格 / 纹理
+.\build\src\Tools\AssetImporter\Debug\TumblerImporter.exe mesh assets/models/xxx.obj --output cooked/
+.\build\src\Tools\AssetImporter\Debug\TumblerImporter.exe texture assets/textures/xxx.png --output cooked/
+```
+
+**示例应用**:
+```powershell
+cmake --build build --config Debug --target App-Tumbler --parallel
 ```
 
 ## 测试命令
@@ -200,6 +207,7 @@ InstanceCull → NodeCull → ClusterCull → RasterBin → SW/HW Raster → Vis
 
 ## 文档索引
 
+- `docs/machine-setups.md` — 各开发机工具链路径与环境变量
 - `docs/gpu-driven-dev-plan.md` — Nanite 渲染器开发计划（Phase 4-10）
 - `docs/guides/continuation.md` — 后续开发指南（Phase 进度 + 待做任务）
 - `docs/standards/coding-style.md` — 编码规范（命名、日志、架构约束）

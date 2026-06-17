@@ -43,6 +43,7 @@
 
 | 文档 | 内容 |
 |------|------|
+| [机器配置](machine-setups.md) | 各开发机的工具链路径与环境变量 |
 | [故障排除](troubleshooting.md) | 构建、运行时、Linux/Wayland 问题 |
 | [测试与 CI](testing-and-ci.md) | 测试结构、CTest 使用、CI 流程 |
 
@@ -51,9 +52,10 @@
 ## 推荐阅读顺序
 
 1. [环境搭建](getting-started/setup.md) — 先跑起来
-2. [代码导航](code-navigation.md) — 快速定位代码位置
-3. [编码规范](standards/coding-style.md) — 了解项目约定
-4. [架构概览](architecture/overview.md) — 理解整体设计
+2. [机器配置](machine-setups.md) — 配置本机工具链路径
+3. [代码导航](code-navigation.md) — 快速定位代码位置
+4. [编码规范](standards/coding-style.md) — 了解项目约定
+5. [架构概览](architecture/overview.md) — 理解整体设计
 5. [GPU-Driven 开发计划](gpu-driven-dev-plan.md) — 了解后续方向
 6. [后续开发指南](guides/continuation.md) — 当前进度
 7. 其余按需查阅
