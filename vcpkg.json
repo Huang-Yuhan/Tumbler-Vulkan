@@ -37,6 +37,7 @@
       ],
       "platform": "linux"
     },
-    "vulkan-memory-allocator"
+    "vulkan-memory-allocator",
+    "nlohmann-json"
   ]
 }

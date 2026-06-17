@@ -9,3 +9,5 @@ build-phase3-*/
 Testing/
 compile_commands.json
 .clangd/
+assets/cooked/
+cooked/
