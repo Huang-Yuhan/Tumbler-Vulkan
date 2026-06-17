@@ -77,29 +77,32 @@ std::vector<SceneSerializer::Dependency> SceneSerializer::CollectDependencies() 
             deps.push_back({"mesh", obj["mesh"].get<std::string>()});
         }
 
-        // Material dependency
-        if (obj.contains("material") && obj["material"].is_string()) {
-            std::string matPath = obj["material"].get<std::string>();
-            deps.push_back({"material", matPath});
+        // Materials dependency (array, 按 materialSlot)
+        if (obj.contains("materials") && obj["materials"].is_array()) {
+            for (const auto& matEntry : obj["materials"]) {
+                if (matEntry.is_null())
+                    continue; // null = 使用默认材质
 
-            // 加载 material JSON 以获取纹理依赖
-            std::ifstream matFile(matPath);
-            if (matFile.is_open()) {
-                try {
-                    json matDoc = json::parse(matFile);
-                    for (const char* key : {"albedo", "normal", "metallicRoughness"}) {
-                        if (matDoc.contains(key) && matDoc[key].is_string()) {
-                            std::string texPath = matDoc[key].get<std::string>();
-                            // 如果纹理路径还没有被 cooked（指向源文件），记录为依赖
-                            // 如果已经是 cooked 路径（以 "cooked/" 开头），跳过
-                            if (!texPath.empty() && texPath.rfind("cooked/", 0) != 0) {
-                                deps.push_back({"texture", texPath});
+                std::string matPath = matEntry.get<std::string>();
+                deps.push_back({"material", matPath});
+
+                // 加载 material JSON 以获取纹理依赖
+                std::ifstream matFile(matPath);
+                if (matFile.is_open()) {
+                    try {
+                        json matDoc = json::parse(matFile);
+                        for (const char* key : {"albedo", "normal", "metallicRoughness"}) {
+                            if (matDoc.contains(key) && matDoc[key].is_string()) {
+                                std::string texPath = matDoc[key].get<std::string>();
+                                if (!texPath.empty() && texPath.rfind("cooked/", 0) != 0) {
+                                    deps.push_back({"texture", texPath});
+                                }
                             }
                         }
+                    } catch (const json::exception& e) {
+                        std::cerr << "[SceneSerializer] Failed to parse material: " << matPath << " (" << e.what()
+                                  << ")" << std::endl;
                     }
-                } catch (const json::exception& e) {
-                    std::cerr << "[SceneSerializer] Failed to parse material: " << matPath << " (" << e.what() << ")"
-                              << std::endl;
                 }
             }
         }

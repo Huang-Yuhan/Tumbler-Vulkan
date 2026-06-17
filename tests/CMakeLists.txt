@@ -9,6 +9,7 @@ add_executable(TumblerUnitTests
         unit/FActorTests.cpp
         unit/FSceneTests.cpp
         unit/AssetDatabaseTests.cpp
+        unit/SceneLoaderTests.cpp
 )
 
 target_link_libraries(TumblerUnitTests PRIVATE
