@@ -8,8 +8,7 @@
 #include "Core/Graphics/VulkanContext.h"
 #include "Core/Graphics/VulkanSwapchain.h"
 #include "Core/Platform/AppWindow.h"
-
-#include <iostream>
+#include "Core/Utils/Log.h"
 
 namespace Tumbler {
 
@@ -22,7 +21,7 @@ bool Engine::Init(const EngineConfig& config) {
     // ---- 1. AssetDatabase ----
     m_AssetDatabase = std::make_unique<AssetDatabase>();
     if (!m_AssetDatabase->LoadAssetMap(m_Config.AssetMapPath)) {
-        std::cerr << "[Engine] Warning: Failed to load asset_map.json. Continuing without asset database." << std::endl;
+        LOG_WARN("Failed to load asset_map.json. Continuing without asset database.");
     }
 
     // ---- 2. AppWindow ----
@@ -33,14 +32,14 @@ bool Engine::Init(const EngineConfig& config) {
 
     m_Window = std::make_unique<AppWindow>();
     if (!m_Window->Init(windowCfg)) {
-        std::cerr << "[Engine] Failed to create window." << std::endl;
+        LOG_ERROR("Failed to create window.");
         return false;
     }
 
     // ---- 3. VulkanContext ----
     m_VulkanContext = std::make_unique<VulkanContext>();
     if (!m_VulkanContext->Init(m_Window.get())) {
-        std::cerr << "[Engine] Failed to initialize Vulkan context." << std::endl;
+        LOG_ERROR("Failed to initialize Vulkan context.");
         return false;
     }
 
@@ -48,14 +47,14 @@ bool Engine::Init(const EngineConfig& config) {
     m_RenderDevice = std::make_unique<RenderDevice>();
     if (!m_RenderDevice->Init(m_VulkanContext->GetInstance(), m_VulkanContext->GetDevice(),
                               m_VulkanContext->GetPhysicalDevice())) {
-        std::cerr << "[Engine] Failed to initialize render device." << std::endl;
+        LOG_ERROR("Failed to initialize render device.");
         return false;
     }
 
     // ---- 5. CommandManager ----
     m_CommandManager = std::make_unique<CommandManager>();
     if (!m_CommandManager->Init(m_VulkanContext->GetDevice(), m_VulkanContext->GetGraphicsQueueFamily())) {
-        std::cerr << "[Engine] Failed to initialize command manager." << std::endl;
+        LOG_ERROR("Failed to initialize command manager.");
         return false;
     }
 
@@ -65,26 +64,26 @@ bool Engine::Init(const EngineConfig& config) {
                            m_VulkanContext->GetDevice(), m_VulkanContext->GetSurface(),
                            m_VulkanContext->GetGraphicsQueueFamily(), m_VulkanContext->GetPresentQueueFamily(),
                            *m_RenderDevice, m_Config.WindowWidth, m_Config.WindowHeight)) {
-        std::cerr << "[Engine] Failed to initialize swapchain." << std::endl;
+        LOG_ERROR("Failed to initialize swapchain.");
         return false;
     }
 
     // ---- 7. DescriptorManager ----
     m_DescriptorManager = std::make_unique<DescriptorManager>();
     if (!m_DescriptorManager->Init(m_VulkanContext->GetDevice(), 1024)) {
-        std::cerr << "[Engine] Failed to initialize descriptor manager." << std::endl;
+        LOG_ERROR("Failed to initialize descriptor manager.");
         return false;
     }
 
     // ---- 8. ResourceManager ----
     m_ResourceManager = std::make_unique<ResourceManager>();
     if (!m_ResourceManager->Init(m_VulkanContext->GetDevice(), *m_RenderDevice, *m_CommandManager)) {
-        std::cerr << "[Engine] Failed to initialize resource manager." << std::endl;
+        LOG_ERROR("Failed to initialize resource manager.");
         return false;
     }
 
     m_bInitialized = true;
-    std::cout << "[Engine] Initialized successfully." << std::endl;
+    LOG_INFO("Initialized successfully.");
     return true;
 }
 
@@ -102,12 +101,12 @@ void Engine::Shutdown() {
     m_bInitialized = false;
     m_bRunning = false;
 
-    std::cout << "[Engine] Shutdown complete." << std::endl;
+    LOG_INFO("Shutdown complete.");
 }
 
 void Engine::Run() {
     if (!m_bInitialized) {
-        std::cerr << "[Engine] Run() called before Init()." << std::endl;
+        LOG_ERROR("Run() called before Init().");
         return;
     }
 
