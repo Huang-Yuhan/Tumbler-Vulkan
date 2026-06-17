@@ -3,6 +3,8 @@
 #include <Core/Math/Math.h>
 #include <vector>
 
+namespace Tumbler {
+
 class CTransform final : public Component {
 private:
     Tumbler::Math::Vector3f Position{0.0f, 0.0f, 0.0f};
@@ -92,4 +94,6 @@ public:
     }
 };
 
-static_assert(std::is_base_of_v<Component, CTransform>, "CTransform must be a subclass of Component");
+} // namespace Tumbler
+
+static_assert(std::is_base_of_v<Tumbler::Component, Tumbler::CTransform>, "CTransform must be a subclass of Component");

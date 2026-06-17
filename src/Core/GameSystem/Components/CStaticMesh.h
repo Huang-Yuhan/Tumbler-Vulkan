@@ -23,7 +23,7 @@ struct FMaterialRef {
 // CStaticMesh — 静态网格组件
 // ============================================================================
 // 每个 FActor 最多一个 CStaticMesh，引用一个 mesh 资产 + 按 slot 覆盖材质
-class CStaticMesh : public ::Component {
+class CStaticMesh : public Component {
 public:
     // 资产路径（源路径，SceneLoader 填入）
     std::string MeshSourcePath; // "assets/models/bunny.obj"

@@ -7,7 +7,7 @@ namespace Tumbler {
 // ============================================================================
 // CCamera — 相机组件
 // ============================================================================
-class CCamera : public ::Component {
+class CCamera : public Component {
 public:
     float FOV = 60.0f;
     float NearPlane = 0.1f;

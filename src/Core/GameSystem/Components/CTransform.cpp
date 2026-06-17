@@ -2,6 +2,8 @@
 #include <algorithm>
 #include <imgui.h>
 
+namespace Tumbler {
+
 using namespace Tumbler::Math;
 
 void CTransform::SetParent(CTransform* newParent, bool bStayWorldPos) {
@@ -108,3 +110,5 @@ void CTransform::OnDrawUI() {
         }
     }
 }
+
+} // namespace Tumbler

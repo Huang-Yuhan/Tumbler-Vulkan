@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+namespace Tumbler {
+
 class FActor;
 class CTransform;
 
@@ -34,3 +36,5 @@ public:
     [[nodiscard]] FActor* FindActorByName(const std::string& name) const;
     [[nodiscard]] bool ContainsActor(const FActor* actor) const;
 };
+
+} // namespace Tumbler

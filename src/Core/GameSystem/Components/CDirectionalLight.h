@@ -7,7 +7,7 @@ namespace Tumbler {
 // ============================================================================
 // CDirectionalLight — 平行光源组件
 // ============================================================================
-class CDirectionalLight : public ::Component {
+class CDirectionalLight : public Component {
 public:
     float Direction[3] = {0.0f, -1.0f, 0.0f};
     float Color[3] = {1.0f, 1.0f, 0.9f};

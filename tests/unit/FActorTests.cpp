@@ -3,6 +3,8 @@
 #include "Core/GameSystem/FActor.h"
 #include "Core/GameSystem/Components/Component.h"
 
+using namespace Tumbler;
+
 namespace {
 
 class DummyComponent final : public Component {

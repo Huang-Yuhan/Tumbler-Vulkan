@@ -19,7 +19,7 @@ using namespace Tumbler::Math;
 
 namespace Tumbler {
 
-bool SceneLoader::LoadFromFile(::FScene& scene, const std::string& jsonPath, const AssetDatabase& assetDb,
+bool SceneLoader::LoadFromFile(FScene& scene, const std::string& jsonPath, const AssetDatabase& assetDb,
                                Result& outResult) {
     std::ifstream file(jsonPath);
     if (!file.is_open()) {

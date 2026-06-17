@@ -4,6 +4,8 @@
 #include "Core/GameSystem/FActor.h"
 #include "Core/GameSystem/Components/Component.h"
 
+using namespace Tumbler;
+
 namespace {
 
 class TickCounterComponent final : public Component {

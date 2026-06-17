@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <iostream>
 
+namespace Tumbler {
+
 using namespace Tumbler::Math;
 
 FScene::FScene() = default;
@@ -65,3 +67,5 @@ bool FScene::ContainsActor(const FActor* actor) const {
     return std::ranges::any_of(Actors,
                                [actor](const std::unique_ptr<FActor>& actorPtr) { return actorPtr.get() == actor; });
 }
+
+} // namespace Tumbler

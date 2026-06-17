@@ -1,6 +1,8 @@
 #pragma once
 
-// 1. 前置声明 (正确，解耦了 FActor.h)
+namespace Tumbler {
+
+// 前置声明
 class FActor;
 
 class Component {
@@ -18,3 +20,5 @@ public:
     virtual void OnDrawUI() {}
     virtual void Update(float DeltaTime);
 };
+
+} // namespace Tumbler

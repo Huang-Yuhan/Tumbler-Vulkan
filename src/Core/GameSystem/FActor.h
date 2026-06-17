@@ -9,6 +9,8 @@
 #include "Core/GameSystem/Components/CTransform.h"
 #include "Core/GameSystem/Components/Component.h"
 
+namespace Tumbler {
+
 class FActor {
 private:
     // 构造函数私有化，强制使用 CreateActor
@@ -66,3 +68,5 @@ template <> inline CTransform* FActor::GetComponent<CTransform>() {
     // 直接返回成员变量的地址
     return &(this->Transform);
 }
+
+} // namespace Tumbler
