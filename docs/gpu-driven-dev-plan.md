@@ -246,6 +246,35 @@ struct FPackedHierarchyNode {
 
 ---
 
+### 阶段 3.1: 资产管线 (Part 2-4) ✅
+
+**目标**: 建立完整的资产导入→运行时加载链
+
+| Part | 模块 | 关键内容 |
+|------|------|----------|
+| 2 | `TumblerImporter` | OBJ→.tmesh, PNG→.ttex (CPU mipmap), SceneSerializer, asset_map.json |
+| 3 | `AssetDatabase` | asset_map.json 加载, 源路径→cooked 路径映射, 按类型查询元数据 |
+| 4 | `SceneLoader` + Components | Scene JSON→FScene, CStaticMesh/CCamera/CPointLight/CDirectionalLight |
+
+**文件格式**:
+- `.tmesh`: Header(64B) + SubMeshArray(N×44B) + VertexData(float32×8) + IndexData(uint32)
+- `.ttex`: Header(32B) + MipData (CPU stbir_resize)
+- `.tmat`: JSON, PBR Metallic-Roughness 合并通道
+- `.tscene`: JSON, 引用源文件路径 + materials 数组（UE 风格 per-slot 覆盖）
+
+### 阶段 3.2: Engine (Part 5) ✅
+
+**目标**: 生命周期编排 + 依赖注入 + 主循环
+
+| 模块 | 关键内容 |
+|------|----------|
+| `EngineConfig` | engine.json 读取 (window + render 配置) |
+| `Engine` | 按序 Init/Shutdown 8 个子系统, Run() 主循环 (Acquire+Present) |
+
+**依赖注入顺序**: AssetDatabase → AppWindow → VulkanContext → RenderDevice → CommandManager → VulkanSwapchain → DescriptorManager → ResourceManager
+
+---
+
 ### 阶段 4: Visibility Buffer + 单三角形 SW 光栅
 
 **目标**: Compute Shader 光栅化单个硬编码三角形 → VisBuffer64

@@ -19,149 +19,188 @@ $env:VCPKG_ROOT = "D:\vcpkg"  # 根据实际安装路径调整
 
 ## 构建命令
 
+**Linux (Ninja + vcpkg)**:
+```bash
+cmake -S . -B build-linux -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+  -DBUILD_TESTING=ON
+cmake --build build-linux
+```
+
+**Windows (MSVC + vcpkg)**:
 ```powershell
-# Windows 配置 (MSVC + vcpkg, 在仓库根目录执行)
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
   -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
   -DVCPKG_TARGET_TRIPLET=x64-windows `
   -DBUILD_TESTING=ON
-
-# Windows 编译
 cmake --build build --config Debug --parallel
 ```
 
+**资产导入工具**:
 ```bash
-# Linux 配置 (Ninja + vcpkg)
-cmake -S . -B build-linux -G Ninja `
-  -DCMAKE_BUILD_TYPE=Debug `
-  -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
-  -DBUILD_TESTING=ON
-
-# Linux 编译
-cmake --build build-linux --target App-Tumbler
+# 导入单个网格
+./build-linux/src/Tools/AssetImporter/TumblerImporter mesh assets/models/bunny.obj --output cooked/
+# 导入单个纹理
+./build-linux/src/Tools/AssetImporter/TumblerImporter texture assets/textures/wood.png --output cooked/
+# 导入完整场景
+./build-linux/src/Tools/AssetImporter/TumblerImporter --input assets/scenes/cornell_box.json --output cooked/
 ```
 
 ## 测试命令
 
-```powershell
-# 运行全部测试 (smoke + unit)
-ctest --test-dir build -C Debug --output-on-failure
+```bash
+# 全部测试
+ctest --test-dir build-linux --output-on-failure
 
-# 仅运行单元测试
-ctest --test-dir build -C Debug -L unit --output-on-failure
+# 仅单元测试（不含 Vulkan）
+ctest --test-dir build-linux -L unit --output-on-failure
 
-# 按名称运行单个测试
-ctest --test-dir build -C Debug -R "CTransform" --output-on-failure
-
-# 列出所有已注册的测试（不执行）
-ctest --test-dir build -C Debug -N
+# 按名称筛选
+ctest --test-dir build-linux -R "Engine" --output-on-failure
 ```
-
-运行时冒烟测试需要开启 `-DTUMBLER_ENABLE_RUNTIME_SMOKE_TESTS=ON`。着色器产物冒烟检查依赖 `glslc`，如果 CI 环境中没有 `glslc`，着色器断言会被自动跳过。
 
 ## Pre-commit Hook
 
 每次提交前自动运行：格式检查 → 编译 → 测试。配置：
-
 ```bash
 git config core.hooksPath .githooks
 ```
 
-脚本位于 `.githooks/pre-commit`。如需跳过（不推荐）：`git commit --no-verify`
-
 ## 代码格式化
 
 ```bash
-# 格式化所有 C++ 文件
 find src tests -name "*.h" -o -name "*.cpp" | xargs clang-format -i
-
-# 检查但不修改
-find src tests -name "*.h" -o -name "*.cpp" | xargs clang-format --dry-run -Werror
 ```
 
 配置文件: `.clang-format` (LLVM 风格, 4 空格缩进, C++20, 120 列宽)
+
+---
 
 ## 架构
 
 ### 分层结构
 
-- **`src/Core/`** — 可复用的引擎库（编译为 `TumblerCore` 静态库）。不得依赖示例代码。
-- **`src/Examples/`** — 应用层（`App-Tumbler` 主示例、`TinyRendererModels` 小型示例）。
-- **`tests/unit/`** — GoogleTest 单元测试，链接 `TumblerCore`。
+- **`src/Core/`** — 引擎库（编译为 `TumblerCore` 静态库），禁止依赖示例代码。
+- **`src/Tools/AssetImporter/`** — 资产导入 CLI 工具（独立可执行文件 `TumblerImporter`），不依赖 Vulkan/GLFW。
+- **`src/Examples/`** — 应用层（待重写）。
+- **`tests/unit/`** — GoogleTest 单元测试。Vulkan 测试在 `tests/unit/Graphics/`。
 
-### 实体-组件系统（ECS 变体）
+### 子系统所有权
 
-`FActor` 是一个容器，持有一个 `CTransform` 和一组 `Component` 子类。通过挂载不同的组件来组合行为（`CMeshRenderer`、`CPointLight`、`CDirectionalLight`、`CCamera`、`CFirstPersonCamera`）。`FScene` 拥有所有 Actor 及其生命周期，通过 `PendingKillActors` 实现延迟销毁。
+`Engine`（`src/Core/Engine/`）按依赖顺序创建并持有所有子系统，通过依赖注入传递引用：
 
-### 渲染：逻辑与物理的分离
+```
+EngineConfig → AssetDatabase → AppWindow → VulkanContext → RenderDevice
+  → CommandManager → VulkanSwapchain → DescriptorManager → ResourceManager
+```
 
-渲染器绝不直接访问 Actor。数据流如下：
+### 目录速查
 
-1. `FScene::ExtractRenderPackets()` 从 `CMeshRenderer` 组件中提取纯净的 `RenderPacket` 结构（网格指针、材质实例、`mat4` 变换矩阵）。
-2. `FScene::GenerateSceneView()` 构建 `SceneViewData`，包含相机矩阵和可见光源数据。
-3. `VulkanRenderer::Render()` 仅消费上述两种数据结构——它对实体或场景一无所知。
+| 路径 | 职责 |
+|------|------|
+| `src/Core/Engine/` | EngineConfig + Engine（生命周期编排、主循环） |
+| `src/Core/Assets/AssetDatabase` | asset_map.json 加载、源路径→cooked 路径映射 |
+| `src/Core/Scene/SceneLoader` | Scene JSON 解析 → FScene 实例化 + Component 挂载 |
+| `src/Core/Platform/AppWindow` | GLFW 窗口 + Vulkan Surface 创建 |
+| `src/Core/Graphics/VulkanContext` | Vulkan 1.4 Instance + Device、队列族选择 |
+| `src/Core/Graphics/VulkanSwapchain` | 交换链 + D32 深度缓冲 + resize 重建 |
+| `src/Core/Graphics/RenderDevice` | 通过 VMA 创建/销毁 GPU 资源 |
+| `src/Core/Graphics/CommandManager` | 命令池分配、ImmediateSubmit、布局转换 |
+| `src/Core/Graphics/ResourceManager` | 统一 VB/IB、Mesh/纹理上传、Shader 加载 |
+| `src/Core/Graphics/DescriptorManager` | Set 0 (Global) + Set 1 (Bindless) 描述符管理 |
+| `src/Core/Math/` | 数学库：Vector/Matrix/Quaternion/Plane/Frustum |
+| `src/Core/GameSystem/` | ECS：FActor、FScene、CTransform + 组件 |
+| `src/Tools/AssetImporter/` | CLI：MeshImporter、TextureImporter、SceneSerializer |
 
-### 渲染器子系统
+### ECS（实体-组件系统）
 
-`VulkanRenderer` 协调五个子系统：
+`FActor` 持有 `CTransform` 成员 + 一组 `Component` 子类。Component 类型通过 `typeid(T)` + TypeMap 查询。
 
-| 子系统 | 职责 |
-|---|---|
-| `VulkanContext` | Vulkan 实例、设备、队列族 |
-| `VulkanSwapchain` | 交换链图像、深度缓冲、重建 |
-| `RenderDevice` | 通过 VMA 创建/销毁 GPU 资源（Buffer、Image、Sampler） |
-| `CommandBufferManager` | 命令池分配、即时提交、布局转换 |
-| `ResourceUploadManager` | Mesh 上传（staging → device-local）、纹理加载、Mesh 去重缓存 |
+**现有组件：**
+- `CTransform` — 嵌入 FActor 的成员（非 Component list 中的条目）
+- `CStaticMesh` — mesh 资产引用 + 按 materialSlot 覆盖材质（`FMaterialRef` 数组）
+- `CCamera` — FOV / Near / Far / LookAt
+- `CPointLight` — Color / Intensity / Range
+- `CDirectionalLight` — Direction / Color / Intensity
 
-### 双管线策略
+`FScene` 拥有所有 Actor 及生命周期（`PendingKillActors` 延迟销毁）。
 
-`IRenderPipeline` 是策略接口，有两个具体实现：
+### 资产管线
 
-- **`FForwardPipeline`** — 单个 Subpass，在 `pbr.frag` 中同时计算几何与光照。
-- **`FDeferredPipeline`** — 2 个 Subpass 的 MRT G-Buffer：Albedo（`R8G8B8A8`）+ Normal+Roughness（`R16G16B16A16`），通过深度反投影重建世界坐标，光照阶段通过 `subpassInput` 读取 G-Buffer，对 Tile-Based GPU 友好。
+```
+源文件 (OBJ/PNG/JPG) ──► TumblerImporter ──► cooked/ (.tmesh/.ttex/.tmat + asset_map.json)
+                                                       │
+                                              ┌────────┘
+                                              ▼
+                                     AssetDatabase (运行时映射)
+                                              │
+                                              ▼
+                                     SceneLoader (创建 Actor + Component)
+```
 
-`VulkanRenderer` 持有 `std::unordered_map<ERenderPath, std::unique_ptr<IRenderPipeline>>`。`SceneViewData::RenderPath` 每帧选择使用哪条管线。两条管线在启动时一起初始化，运行时可热切换。
+**文件格式：**
+- `.tscene` — JSON，引用源文件路径（mesh、materials 数组、lights）
+- `.tmesh` — 二进制，Header(64B) + SubMeshArray(N×44B) + VertexData + IndexData
+- `.ttex` — 二进制，Header(32B) + MipData（CPU 端 mipmap 生成）
+- `.tmat` — JSON，PBR Metallic-Roughness（合并通道）
+- `asset_map.json` — 结构化分组（meshes/textures/materials），含 sourceHash + dependsOn
 
-### 材质系统：母体-实例模式
+**关键约定：**
+- 只提交源文件，`cooked/` 在 `.gitignore` 中
+- Scene JSON 引用源文件路径（非 cooked），AssetDatabase 做运行时映射
+- Material 的 Metallic-Roughness 合并为单纹理的两个通道（glTF 风格）
+- 顶点格式：8×float32 交织（pos+normal+uv），资产不压缩，GPU 端自行量化
+- Rotation 序列化格式：Quaternion [x,y,z,w]（Unity 风格）
 
-`FMaterial` 拥有烘焙后的管线（通过 `VulkanPipelineBuilder`）、管线布局和描述符集布局。`FMaterialInstance` 持有每实例的 `DescriptorSet`、`UBOBuffer` 及 CPU 端 `FMaterialUBO` 镜像。当两种管线均可用时，材质会同时为 Forward 和 Deferred 路径编译。
+### 渲染器子系统（当前状态）
 
-### UIManager / 控制台 / 编辑器状态
+Engine 创建所有 Vulkan 子系统但**尚未有 Renderer 管线**（Phase 4 以后）。当前主循环仅做 Acquire + Present（无 draw call）。
 
-- `UIManager` 管理 ImGui 生命周期（GLFW/Vulkan 后端），驱动 `RuntimeConsole`，每帧调用 `TickInput()`。
-- `RuntimeConsole` 管理输入框、历史记录、Tab 补全和命令注册——这是 Core 层通用框架。
-- `EditorSessionState` 是共享编辑状态（`SelectedActor`、`CurrentRenderPath`），被 Inspector、层级面板、控制台命令和渲染路径切换共同消费。
-- 示例专属的控制台命令通过 `TumblerConsoleBindings.cpp` 注册，不硬编码在 Core 中。
+**Descriptor Set 绑定模型（已创建，渲染时启用）：**
+```
+Set 0 (Global): binding 0 = SceneUBO, binding 1 = CombinedImageSampler (ShadowMap)
+Set 1 (Bindless): binding 0 = SampledImage[], binding 1 = MaterialData SSBO, binding 2 = ObjectData SSBO
+```
 
-### 输入分离
+**Vulkan 1.4 必需特性：**
+- `bufferDeviceAddress` — GPU-Driven 间接绘制
+- `descriptorIndexing` — Bindless 纹理数组
+- `drawIndirectCount` — GPU 端生成绘制命令
 
-`InputManager` 显式区分游戏输入（`GetAxis`、`IsActionPressed`、`GetMouseDelta`）和原始按键输入（`WasKeyJustPressed`）。控制台打开时（`~` / `GraveAccent`），立即调用 `SetGameplayInputBlocked(true)` 阻断相机移动，无需等待 ImGui 的焦点捕获。
+### GPU-Driven 渲染管线（规划中）
+
+目标：复现 UE5 Nanite 核心管线
+```
+InstanceCull → NodeCull → ClusterCull → RasterBin → SW/HW Raster → VisBuffer → DepthExport → ShadeBinning → ShadeGBuffer → Lighting
+```
+
+详见 `docs/gpu-driven-dev-plan.md`。
+
+---
 
 ## 关键约定
 
-- **Windows 强制使用 MSVC** —— CMake 在 WIN32 上显式拒绝非 MSVC 编译器。
-- **vcpkg GLFW 3.4+** —— CMake 强制优先解析 vcpkg 提供的 `glfw3Config.cmake`，避免误链系统自带的旧版 GLFW（项目使用了 `glfwGetPlatform` 等新 API）。
-- **跨平台环境变量** —— `AppWindow.cpp` 中 Windows 用 `_putenv_s`，非 Windows 用 `setenv`/`unsetenv`。
-- **着色器编译** —— 通过 `add_subdirectory(assets/shaders)` 处理。`.spv` 产物被 `.gitignore` 忽略，必须在本地构建。
-- **资源拷贝** —— 构建后将 `assets/` 复制到可执行文件目录，运行时资源相对于二进制文件路径加载。
-- **材质参数编辑** —— 需要参数跨帧持久时使用 `UpdateUBO()`（直接写入持久化映射的缓冲），而非 `ApplyChanges()`（仅更新描述符写入），否则参数值会丢失。
+- **命名空间**：新代码使用 `namespace Tumbler`。旧 ECS 代码在全局命名空间（`Component`、`CTransform`、`FActor`、`FScene`），通过 `::` 前缀引用。
+- **单例**：谨慎使用。Engine、AssetDatabase 等核心类均为普通 RAII 对象，由 Engine 持有并注入。
+- **Windows 强制 MSVC** — CMake 在 WIN32 上显式拒绝非 MSVC 编译器。
+- **vcpkg GLFW 3.4+** — CMake 强制优先解析 vcpkg 提供的 `glfw3Config.cmake`。
+- **着色器编译** — 通过 `add_subdirectory(assets/shaders)` 处理，`.spv` 在 `.gitignore` 中。
+- **第三方库实现**：`VMAImplementations.cpp`（仅 TumblerCore）+ `StbImplementations.cpp`（TumblerCore 和 TumblerImporter 共享）。
+- **新模块添加**：`src/Core/` 下新增 `.cpp` 由 `GLOB_RECURSE` 自动收集。TumblerImporter 在 CMakeLists.txt 中显式列举源文件。
 
 ## 改动后验证
 
-- 修改了 CMake/依赖/GLFW/平台层 → 重新配置、完整编译、运行 `ctest`。
-- 修改了控制台/编辑器/输入逻辑 → 启动 `App-Tumbler`，验证控制台开关、历史记录、Tab 补全、命令执行和输入阻断。
-- 修改了 Windows 构建链或平台兼容性 → 关注 `.github/workflows/windows-ci.yml` 的 CI 结果。
+- 修改 CMake/依赖/平台层 → 重新配置、完整编译、`ctest`。
+- 修改 Engine/子系统 Init 顺序 → `EngineSmokeTest`。
+- 修改资产管线 → 执行 `TumblerImporter` 端到端验证。
+- 修改 ECS → `CTransformTests` / `FActorTests` / `FSceneTests`。
 
 ## 文档索引
 
-文档入口见 `docs/index.md`。速查：
-- `docs/getting-started/setup.md` — 环境搭建
+- `docs/gpu-driven-dev-plan.md` — Nanite 渲染器开发计划（Phase 4-10）
 - `docs/architecture/overview.md` — 设计原则与数据流
-- `docs/architecture/decisions.md` — 关键设计决策（为什么这样做）
-- `docs/architecture/rendering.md` — 双管线策略、Deferred 优化
-- `docs/reference/rendering-pipeline.md` — 帧循环、G-Buffer、同步细节
-- `docs/reference/shaders.md` — 着色器绑定点与 G-Buffer 布局
-- `docs/guides/editor.md` — 编辑器与调试
-- `docs/guides/console.md` — 控制台命令参考
+- `docs/architecture/decisions.md` — 关键设计决策
+- `docs/getting-started/setup.md` — 环境搭建
+- `docs/code-navigation.md` — 文件级速查表
 - `docs/troubleshooting.md` — 构建、运行时及 Linux/Wayland 问题
-- `docs/code-navigation.md` — 文件级"功能在哪"速查表
