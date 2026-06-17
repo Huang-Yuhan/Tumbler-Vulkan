@@ -6,7 +6,7 @@
 
 ## 1. 当前状态总览
 
-**分支**: `nanite-integration` | **提交数**: 7 | **测试**: 92/92 通过
+**分支**: `nanite-integration` | **测试**: 41/41 通过（单元）
 
 ### 已完成的模块
 
@@ -19,6 +19,10 @@
 | Part 3 | 运行时资产映射 | `src/Core/Assets/AssetDatabase` |
 | Part 4 | Scene 加载 + 组件 | `src/Core/Scene/SceneLoader`, `CStaticMesh`/`CCamera`/`CPointLight`/`CDirectionalLight` |
 | Part 5 | Engine 编排 | `src/Core/Engine/Engine` + `EngineConfig` |
+| Part 6 | 示例应用 | `src/Examples/Tumbler/main.cpp` — `App-Tumbler` 可执行文件 |
+| - | LOG 宏统一 | 全 Core 模块改用 `LOG_INFO/ERROR/WARN`，移除 `std::cout/cerr` |
+| - | ECS 命名空间迁移 | FActor/FScene/Component/CTransform 迁入 `namespace Tumbler` |
+| - | 编码规范 | `docs/standards/coding-style.md` |
 
 ### 架构
 
@@ -101,48 +105,18 @@ Hook 会自动执行：格式检查 → 编译 → 测试。
 
 ## 3. 待做任务
 
-### Part 6: 示例重写（优先）
+### Part 6: 示例重写 ✅（已完成）
 
-**目标**: 用新 Engine API 重写示例应用。
-
-**当前 `src/Examples/` 状态**: 旧代码已被删除或注释。`src/Examples/CMakeLists.txt` 被注释掉。
-
-**需要做的**:
-1. 取消 `CMakeLists.txt` 中 `add_subdirectory(src/Examples)` 的注释
-2. 创建新的 `src/Examples/Tumbler/main.cpp`
-3. 使用 Engine API 的示例代码如下：
-
-```cpp
-#include "Core/Engine/Engine.h"
-#include "Core/Engine/EngineConfig.h"
-#include "Core/Scene/SceneLoader.h"
-#include "Core/Assets/AssetDatabase.h"
-#include "Core/GameSystem/FScene.h"
-
-int main() {
-    Tumbler::EngineConfig config;
-    config.LoadFromFile("engine.json");
-
-    Tumbler::Engine engine;
-    if (!engine.Init(config)) return 1;
-
-    // 加载场景
-    Tumbler::FScene scene;
-    Tumbler::SceneLoader::Result result;
-    Tumbler::SceneLoader loader;
-    loader.LoadFromFile(scene, "assets/scenes/demo.tscene",
-                        *engine.GetAssetDatabase(), result);
-
-    // 主循环
-    engine.Run();
-
-    engine.Shutdown();
-    return 0;
-}
-```
-
-4. 创建配套的 `engine.json` 和场景 JSON 文件
-5. 先用 `TumblerImporter` 导入资产生成 cooked 目录
+**已完成的工作**:
+- `src/Examples/Tumbler/main.cpp` — App-Tumbler 可执行文件
+- `engine.json` + `assets/scenes/demo.tscene` + `assets/materials/sword.tmat`
+- 根 CMakeLists.txt 取消注释 `add_subdirectory(src/Examples)`
+- TumblerImporter 资产导入 → `cooked/` 目录
+- 全 8 个子系统初始化验证通过（RTX 4070 Ti SUPER, Vulkan 1.4）
+- ECS 核心类型（FActor/FScene/Component/CTransform）迁入 `namespace Tumbler`
+- 全 Core 模块 LOG 宏统一，移除 `std::cout/cerr`
+- 新增 `docs/standards/coding-style.md` 编码规范
+- 41/41 单元测试通过
 
 ### Phase 4: VisBuffer + 单三角形 SW 光栅
 
@@ -176,9 +150,8 @@ int main() {
 ## 4. 关键约定速查
 
 ### 命名空间
-- **新代码**: `namespace Tumbler` — Engine、Vulkan 模块、组件、资产系统
-- **旧 ECS**: 全局命名空间 — `::FActor`, `::FScene`, `::Component`, `::CTransform`
-- 在 Tumbler 代码中引用旧 ECS 类型需加 `::` 前缀
+- **所有代码统一** `namespace Tumbler` — Engine、Vulkan 模块、组件、资产系统、ECS 类型均在其中
+- 无需 `::` 前缀，所有类型可在 Tumbler 命名空间内直接引用
 
 ### 单例策略
 **不使用单例**。Engine 用 `std::unique_ptr` 持有所有子系统，通过引用注入依赖。

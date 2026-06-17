@@ -181,8 +181,10 @@ InstanceCull → NodeCull → ClusterCull → RasterBin → SW/HW Raster → Vis
 
 ## 关键约定
 
-- **命名空间**：新代码使用 `namespace Tumbler`。旧 ECS 代码在全局命名空间（`Component`、`CTransform`、`FActor`、`FScene`），通过 `::` 前缀引用。
-- **单例**：谨慎使用。Engine、AssetDatabase 等核心类均为普通 RAII 对象，由 Engine 持有并注入。
+- **命名空间**：所有代码统一使用 `namespace Tumbler`（旧 ECS 类型 FActor/FScene/Component/CTransform 也已迁入）。
+- **日志**：强制使用 `LOG_INFO`/`LOG_ERROR`/`LOG_WARN` 等宏（`Core/Utils/Log.h`），**禁止** `std::cout` / `std::cerr`。
+- **单例**：不使用单例模式。子系统由 Engine 持有 `std::unique_ptr`，通过引用注入。
+- **编码规范**：详见 `docs/standards/coding-style.md`。
 - **Windows 强制 MSVC** — CMake 在 WIN32 上显式拒绝非 MSVC 编译器。
 - **vcpkg GLFW 3.4+** — CMake 强制优先解析 vcpkg 提供的 `glfw3Config.cmake`。
 - **着色器编译** — 通过 `add_subdirectory(assets/shaders)` 处理，`.spv` 在 `.gitignore` 中。
@@ -199,8 +201,11 @@ InstanceCull → NodeCull → ClusterCull → RasterBin → SW/HW Raster → Vis
 ## 文档索引
 
 - `docs/gpu-driven-dev-plan.md` — Nanite 渲染器开发计划（Phase 4-10）
+- `docs/guides/continuation.md` — 后续开发指南（Phase 进度 + 待做任务）
+- `docs/standards/coding-style.md` — 编码规范（命名、日志、架构约束）
 - `docs/architecture/overview.md` — 设计原则与数据流
 - `docs/architecture/decisions.md` — 关键设计决策
 - `docs/getting-started/setup.md` — 环境搭建
 - `docs/code-navigation.md` — 文件级速查表
 - `docs/troubleshooting.md` — 构建、运行时及 Linux/Wayland 问题
+- `docs/testing-and-ci.md` — 测试结构与 CI 流程

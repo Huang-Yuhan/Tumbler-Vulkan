@@ -1,6 +1,6 @@
 # 代码导航指南
 
-帮助你快速理解代码结构，找到需要阅读的代码。
+快速定位代码位置，理解项目结构。
 
 ## 目录结构
 
@@ -8,166 +8,127 @@
 Tumbler-Vulkan/
 ├── src/
 │   ├── Core/
-│   │   ├── Assets/              # 资产管理（Mesh/Texture/Material）
-│   │   ├── Editor/              # 编辑器工具（UIManager/RuntimeConsole/DebugTexturePreview）
-│   │   ├── GameSystem/          # ECS（FActor/FScene/Component/InputManager）
-│   │   │   └── Components/      # 组件（CTransform/CMeshRenderer/CCamera/CPointLight/...）
-│   │   ├── Geometry/            # 几何数据（FMesh）
-│   │   ├── Graphics/            # 渲染系统
-│   │   │   └── Pipelines/       # 管线策略实现（FForwardPipeline/FDeferredPipeline）
-│   │   ├── Platform/            # 平台抽象（AppWindow GLFW 封装）
-│   │   └── Utils/               # 工具类（Log/Singleton/VMA 实现）
-│   └── Examples/
-│       ├── Tumbler/             # 主示例（PBR 渲染 + 编辑器）
-│       └── TinyRendererModels/  # 简单渲染示例
+│   │   ├── Assets/              # AssetDatabase — 运行时资产映射 (asset_map.json)
+│   │   ├── Engine/              # Engine + EngineConfig — 生命周期编排
+│   │   ├── GameSystem/          # ECS — FActor / FScene / InputManager
+│   │   │   └── Components/      # CTransform / CStaticMesh / CCamera / CLights
+│   │   ├── Graphics/            # Vulkan 基础设施（无 Renderer）
+│   │   │   ├── VulkanContext    # Instance + Device 1.4
+│   │   │   ├── VulkanSwapchain  # 交换链 + D32 深度
+│   │   │   ├── RenderDevice     # VMA Buffer/Image
+│   │   │   ├── CommandManager   # CommandPool + ImmediateSubmit
+│   │   │   ├── ResourceManager  # 统一 VB/IB + Mesh/纹理上传
+│   │   │   └── DescriptorManager # Set 0 Global + Set 1 Bindless
+│   │   ├── Math/                # Vector/Matrix/Quaternion/Plane/Frustum
+│   │   ├── Platform/            # AppWindow — GLFW + Surface
+│   │   ├── Scene/               # SceneLoader — JSON → FScene
+│   │   └── Utils/               # Log / Singleton / Stb / VMA 实现
+│   ├── Examples/
+│   │   └── Tumbler/             # App-Tumbler 主示例（Engine API 集成）
+│   └── Tools/
+│       └── AssetImporter/       # CLI — OBJ→.tmesh, PNG→.ttex, scene→asset_map
 ├── assets/
-│   ├── models/                  # 3D 模型
-│   ├── shaders/engine/          # 着色器（GLSL → SPIR-V）
+│   ├── models/                  # 3D 模型（OBJ）
+│   ├── shaders/                 # GLSL → SPIR-V
+│   ├── scenes/                  # 场景 JSON (.tscene)
+│   ├── materials/               # 材质 JSON (.tmat)
 │   └── textures/                # 纹理
-├── docs/                        # 文档（入门/架构/指南/参考）
+├── docs/                        # 文档
 └── tests/unit/                  # GoogleTest 单元测试
 ```
 
 ## 按功能查找
 
-### 1. 渲染流程
-
-入口：`src/Examples/Tumbler/main.cpp` — 主循环
-
-阅读顺序：
-1. **`main.cpp`** — 帧循环（数据提取 → UI → 渲染）
-2. **`VulkanRenderer.cpp`** — `Render()` / `RecordCommandBuffer()` 方法
-3. **`IRenderPipeline.h`** — 管线策略接口
-4. **`FForwardPipeline.cpp`** / **`FDeferredPipeline.cpp`** — 具体管线实现
-5. **`PipelineUtils.cpp`** — `DrawMeshPackets()` / `CreateFramebuffers()` 共享辅助
-
-### 2. 游戏系统（ECS）
-
-| 功能 | 文件 |
-|------|------|
-| Actor | `src/Core/GameSystem/FActor.h` |
-| Component 基类 | `src/Core/GameSystem/Components/Component.h` |
-| 场景管理 | `src/Core/GameSystem/FScene.h` |
-| Transform | `src/Core/GameSystem/Components/CTransform.h` |
-| 网格渲染 | `src/Core/GameSystem/Components/CMeshRenderer.h` |
-| 相机 | `src/Core/GameSystem/Components/CCamera.h` |
-| 第一人称相机 | `src/Core/GameSystem/Components/CFirstPersonCamera.h` |
-| 点光源 | `src/Core/GameSystem/Components/CPointLight.h` |
-| 方向光 | `src/Core/GameSystem/Components/CDirectionalLight.h` |
-
-参考示例：`src/Examples/Tumbler/AppLogic.cpp` — `InitializeScene()` 方法
-
-### 3. 材质系统
-
-| 功能 | 文件 |
-|------|------|
-| 材质母体 | `src/Core/Assets/FMaterial.h` |
-| 材质实例 | `src/Core/Assets/FMaterialInstance.h`（含 `FMaterialUBO` 结构体） |
-| 资产管理 | `src/Core/Assets/FAssetManager.h` |
-| 纹理 | `src/Core/Assets/FTexture.h` |
-
-重要提示：编辑材质参数时使用 `UpdateUBO()` 而非 `ApplyChanges()`。
-
-### 4. 编辑器
-
-| 功能 | 文件 |
-|------|------|
-| UI 管理器 | `src/Core/Editor/UIManager.h` |
-| 运行时控制台 | `src/Core/Editor/RuntimeConsole.h` |
-| G-Buffer 预览 | `src/Core/Editor/DebugTexturePreview.h` |
-| 共享编辑状态 | `src/Core/Editor/EditorSessionState.h`（含 `RenderSettings`） |
-| AppLogic 编辑器方法 | `src/Examples/Tumbler/AppLogic.h` / `.cpp` |
-| 控制台命令绑定 | `src/Examples/Tumbler/TumblerConsoleBindings.cpp` |
-
-编辑器面板方法：
-- `DrawDebugPanel()` — 统一调试窗口（含 `CollapsingHeader` 布局）
-- `DrawPerformanceSection()` — 性能统计
-- `DrawLightingSection()` — 光源设置
-- `DrawCameraSection()` — 相机参数
-- `DrawRenderingSection()` — 渲染路径选择
-- `DrawSceneHierarchyPanel()` — 场景层级（独立窗口）
-- `DrawInspectorPanel()` — Inspector（独立窗口）
-
-### 5. Vulkan 底层
-
-| 功能 | 文件 |
-|------|------|
-| VulkanContext | `src/Core/Graphics/VulkanContext.h` |
-| RenderDevice | `src/Core/Graphics/RenderDevice.h` |
-| Swapchain | `src/Core/Graphics/VulkanSwapchain.h` |
-| CommandBuffer | `src/Core/Graphics/CommandBufferManager.h` |
-| 资源上传 | `src/Core/Graphics/ResourceUploadManager.h` |
-| 管线构建器 | `src/Core/Graphics/VulkanPipelineBuilder.h` |
-| VulkanTypes | `src/Core/Graphics/VulkanTypes.h`（AllocatedBuffer/Image、SceneDataUBO） |
-| 描述符队列 | `src/Core/Graphics/DescriptorSetFreeQueue.h` |
-
-## 关键代码位置速查
-
-### 主循环
+### 1. 入口与主循环
 
 ```
 src/Examples/Tumbler/main.cpp
-├── 初始化
-│   ├── 创建窗口 + VulkanRenderer + FAssetManager
-│   ├── InputManager 绑定（MoveForward/MoveRight/MoveUp）
-│   ├── EditorSessionState + RenderSettings
-│   └── AppLogic::Init(renderer, assetMgr, inputMgr, sessionState, renderSettings)
-└── 帧循环
-    ├── SetUIFocused() → inputManager.Tick() → ui_manager.TickInput()
-    ├── logic.Tick(frameTime)
-    ├── scene->ExtractRenderPackets(renderPackets)
-    ├── ui_manager.BeginFrame() → logic.UpdatePerformanceStats() → DrawEditorUI() → EndFrame()
-    ├── scene->GenerateSceneView(...)
-    └── renderer.Render(viewData, renderPackets, UI callback)
+├── EngineConfig::LoadFromFile("engine.json")
+├── Engine::Init(config)          — 初始化 8 个子系统
+├── SceneLoader::LoadFromFile()   — 加载场景
+├── Engine::Run()                 — 主循环 (Acquire+Present)
+└── Engine::Shutdown()
 ```
 
-### AppLogic 数据成员
+### 2. Engine 子系统依赖链
+
+| 顺序 | 子系统 | 文件 | 依赖 |
+|------|--------|------|------|
+| 1 | AssetDatabase | `src/Core/Assets/AssetDatabase.h` | 无 |
+| 2 | AppWindow | `src/Core/Platform/AppWindow.h` | 无 |
+| 3 | VulkanContext | `src/Core/Graphics/VulkanContext.h` | AppWindow |
+| 4 | RenderDevice | `src/Core/Graphics/RenderDevice.h` | VulkanContext |
+| 5 | CommandManager | `src/Core/Graphics/CommandManager.h` | VulkanContext |
+| 6 | VulkanSwapchain | `src/Core/Graphics/VulkanSwapchain.h` | VulkanContext + RenderDevice |
+| 7 | DescriptorManager | `src/Core/Graphics/DescriptorManager.h` | VulkanContext |
+| 8 | ResourceManager | `src/Core/Graphics/ResourceManager.h` | RenderDevice + CommandManager |
+
+### 3. ECS (实体-组件系统)
+
+| 类型 | 文件 | 职责 |
+|------|------|------|
+| FActor | `src/Core/GameSystem/FActor.h` | 实体容器，持有 Transform + Components |
+| FScene | `src/Core/GameSystem/FScene.h` | Actor 生命周期管理，延迟销毁 |
+| Component | `src/Core/GameSystem/Components/Component.h` | 组件基类 |
+| CTransform | `src/Core/GameSystem/Components/CTransform.h` | 位置/旋转/缩放，层级支持 |
+| CStaticMesh | `src/Core/GameSystem/Components/CStaticMesh.h` | Mesh 资产引用 + 材质覆盖 |
+| CCamera | `src/Core/GameSystem/Components/CCamera.h` | FOV / Near / Far / LookAt |
+| CPointLight | `src/Core/GameSystem/Components/CPointLight.h` | Color / Intensity / Range |
+| CDirectionalLight | `src/Core/GameSystem/Components/CDirectionalLight.h` | Direction / Color / Intensity |
+| InputManager | `src/Core/GameSystem/InputManager.h` | 输入轮询与动作绑定 |
+
+所有 ECS 类型均在 `namespace Tumbler` 中。
+
+### 4. 资产管线
 
 ```
-AppLogic
-├── Scene (unique_ptr<FScene>)
-├── AssetMgr / InputMgr / SessionState / RenderCfg / Renderer（指针）
-├── MainCamera (CFirstPersonCamera*)
-├── Stats (PerformanceStats)
-└── DebugPreview (DebugTexturePreview)
+源文件 (OBJ/PNG/jpg) ──► TumblerImporter ──► cooked/
+                                               ├── meshes/*.tmesh
+                                               ├── textures/*.ttex
+                                               ├── materials/*.tmat
+                                               └── asset_map.json
+
+Scene JSON (*.tscene) ──► AssetDatabase ──► SceneLoader ──► FScene + Actors
 ```
 
-### EditorSessionState / RenderSettings
+| 模块 | 文件 | 职责 |
+|------|------|------|
+| AssetImporter | `src/Tools/AssetImporter/` | CLI 工具：OBJ→.tmesh, PNG→.ttex, Scene→asset_map |
+| AssetDatabase | `src/Core/Assets/AssetDatabase.h` | 加载 asset_map.json，源路径→cooked 查询 |
+| SceneLoader | `src/Core/Scene/SceneLoader.h` | 解析 Scene JSON，创建 Actor + Component |
+| AssetFormats | `src/Core/AssetFormats.h` | .tmesh/.ttex 二进制格式定义 |
 
-```cpp
-struct EditorSessionState {
-    FActor* SelectedActor;      // Hierarchy 面板选中
-    bool ShowDebugPanel;        // 调试窗口开关
-};
-struct RenderSettings {
-    ERenderPath CurrentRenderPath;  // Forward / Deferred / GPUDriven
-};
-```
+### 5. 渲染基础设施 (当前状态)
 
-### 渲染流程
+**尚无 Renderer 管线**。Engine::Run() 目前只做 Acquire + Present。
 
-```
-Render() 方法：
-1. FlushPendingDescriptorSetFrees()
-2. vkWaitForFences(kFenceTimeoutNs)  // 5 秒超时
-3. AcquireNextImage(kAcquireTimeoutNs)
-4. vkResetCommandBuffer()
-5. 更新 SceneDataUBO (memcpy 到持久映射缓冲)
-6. pipeline->RecordCommands(cmd, imageIndex, ...)
-   ├── [Forward]  单 Subpass：几何 + 光照
-   └── [Deferred] Subpass 0: G-Buffer 写入 → Subpass 1: 全屏光照
-7. onUIRender(cmd, imageIndex)  // ImGui 录制
-8. vkEndCommandBuffer()
-9. vkQueueSubmit() → vkQueuePresentKHR()
-```
+| 模块 | 文件 | 职责 |
+|------|------|------|
+| VulkanContext | `src/Core/Graphics/VulkanContext.h` | Instance + Device + 队列族 (Vulkan 1.4) |
+| RenderDevice | `src/Core/Graphics/RenderDevice.h` | Buffer/Image/Sampler 创建 (VMA) |
+| CommandManager | `src/Core/Graphics/CommandManager.h` | CommandPool + ImmediateSubmit + 布局转换 |
+| VulkanSwapchain | `src/Core/Graphics/VulkanSwapchain.h` | 交换链 + D32 深度 + resize 重建 |
+| DescriptorManager | `src/Core/Graphics/DescriptorManager.h` | Set 0 (Global) + Set 1 (Bindless) |
+| ResourceManager | `src/Core/Graphics/ResourceManager.h` | 统一 VB/IB + Mesh/纹理/Shader 上传 |
+| VulkanUtils | `src/Core/Graphics/VulkanUtils.h` | VK_CHECK 宏 |
 
-## 配套文档
+### 6. 数学库
 
-- [架构概览](architecture/overview.md)
-- [设计决策](architecture/decisions.md)
-- [渲染架构](architecture/rendering.md)
-- [渲染管线深度解析](../reference/rendering-pipeline.md)
-- [ECS 游戏系统](architecture/ecs.md)
-- [材质系统](architecture/material.md)
-- [编辑器与调试](../guides/editor.md)
-- [Vulkan 核心概念](../reference/vulkan-concepts/)
+| 类型 | 文件 |
+|------|------|
+| Vector3f | `src/Core/Math/Vector.h` |
+| Vector2f | `src/Core/Math/Vector2.h` |
+| Vector4f | `src/Core/Math/Vector4.h` |
+| Matrix4f | `src/Core/Math/Matrix.h` |
+| Quaternionf | `src/Core/Math/Quaternion.h` |
+| Plane | `src/Core/Math/Plane.h` |
+| Frustum | `src/Core/Math/Frustum.h` |
+| 工具函数 | `src/Core/Math/MathUtility.h` |
+
+## 文档配套
+
+- [架构概览](architecture/overview.md) — 设计原则
+- [编码规范](standards/coding-style.md) — 命名/日志/架构约束
+- [GPU-Driven 开发计划](gpu-driven-dev-plan.md) — Phase 4-10 规划
+- [后续开发指南](guides/continuation.md) — 当前进度 + 待做任务
+- [故障排除](troubleshooting.md)
