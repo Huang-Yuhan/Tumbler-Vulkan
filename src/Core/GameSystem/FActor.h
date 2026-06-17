@@ -1,10 +1,10 @@
 #pragma once
 
-#include <string>
-#include <vector>
-#include <unordered_map>
-#include <typeindex>
 #include <memory>
+#include <string>
+#include <typeindex>
+#include <unordered_map>
+#include <vector>
 
 #include "Core/GameSystem/Components/CTransform.h"
 #include "Core/GameSystem/Components/Component.h"
@@ -27,8 +27,7 @@ public:
 
     static FActor* CreateActor(const std::string& name);
 
-    template<typename T, typename... Args>
-    T* AddComponent(Args&&... args) {
+    template <typename T, typename... Args> T* AddComponent(Args&&... args) {
         auto NewComp = std::make_unique<T>(std::forward<Args>(args)...);
         NewComp->SetOwner(this);
         T* Ptr = NewComp.get();
@@ -37,8 +36,7 @@ public:
         return Ptr;
     }
 
-    template<typename T>
-    T* GetComponent() {
+    template <typename T> T* GetComponent() {
         auto it = TypeMap.find(std::type_index(typeid(T)));
         if (it != TypeMap.end()) {
             return static_cast<T*>(it->second);
@@ -53,8 +51,7 @@ public:
     }
 
     // 获取多个同类型组件
-    template<typename T>
-    std::vector<T*> GetComponents() {
+    template <typename T> std::vector<T*> GetComponents() {
         std::vector<T*> results;
         for (auto& Comp : Components) {
             if (T* Ptr = dynamic_cast<T*>(Comp.get())) {
@@ -65,10 +62,7 @@ public:
     }
 };
 
-
-template<>
-inline CTransform * FActor::GetComponent<CTransform>()
-{
+template <> inline CTransform* FActor::GetComponent<CTransform>() {
     // 直接返回成员变量的地址
     return &(this->Transform);
 }

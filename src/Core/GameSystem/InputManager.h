@@ -1,7 +1,7 @@
 #pragma once
+#include <glm/glm.hpp>
 #include <string>
 #include <unordered_map>
-#include <glm/glm.hpp>
 
 #include "KeyCodes.h"
 
@@ -54,7 +54,10 @@ public:
 private:
     GLFWwindow* WindowHandle = nullptr;
 
-    struct AxisBinding { EKeyCode PosKey; EKeyCode NegKey; };
+    struct AxisBinding {
+        EKeyCode PosKey;
+        EKeyCode NegKey;
+    };
     std::unordered_map<std::string, AxisBinding> AxisBindings;
     std::unordered_map<std::string, EKeyCode> ActionBindings;
 

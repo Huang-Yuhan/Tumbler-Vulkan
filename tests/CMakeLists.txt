@@ -5,7 +5,6 @@ add_subdirectory(unit/Graphics)
 # Legacy flat tests (from main)
 add_executable(TumblerUnitTests
         unit/DescriptorSetFreeQueueTests.cpp
-        unit/FQuaternionTests.cpp
         unit/CTransformTests.cpp
         unit/FActorTests.cpp
         unit/FSceneTests.cpp

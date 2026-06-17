@@ -1,8 +1,7 @@
 #pragma once
 
 // 模板类：T 是继承这个单例的子类类型
-template <typename T>
-class Singleton {
+template <typename T> class Singleton {
 public:
     // 获取单例引用的静态方法
     static T& Get() {

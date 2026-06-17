@@ -3,8 +3,7 @@
 // 1. 前置声明 (正确，解耦了 FActor.h)
 class FActor;
 
-class Component
-{
+class Component {
 protected:
     // [Ownership] 非拥有型指针
     FActor* Owner = nullptr;

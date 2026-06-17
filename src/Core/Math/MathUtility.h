@@ -7,8 +7,7 @@
 
 namespace Tumbler::Math {
 
-template <typename T>
-constexpr T Clamp(T value, T minValue, T maxValue) {
+template <typename T> constexpr T Clamp(T value, T minValue, T maxValue) {
     return value < minValue ? minValue : (value > maxValue ? maxValue : value);
 }
 
@@ -36,8 +35,7 @@ inline float InvSqrt(float value) {
     return 1.0f / std::sqrt(value);
 }
 
-template <typename T>
-constexpr T Lerp(const T& a, const T& b, float t) {
+template <typename T> constexpr T Lerp(const T& a, const T& b, float t) {
     return a + (b - a) * t;
 }
 

@@ -3,23 +3,17 @@
 namespace Tumbler::Math {
 
 // 前向声明
-template <typename T>
-struct TVector2;
+template <typename T> struct TVector2;
 
-template <typename T>
-struct TVector3;
+template <typename T> struct TVector3;
 
-template <typename T>
-struct TVector4;
+template <typename T> struct TVector4;
 
-template <typename T>
-struct TMatrix4;
+template <typename T> struct TMatrix4;
 
-template <typename T>
-struct TPlane;
+template <typename T> struct TPlane;
 
-template <typename T>
-struct TQuaternion;
+template <typename T> struct TQuaternion;
 
 struct Frustum;
 

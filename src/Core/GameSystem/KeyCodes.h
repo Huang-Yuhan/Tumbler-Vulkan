@@ -6,8 +6,32 @@ enum class EKeyCode : uint16_t {
     Unknown = 0,
 
     // 字母键
-    A, B, C, D, E, F, G, H, I, J, K, L, M,
-    N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
+    A,
+    B,
+    C,
+    D,
+    E,
+    F,
+    G,
+    H,
+    I,
+    J,
+    K,
+    L,
+    M,
+    N,
+    O,
+    P,
+    Q,
+    R,
+    S,
+    T,
+    U,
+    V,
+    W,
+    X,
+    Y,
+    Z,
 
     // 控制键
     Escape,
@@ -18,7 +42,10 @@ enum class EKeyCode : uint16_t {
     LeftCtrl,
 
     // 方向键
-    Up, Down, Left, Right,
+    Up,
+    Down,
+    Left,
+    Right,
 
     // 鼠标按键
     MouseLeft,

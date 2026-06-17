@@ -7,8 +7,7 @@
 
 namespace Tumbler::Math {
 
-template <typename T>
-struct TVector4 {
+template <typename T> struct TVector4 {
     static_assert(std::is_floating_point_v<T>, "TVector4 requires a floating point type.");
 
     T X{};
@@ -42,13 +41,11 @@ struct TVector4 {
     }
 };
 
-template <typename T>
-[[nodiscard]] constexpr TVector4<T> operator*(T scalar, const TVector4<T>& vector) {
+template <typename T> [[nodiscard]] constexpr TVector4<T> operator*(T scalar, const TVector4<T>& vector) {
     return vector * scalar;
 }
 
-template <typename T>
-[[nodiscard]] constexpr T Dot(const TVector4<T>& a, const TVector4<T>& b) {
+template <typename T> [[nodiscard]] constexpr T Dot(const TVector4<T>& a, const TVector4<T>& b) {
     return a.X * b.X + a.Y * b.Y + a.Z * b.Z + a.W * b.W;
 }
 

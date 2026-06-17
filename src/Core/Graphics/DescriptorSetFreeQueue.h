@@ -7,8 +7,7 @@
 
 class DescriptorSetFreeQueue {
 public:
-    bool Enqueue(VkDescriptorSet descriptorSet)
-    {
+    bool Enqueue(VkDescriptorSet descriptorSet) {
         if (descriptorSet == VK_NULL_HANDLE) {
             return false;
         }
@@ -21,25 +20,13 @@ public:
         return true;
     }
 
-    void Clear()
-    {
-        PendingDescriptorSets.clear();
-    }
+    void Clear() { PendingDescriptorSets.clear(); }
 
-    [[nodiscard]] bool Empty() const
-    {
-        return PendingDescriptorSets.empty();
-    }
+    [[nodiscard]] bool Empty() const { return PendingDescriptorSets.empty(); }
 
-    [[nodiscard]] size_t Size() const
-    {
-        return PendingDescriptorSets.size();
-    }
+    [[nodiscard]] size_t Size() const { return PendingDescriptorSets.size(); }
 
-    [[nodiscard]] const std::vector<VkDescriptorSet>& GetPendingDescriptorSets() const
-    {
-        return PendingDescriptorSets;
-    }
+    [[nodiscard]] const std::vector<VkDescriptorSet>& GetPendingDescriptorSets() const { return PendingDescriptorSets; }
 
 private:
     std::vector<VkDescriptorSet> PendingDescriptorSets;

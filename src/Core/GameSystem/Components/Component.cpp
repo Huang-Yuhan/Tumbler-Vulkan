@@ -8,19 +8,16 @@ Component::Component() = default;
 Component::~Component() = default;
 
 // 3. 在这里实现 SetOwner
-void Component::SetOwner(FActor* InOwner)
-{
+void Component::SetOwner(FActor* InOwner) {
     Owner = InOwner;
 }
 
 // 4. 在这里实现 GetOwner
-FActor* Component::GetOwner()
-{
+FActor* Component::GetOwner() {
     return Owner;
 }
 
 // 5. 实现 Update (虽然是空的)
-void Component::Update(float DeltaTime)
-{
+void Component::Update(float DeltaTime) {
     // 留空，等待子类重写
 }

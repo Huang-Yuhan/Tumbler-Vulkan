@@ -90,7 +90,7 @@ endif()
 # =========================================================
 # 4. 添加例子子目录
 # =========================================================
-add_subdirectory(src/Examples)
+# add_subdirectory(src/Examples)
 if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()

@@ -2,17 +2,16 @@
 
 #include "Core/Math/MathFwd.h"
 #include "Core/Math/MathUtility.h"
+#include "Core/Math/Matrix.h"
 #include "Core/Math/Vector.h"
 #include "Core/Math/Vector2.h"
-#include "Core/Math/Matrix.h"
 
 #include <cmath>
 #include <type_traits>
 
 namespace Tumbler::Math {
 
-template <typename T>
-struct TQuaternion {
+template <typename T> struct TQuaternion {
     static_assert(std::is_floating_point_v<T>, "TQuaternion requires a floating point type.");
 
     T X{};
@@ -54,7 +53,7 @@ struct TQuaternion {
 
     static TQuaternion FromEulerDegrees(const TVector3<T>& eulerDegrees) {
         return FromEulerRadians(TVector3<T>{DegreesToRadians(eulerDegrees.X), DegreesToRadians(eulerDegrees.Y),
-                                             DegreesToRadians(eulerDegrees.Z)});
+                                            DegreesToRadians(eulerDegrees.Z)});
     }
 
     [[nodiscard]] T LengthSquared() const { return X * X + Y * Y + Z * Z + W * W; }
@@ -112,10 +111,22 @@ struct TQuaternion {
         const T wz = W * Z;
 
         return TMatrix4<T>{
-            T(1) - T(2) * (yy + zz), T(2) * (xy - wz),        T(2) * (xz + wy),        T(0),
-            T(2) * (xy + wz),        T(1) - T(2) * (xx + zz), T(2) * (yz - wx),        T(0),
-            T(2) * (xz - wy),        T(2) * (yz + wx),        T(1) - T(2) * (xx + yy), T(0),
-            T(0),                    T(0),                    T(0),                    T(1),
+            T(1) - T(2) * (yy + zz),
+            T(2) * (xy - wz),
+            T(2) * (xz + wy),
+            T(0),
+            T(2) * (xy + wz),
+            T(1) - T(2) * (xx + zz),
+            T(2) * (yz - wx),
+            T(0),
+            T(2) * (xz - wy),
+            T(2) * (yz + wx),
+            T(1) - T(2) * (xx + yy),
+            T(0),
+            T(0),
+            T(0),
+            T(0),
+            T(1),
         };
     }
 
@@ -196,8 +207,7 @@ struct TQuaternion {
 // 矩阵 — 四元数互操作
 // ==========================================
 
-template <typename T>
-TMatrix4<T> MakeRotation(const TQuaternion<T>& q) {
+template <typename T> TMatrix4<T> MakeRotation(const TQuaternion<T>& q) {
     return q.ToMatrix();
 }
 

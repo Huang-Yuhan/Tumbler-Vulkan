@@ -10,21 +10,19 @@
 
 namespace Tumbler::Math {
 
-template <typename T>
-struct TMatrix4 {
+template <typename T> struct TMatrix4 {
     static_assert(std::is_floating_point_v<T>, "TMatrix4 requires a floating point type.");
 
     T M[4][4]{};
 
     constexpr TMatrix4() = default;
 
-    constexpr TMatrix4(T m00, T m01, T m02, T m03, T m10, T m11, T m12, T m13, T m20, T m21, T m22, T m23,
-                       T m30, T m31, T m32, T m33)
+    constexpr TMatrix4(T m00, T m01, T m02, T m03, T m10, T m11, T m12, T m13, T m20, T m21, T m22, T m23, T m30, T m31,
+                       T m32, T m33)
         : M{{m00, m01, m02, m03}, {m10, m11, m12, m13}, {m20, m21, m22, m23}, {m30, m31, m32, m33}} {}
 
     [[nodiscard]] static constexpr TMatrix4 Identity() {
-        return TMatrix4{T(1), T(0), T(0), T(0), T(0), T(1), T(0), T(0),
-                        T(0), T(0), T(1), T(0), T(0), T(0), T(0), T(1)};
+        return TMatrix4{T(1), T(0), T(0), T(0), T(0), T(1), T(0), T(0), T(0), T(0), T(1), T(0), T(0), T(0), T(0), T(1)};
     }
 
     [[nodiscard]] constexpr const T* operator[](int row) const { return M[row]; }
@@ -62,22 +60,9 @@ inline Matrix4f MakeLookAt(const Vector3f& eye, const Vector3f& target, const Ve
     const Vector3f right = Cross(forward, up).GetNormalized();
     const Vector3f cameraUp = Cross(right, forward);
 
-    return Matrix4f{right.X,
-                    right.Y,
-                    right.Z,
-                    -Dot(right, eye),
-                    cameraUp.X,
-                    cameraUp.Y,
-                    cameraUp.Z,
-                    -Dot(cameraUp, eye),
-                    -forward.X,
-                    -forward.Y,
-                    -forward.Z,
-                    Dot(forward, eye),
-                    0.0f,
-                    0.0f,
-                    0.0f,
-                    1.0f};
+    return Matrix4f{
+        right.X,    right.Y,    right.Z,    -Dot(right, eye),  cameraUp.X, cameraUp.Y, cameraUp.Z, -Dot(cameraUp, eye),
+        -forward.X, -forward.Y, -forward.Z, Dot(forward, eye), 0.0f,       0.0f,       0.0f,       1.0f};
 }
 
 inline Matrix4f MakePerspective(float verticalFovRadians, float aspectRatio, float nearZ, float farZ,
@@ -89,32 +74,24 @@ inline Matrix4f MakePerspective(float verticalFovRadians, float aspectRatio, flo
     if (convention == DepthConvention::ReverseZZeroToOne) {
         const float zScale = nearZ / (farZ - nearZ);
         const float zOffset = (farZ * nearZ) / (farZ - nearZ);
-        return Matrix4f{xScale, 0.0f,   0.0f,   0.0f,
-                        0.0f,   yScale, 0.0f,   0.0f,
-                        0.0f,   0.0f,   zScale,  zOffset,
-                        0.0f,   0.0f,   -1.0f,  0.0f};
+        return Matrix4f{xScale, 0.0f, 0.0f,   0.0f,    0.0f, yScale, 0.0f,  0.0f,
+                        0.0f,   0.0f, zScale, zOffset, 0.0f, 0.0f,   -1.0f, 0.0f};
     }
 
     const float zScale = farZ / (nearZ - farZ);
     const float zOffset = (farZ * nearZ) / (nearZ - farZ);
-    return Matrix4f{xScale, 0.0f,   0.0f,  0.0f,
-                    0.0f,   yScale, 0.0f,  0.0f,
-                    0.0f,   0.0f,   zScale, zOffset,
-                    0.0f,   0.0f,   -1.0f, 0.0f};
+    return Matrix4f{xScale, 0.0f, 0.0f,   0.0f,    0.0f, yScale, 0.0f,  0.0f,
+                    0.0f,   0.0f, zScale, zOffset, 0.0f, 0.0f,   -1.0f, 0.0f};
 }
 
 inline Matrix4f MakeTranslation(const Vector3f& translation) {
-    return Matrix4f{1.0f, 0.0f, 0.0f, translation.X,
-                    0.0f, 1.0f, 0.0f, translation.Y,
-                    0.0f, 0.0f, 1.0f, translation.Z,
-                    0.0f, 0.0f, 0.0f, 1.0f};
+    return Matrix4f{1.0f, 0.0f, 0.0f, translation.X, 0.0f, 1.0f, 0.0f, translation.Y,
+                    0.0f, 0.0f, 1.0f, translation.Z, 0.0f, 0.0f, 0.0f, 1.0f};
 }
 
 inline Matrix4f MakeScale(const Vector3f& scale) {
-    return Matrix4f{scale.X, 0.0f,    0.0f,    0.0f,
-                    0.0f,    scale.Y, 0.0f,    0.0f,
-                    0.0f,    0.0f,    scale.Z, 0.0f,
-                    0.0f,    0.0f,    0.0f,    1.0f};
+    return Matrix4f{scale.X, 0.0f, 0.0f,    0.0f, 0.0f, scale.Y, 0.0f, 0.0f,
+                    0.0f,    0.0f, scale.Z, 0.0f, 0.0f, 0.0f,    0.0f, 1.0f};
 }
 
 inline Matrix4f MakeOrtho(float left, float right, float bottom, float top, float nearZ, float farZ,
@@ -124,17 +101,13 @@ inline Matrix4f MakeOrtho(float left, float right, float bottom, float top, floa
 
     if (convention == DepthConvention::ReverseZZeroToOne) {
         const float fn = 1.0f / (nearZ - farZ);
-        return Matrix4f{2.0f * rl, 0.0f,      0.0f,       -(right + left) * rl,
-                        0.0f,      2.0f * tb, 0.0f,       -(top + bottom) * tb,
-                        0.0f,      0.0f,      fn,          nearZ * fn,
-                        0.0f,      0.0f,      0.0f,       1.0f};
+        return Matrix4f{2.0f * rl, 0.0f, 0.0f, -(right + left) * rl, 0.0f, 2.0f * tb, 0.0f, -(top + bottom) * tb,
+                        0.0f,      0.0f, fn,   nearZ * fn,           0.0f, 0.0f,      0.0f, 1.0f};
     }
 
     const float fn = 1.0f / (farZ - nearZ);
-    return Matrix4f{2.0f * rl, 0.0f,      0.0f,      -(right + left) * rl,
-                    0.0f,      2.0f * tb, 0.0f,      -(top + bottom) * tb,
-                    0.0f,      0.0f,      -fn,        -nearZ * fn,
-                    0.0f,      0.0f,      0.0f,       1.0f};
+    return Matrix4f{2.0f * rl, 0.0f, 0.0f, -(right + left) * rl, 0.0f, 2.0f * tb, 0.0f, -(top + bottom) * tb,
+                    0.0f,      0.0f, -fn,  -nearZ * fn,          0.0f, 0.0f,      0.0f, 1.0f};
 }
 
 inline Matrix4f Inverse(const Matrix4f& m) {
@@ -164,25 +137,17 @@ inline Matrix4f Inverse(const Matrix4f& m) {
 
     const float invDet = 1.0f / det;
     return Matrix4f{
-        (m11 * c5 - m12 * c4 + m13 * c3) * invDet,
-        (-m01 * c5 + m02 * c4 - m03 * c3) * invDet,
-        (m31 * s5 - m32 * s4 + m33 * s3) * invDet,
-        (-m21 * s5 + m22 * s4 - m23 * s3) * invDet,
+        (m11 * c5 - m12 * c4 + m13 * c3) * invDet,  (-m01 * c5 + m02 * c4 - m03 * c3) * invDet,
+        (m31 * s5 - m32 * s4 + m33 * s3) * invDet,  (-m21 * s5 + m22 * s4 - m23 * s3) * invDet,
 
-        (-m10 * c5 + m12 * c2 - m13 * c1) * invDet,
-        (m00 * c5 - m02 * c2 + m03 * c1) * invDet,
-        (-m30 * s5 + m32 * s2 - m33 * s1) * invDet,
-        (m20 * s5 - m22 * s2 + m23 * s1) * invDet,
+        (-m10 * c5 + m12 * c2 - m13 * c1) * invDet, (m00 * c5 - m02 * c2 + m03 * c1) * invDet,
+        (-m30 * s5 + m32 * s2 - m33 * s1) * invDet, (m20 * s5 - m22 * s2 + m23 * s1) * invDet,
 
-        (m10 * c4 - m11 * c2 + m13 * c0) * invDet,
-        (-m00 * c4 + m01 * c2 - m03 * c0) * invDet,
-        (m30 * s4 - m31 * s2 + m33 * s0) * invDet,
-        (-m20 * s4 + m21 * s2 - m23 * s0) * invDet,
+        (m10 * c4 - m11 * c2 + m13 * c0) * invDet,  (-m00 * c4 + m01 * c2 - m03 * c0) * invDet,
+        (m30 * s4 - m31 * s2 + m33 * s0) * invDet,  (-m20 * s4 + m21 * s2 - m23 * s0) * invDet,
 
-        (-m10 * c3 + m11 * c1 - m12 * c0) * invDet,
-        (m00 * c3 - m01 * c1 + m02 * c0) * invDet,
-        (-m30 * s3 + m31 * s1 - m32 * s0) * invDet,
-        (m20 * s3 - m21 * s1 + m22 * s0) * invDet,
+        (-m10 * c3 + m11 * c1 - m12 * c0) * invDet, (m00 * c3 - m01 * c1 + m02 * c0) * invDet,
+        (-m30 * s3 + m31 * s1 - m32 * s0) * invDet, (m20 * s3 - m21 * s1 + m22 * s0) * invDet,
     };
 }
 

@@ -8,8 +8,7 @@
 
 namespace Tumbler::Math {
 
-template <typename T>
-struct TPlane {
+template <typename T> struct TPlane {
     static_assert(std::is_floating_point_v<T>, "TPlane requires a floating point type.");
 
     T X{};

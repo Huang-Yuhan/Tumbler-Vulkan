@@ -53,14 +53,11 @@ namespace Detail {
 
 inline Planef MakePlaneFromRows(const Matrix4f& matrix, float row0Scale, float row1Scale, float row2Scale,
                                 float row3Scale) {
-    return Planef{row0Scale * matrix[0][0] + row1Scale * matrix[1][0] + row2Scale * matrix[2][0] +
-                      row3Scale * matrix[3][0],
-                  row0Scale * matrix[0][1] + row1Scale * matrix[1][1] + row2Scale * matrix[2][1] +
-                      row3Scale * matrix[3][1],
-                  row0Scale * matrix[0][2] + row1Scale * matrix[1][2] + row2Scale * matrix[2][2] +
-                      row3Scale * matrix[3][2],
-                  row0Scale * matrix[0][3] + row1Scale * matrix[1][3] + row2Scale * matrix[2][3] +
-                      row3Scale * matrix[3][3]};
+    return Planef{
+        row0Scale * matrix[0][0] + row1Scale * matrix[1][0] + row2Scale * matrix[2][0] + row3Scale * matrix[3][0],
+        row0Scale * matrix[0][1] + row1Scale * matrix[1][1] + row2Scale * matrix[2][1] + row3Scale * matrix[3][1],
+        row0Scale * matrix[0][2] + row1Scale * matrix[1][2] + row2Scale * matrix[2][2] + row3Scale * matrix[3][2],
+        row0Scale * matrix[0][3] + row1Scale * matrix[1][3] + row2Scale * matrix[2][3] + row3Scale * matrix[3][3]};
 }
 
 inline bool NormalizeAndStore(Planef plane, FrustumPlane index, Frustum& outFrustum) {
@@ -94,20 +91,20 @@ inline bool ExtractFrustumPlanes(const Matrix4f& viewProj, Frustum& outFrustum,
     }
 
     if (convention == DepthConvention::ReverseZZeroToOne) {
-        if (!Detail::NormalizeAndStore(Detail::MakePlaneFromRows(viewProj, 0.0f, 0.0f, -1.0f, 1.0f),
-                                       FrustumPlane::Near, outFrustum)) {
+        if (!Detail::NormalizeAndStore(Detail::MakePlaneFromRows(viewProj, 0.0f, 0.0f, -1.0f, 1.0f), FrustumPlane::Near,
+                                       outFrustum)) {
             return false;
         }
-        return Detail::NormalizeAndStore(Detail::MakePlaneFromRows(viewProj, 0.0f, 0.0f, 1.0f, 0.0f),
-                                         FrustumPlane::Far, outFrustum);
+        return Detail::NormalizeAndStore(Detail::MakePlaneFromRows(viewProj, 0.0f, 0.0f, 1.0f, 0.0f), FrustumPlane::Far,
+                                         outFrustum);
     }
 
-    if (!Detail::NormalizeAndStore(Detail::MakePlaneFromRows(viewProj, 0.0f, 0.0f, 1.0f, 0.0f),
-                                   FrustumPlane::Near, outFrustum)) {
+    if (!Detail::NormalizeAndStore(Detail::MakePlaneFromRows(viewProj, 0.0f, 0.0f, 1.0f, 0.0f), FrustumPlane::Near,
+                                   outFrustum)) {
         return false;
     }
-    return Detail::NormalizeAndStore(Detail::MakePlaneFromRows(viewProj, 0.0f, 0.0f, -1.0f, 1.0f),
-                                     FrustumPlane::Far, outFrustum);
+    return Detail::NormalizeAndStore(Detail::MakePlaneFromRows(viewProj, 0.0f, 0.0f, -1.0f, 1.0f), FrustumPlane::Far,
+                                     outFrustum);
 }
 
 } // namespace Tumbler::Math

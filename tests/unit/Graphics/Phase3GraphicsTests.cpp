@@ -1,10 +1,10 @@
 #include "Core/Graphics/CommandManager.h"
-#include "Core/Graphics/GpuDescriptorManager.h"
-#include "Core/Graphics/GpuRenderDevice.h"
+#include "Core/Graphics/DescriptorManager.h"
+#include "Core/Graphics/RenderDevice.h"
 #include "Core/Graphics/ResourceManager.h"
-#include "Core/Graphics/GpuVulkanContext.h"
-#include "Core/Graphics/GpuVulkanSwapchain.h"
-#include "Core/Platform/GpuAppWindow.h"
+#include "Core/Graphics/VulkanContext.h"
+#include "Core/Graphics/VulkanSwapchain.h"
+#include "Core/Platform/AppWindow.h"
 
 #include <GLFW/glfw3.h>
 #include <gtest/gtest.h>
@@ -154,8 +154,8 @@ std::filesystem::path SourcePath(const char* relativePath) {
     return std::filesystem::path(TUMBLER_SOURCE_DIR) / relativePath;
 }
 
-Tumbler::GpuAppWindow::Config HiddenWindowConfig() {
-    Tumbler::GpuAppWindow::Config config{};
+Tumbler::AppWindow::Config HiddenWindowConfig() {
+    Tumbler::AppWindow::Config config{};
     config.Width = 64;
     config.Height = 64;
     config.Title = "TumblerPhase3WindowedTests";
@@ -182,8 +182,8 @@ protected:
         Context.Shutdown();
     }
 
-    Tumbler::GpuContext Context;
-    Tumbler::GpuDevice Device;
+    Tumbler::VulkanContext Context;
+    Tumbler::RenderDevice Device;
     Tumbler::CommandManager Commands;
 };
 
@@ -228,11 +228,11 @@ protected:
                               Device, width, height);
     }
 
-    Tumbler::GpuAppWindow Window;
-    Tumbler::GpuContext Context;
-    Tumbler::GpuDevice Device;
+    Tumbler::AppWindow Window;
+    Tumbler::VulkanContext Context;
+    Tumbler::RenderDevice Device;
     Tumbler::CommandManager Commands;
-    Tumbler::GpuSwapchain Swapchain;
+    Tumbler::VulkanSwapchain Swapchain;
 };
 
 VkImageView CreateImageView(VkDevice device, VkImage image, VkFormat format, VkImageAspectFlags aspectMask) {
@@ -257,7 +257,7 @@ VkImageView CreateImageView(VkDevice device, VkImage image, VkFormat format, VkI
 TEST(VulkanContextPhase3, InitializesRequiredHandles) {
     SkipIfPhase3VulkanUnavailable();
 
-    Tumbler::GpuContext context;
+    Tumbler::VulkanContext context;
     ASSERT_TRUE(context.Init());
 
     EXPECT_NE(context.GetInstance(), VK_NULL_HANDLE);
@@ -271,7 +271,7 @@ TEST(VulkanContextPhase3, InitializesRequiredHandles) {
 TEST(AppWindowPhase3, CreatesHiddenWindowForVulkanSurface) {
     SkipIfWindowedVulkanUnavailable();
 
-    Tumbler::GpuAppWindow window;
+    Tumbler::AppWindow window;
     if (!window.Init(HiddenWindowConfig())) {
         GTEST_SKIP() << "Hidden GLFW window creation failed";
     }
@@ -484,7 +484,7 @@ TEST_F(VulkanPhase3Fixture, CommandManagerTransitionsImageLayouts) {
 }
 
 TEST_F(VulkanPhase3Fixture, DescriptorManagerAllocatesAndUpdatesPhase3Sets) {
-    Tumbler::GpuDescriptorManager descriptors;
+    Tumbler::DescriptorManager descriptors;
     ASSERT_TRUE(descriptors.Init(Context.GetDevice(), 8));
     EXPECT_NE(descriptors.GetSet0Layout(), VK_NULL_HANDLE);
     EXPECT_NE(descriptors.GetSet1Layout(), VK_NULL_HANDLE);
@@ -514,8 +514,8 @@ TEST_F(VulkanPhase3Fixture, DescriptorManagerAllocatesAndUpdatesPhase3Sets) {
                                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     });
 
-    VkImageView imageView = CreateImageView(Context.GetDevice(), image.Image, VK_FORMAT_R8G8B8A8_UNORM,
-                                            VK_IMAGE_ASPECT_COLOR_BIT);
+    VkImageView imageView =
+        CreateImageView(Context.GetDevice(), image.Image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
     ASSERT_NE(imageView, VK_NULL_HANDLE);
     VkSampler sampler = Device.CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT, 1);
 

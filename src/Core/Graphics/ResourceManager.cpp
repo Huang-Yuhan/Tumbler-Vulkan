@@ -1,13 +1,12 @@
 #include "ResourceManager.h"
 #include "CommandManager.h"
 #include "Core/Utils/Log.h"
-#include "GpuRenderDevice.h"
+#include "RenderDevice.h"
 #include "VulkanUtils.h"
 
 #include <cstring>
 #include <fstream>
 #include <stb_image.h>
-#define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 #include <vk_mem_alloc.h>
 
@@ -16,9 +15,9 @@ namespace Tumbler {
 static constexpr VkDeviceSize kVertexBufferSize = 128ULL * 1024 * 1024;
 static constexpr VkDeviceSize kIndexBufferSize = 32ULL * 1024 * 1024;
 
-bool ResourceManager::Init(VkDevice device, GpuDevice& renderDevice, CommandManager& commandManager) {
+bool ResourceManager::Init(VkDevice device, RenderDevice& renderDevice, CommandManager& commandManager) {
     m_Device = device;
-    m_GpuDevice = &renderDevice;
+    m_RenderDevice = &renderDevice;
     m_CommandManager = &commandManager;
 
     // 创建 Unified Vertex Buffer
@@ -65,7 +64,7 @@ void ResourceManager::Shutdown() {
 
     for (size_t i = 0; i < m_TextureImages.size(); ++i) {
         if (m_TextureImages[i]) {
-            vmaDestroyImage(m_GpuDevice->GetAllocator(), m_TextureImages[i], m_TextureAllocations[i]);
+            vmaDestroyImage(m_RenderDevice->GetAllocator(), m_TextureImages[i], m_TextureAllocations[i]);
         }
     }
     m_TextureAllocations.clear();
@@ -73,11 +72,11 @@ void ResourceManager::Shutdown() {
     m_TextureIndexMap.clear();
 
     if (m_IndexBuffer) {
-        vmaDestroyBuffer(m_GpuDevice->GetAllocator(), m_IndexBuffer, m_IndexBufferAlloc);
+        vmaDestroyBuffer(m_RenderDevice->GetAllocator(), m_IndexBuffer, m_IndexBufferAlloc);
         m_IndexBuffer = VK_NULL_HANDLE;
     }
     if (m_VertexBuffer) {
-        vmaDestroyBuffer(m_GpuDevice->GetAllocator(), m_VertexBuffer, m_VertexBufferAlloc);
+        vmaDestroyBuffer(m_RenderDevice->GetAllocator(), m_VertexBuffer, m_VertexBufferAlloc);
         m_VertexBuffer = VK_NULL_HANDLE;
     }
 }
@@ -163,13 +162,13 @@ MeshHandle ResourceManager::UploadMesh(const std::string& objPath) {
     VmaAllocationCreateInfo stagingAllocInfo{};
     stagingAllocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
 
-    auto stagingHandle = m_GpuDevice->CreateBuffer(stagingInfo, stagingAllocInfo, "MeshStaging");
+    auto stagingHandle = m_RenderDevice->CreateBuffer(stagingInfo, stagingAllocInfo, "MeshStaging");
 
     void* data;
-    vmaMapMemory(m_GpuDevice->GetAllocator(), stagingHandle.Allocation, &data);
+    vmaMapMemory(m_RenderDevice->GetAllocator(), stagingHandle.Allocation, &data);
     memcpy(data, vertices.data(), vertexSize);
     memcpy(static_cast<uint8_t*>(data) + vertexSize, indices.data(), indexSize);
-    vmaUnmapMemory(m_GpuDevice->GetAllocator(), stagingHandle.Allocation);
+    vmaUnmapMemory(m_RenderDevice->GetAllocator(), stagingHandle.Allocation);
 
     // 通过 staging buffer 上传
     m_CommandManager->ImmediateSubmit([&](VkCommandBuffer cmd) {
@@ -187,7 +186,7 @@ MeshHandle ResourceManager::UploadMesh(const std::string& objPath) {
         ibCopy.size = indexSize;
         vkCmdCopyBuffer(cmd, stagingHandle.Buffer, m_IndexBuffer, 1, &ibCopy);
     });
-    m_GpuDevice->DestroyBuffer(stagingHandle);
+    m_RenderDevice->DestroyBuffer(stagingHandle);
 
     m_VertexBufferOffset += vertexSize;
     m_IndexBufferOffset += indexSize;
@@ -232,12 +231,12 @@ TextureHandle ResourceManager::UploadTexture(const std::string& path) {
     VmaAllocationCreateInfo stagingAllocInfo{};
     stagingAllocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
 
-    auto stagingHandle = m_GpuDevice->CreateBuffer(stagingInfo, stagingAllocInfo, "TextureStaging");
+    auto stagingHandle = m_RenderDevice->CreateBuffer(stagingInfo, stagingAllocInfo, "TextureStaging");
 
     void* data;
-    vmaMapMemory(m_GpuDevice->GetAllocator(), stagingHandle.Allocation, &data);
+    vmaMapMemory(m_RenderDevice->GetAllocator(), stagingHandle.Allocation, &data);
     memcpy(data, pixels, static_cast<size_t>(imageSize));
-    vmaUnmapMemory(m_GpuDevice->GetAllocator(), stagingHandle.Allocation);
+    vmaUnmapMemory(m_RenderDevice->GetAllocator(), stagingHandle.Allocation);
     stbi_image_free(pixels);
 
     // Create device-local image
@@ -258,7 +257,7 @@ TextureHandle ResourceManager::UploadTexture(const std::string& path) {
 
     VkImage image;
     VmaAllocation imageAlloc;
-    VK_CHECK(vmaCreateImage(m_GpuDevice->GetAllocator(), &imageInfo, &imageAllocInfo, &image, &imageAlloc, nullptr));
+    VK_CHECK(vmaCreateImage(m_RenderDevice->GetAllocator(), &imageInfo, &imageAllocInfo, &image, &imageAlloc, nullptr));
 
     // Upload + transition
     m_CommandManager->ImmediateSubmit([&](VkCommandBuffer cmd) {
@@ -344,7 +343,7 @@ TextureHandle ResourceManager::UploadTexture(const std::string& path) {
     });
 
     // Cleanup staging buffer
-    vmaDestroyBuffer(m_GpuDevice->GetAllocator(), stagingHandle.Buffer, stagingHandle.Allocation);
+    vmaDestroyBuffer(m_RenderDevice->GetAllocator(), stagingHandle.Buffer, stagingHandle.Allocation);
 
     // Create ImageView
     VkImageViewCreateInfo viewInfo{};
