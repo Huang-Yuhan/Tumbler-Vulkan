@@ -208,7 +208,7 @@ InstanceCull → NodeCull → ClusterCull → RasterBin → SW/HW Raster → Vis
 ## 文档索引
 
 - `docs/machine-setups.md` — 各开发机工具链路径与环境变量
-- `docs/gpu-driven-dev-plan.md` — Nanite 渲染器开发计划（Phase 4-10）
+- `docs/gpu-driven-dev-plan.md` — Nanite 渲染器开发计划（Phase 4-9）
 - `docs/guides/continuation.md` — 后续开发指南（Phase 进度 + 待做任务）
 - `docs/standards/coding-style.md` — 编码规范（命名、日志、架构约束）
 - `docs/architecture/overview.md` — 设计原则与数据流
@@ -217,3 +217,5 @@ InstanceCull → NodeCull → ClusterCull → RasterBin → SW/HW Raster → Vis
 - `docs/code-navigation.md` — 文件级速查表
 - `docs/troubleshooting.md` — 构建、运行时及 Linux/Wayland 问题
 - `docs/testing-and-ci.md` — 测试结构与 CI 流程
+- `docs/ue-research/INDEX.md` — UE5 Nanite 源码调研索引
+- `docs/ue-research/nanite-material-system.md` — Nanite 多材质系统分析

@@ -39,6 +39,13 @@
 | [PBR 理论与实现](reference/pbr-theory.md) | Cook-Torrance BRDF、金属工作流 |
 | [基于图像的照明](reference/ibl.md) | IBL 理论与引擎集成 |
 
+## UE5 源码调研
+
+| 文档 | 内容 |
+|------|------|
+| [调研索引](ue-research/INDEX.md) | 调研主题列表 + UE 源文件速查 |
+| [Nanite 材质系统](ue-research/nanite-material-system.md) | 多材质架构、FPackedCluster 编码、RasterBin/ShadeBin 分发 |
+
 ## 运维
 
 | 文档 | 内容 |

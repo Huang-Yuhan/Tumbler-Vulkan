@@ -118,32 +118,29 @@ Hook 会自动执行：格式检查 → 编译 → 测试。
 - 新增 `docs/standards/coding-style.md` 编码规范
 - 41/41 单元测试通过
 
-### Phase 4: VisBuffer + 单三角形 SW 光栅
+### Phase 4: LOD 0 Cluster + GPU-Driven Culling + VisBuffer + Deferred
 
-**目标**: Compute Shader 光栅化单个三角形 → VisBuffer64
+**目标**: 把完整 Mesh 拆成 LOD 0 Cluster → GPU 剔除 → SW 光栅 → VisBuffer → Deferred Shading 整条链路跑通。
 
-**新文件**:
-- `src/Core/Graphics/VisBuffer.h/.cpp` — R64_UINT 纹理，ImageInterlockedMaxUInt64
-- `src/Core/Graphics/RasterPass.h/.cpp` — SW 光栅 Compute Shader 调度
-- `assets/shaders/engine/rasterize.comp` — 边函数 + 原子写 VisBuffer64
+**子阶段**:
+- 4A: VisBuffer 创建 + 单三角形 SW 光栅验证（快速 checkpoint）
+- 4B: Cluster 数据结构 + CPU 构建（Morton sort, ~128 tri/cluster）
+- 4C: Cluster 上传 + GPU 视锥体剔除
+- 4D: 多 Cluster SW 光栅 → VisBuffer64
+- 4E: Depth Export（VisBuffer → SceneDepth + ShadingMask）
+- 4F: Shade Binning + VisBuffer 解码 → G-Buffer
+- 4G: Deferred Lighting（全屏三角形 + PBR + 方向光）
 
-**步骤**:
-1. 创建 VisBuffer: `R64_UINT` 格式纹理，Clear(0)
-2. 写 `rasterize.comp`: 硬编码三角形顶点（裁剪空间），边函数测试，InterlockedMax 写入
-3. RasterPass CPU 端: 创建 Compute Pipeline，Dispatch(1,1,1)
-4. Readback 验证: 读取 VisBuffer64 像素值，验证三角形渲染正确
+**不做**: HZB 遮挡剔除、LOD 层级、HW 混合光栅、顶点压缩。详见 `docs/gpu-driven-dev-plan.md`。
 
-**依赖**: `shaderInt64` 特性（检查 `VkPhysicalDeviceShaderAtomicInt64Features`）
-
-### Phase 5-10
+### Phase 5-9
 
 后续阶段参考 `docs/gpu-driven-dev-plan.md`：
-- Phase 5: Cluster 数据结构 + CPU 预处理
-- Phase 6: GPU Cluster 光栅化（无 LOD）
-- Phase 7: Cluster 层级 + LOD 选择
-- Phase 8: HW 光栅化 + 混合光栅
-- Phase 9: Deferred Material
-- Phase 10: 压缩编码 + 流式加载
+- Phase 5: 多材质支持（Material Ranges + Shade Binning 按材质桶分发）
+- Phase 6: Cluster 层级 + LOD 选择（DAG 构建 + NodeCull BVH 遍历）
+- Phase 7: HW 光栅化 + 混合光栅（按屏幕面积分箱）
+- Phase 8: HZB 遮挡剔除（上一帧深度 → 视锥体 + HZB 双重剔除）
+- Phase 9: 压缩编码 + 流式加载
 
 ---
 
