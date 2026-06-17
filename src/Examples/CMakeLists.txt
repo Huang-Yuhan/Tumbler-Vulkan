@@ -1,2 +1,1 @@
 add_subdirectory(Tumbler)
-add_subdirectory(TinyRendererModels)
