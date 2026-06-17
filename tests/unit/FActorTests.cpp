@@ -26,22 +26,20 @@ public:
 } // namespace
 
 TEST(FActorTests, CreateActorInitializesNameAndTransformOwner) {
-    FActor* actor = FActor::CreateActor("UnitActor");
+    auto actor = FActor::CreateActor("UnitActor");
     ASSERT_NE(actor, nullptr);
 
     EXPECT_EQ(actor->Name, "UnitActor");
-    EXPECT_EQ(actor->Transform.GetOwner(), actor);
-
-    delete actor;
+    EXPECT_EQ(actor->Transform.GetOwner(), actor.get());
 }
 
 TEST(FActorTests, AddComponentSetsOwnerAndSupportsGetters) {
-    FActor* actor = FActor::CreateActor("ComponentHost");
+    auto actor = FActor::CreateActor("ComponentHost");
     ASSERT_NE(actor, nullptr);
 
     DummyComponent* component = actor->AddComponent<DummyComponent>(7);
     ASSERT_NE(component, nullptr);
-    EXPECT_EQ(component->GetOwner(), actor);
+    EXPECT_EQ(component->GetOwner(), actor.get());
     EXPECT_EQ(component->Value, 7);
 
     DummyComponent* resolvedSingle = actor->GetComponent<DummyComponent>();
@@ -51,33 +49,27 @@ TEST(FActorTests, AddComponentSetsOwnerAndSupportsGetters) {
     const std::vector<DummyComponent*> resolvedMany = actor->GetComponents<DummyComponent>();
     ASSERT_EQ(resolvedMany.size(), 1u);
     EXPECT_EQ(resolvedMany[0], component);
-
-    delete actor;
 }
 
 TEST(FActorTests, GetComponentTransformSpecializationReturnsEmbeddedTransform) {
-    FActor* actor = FActor::CreateActor("TransformOwner");
+    auto actor = FActor::CreateActor("TransformOwner");
     ASSERT_NE(actor, nullptr);
 
     CTransform* transform = actor->GetComponent<CTransform>();
     ASSERT_NE(transform, nullptr);
     EXPECT_EQ(transform, &actor->Transform);
-
-    delete actor;
 }
 
 TEST(FActorTests, GetComponentReturnsNullWhenComponentDoesNotExist) {
-    FActor* actor = FActor::CreateActor("MissingCompHost");
+    auto actor = FActor::CreateActor("MissingCompHost");
     ASSERT_NE(actor, nullptr);
 
     EXPECT_EQ(actor->GetComponent<DummyComponent>(), nullptr);
     EXPECT_EQ(actor->GetComponent<AnotherDummyComponent>(), nullptr);
-
-    delete actor;
 }
 
 TEST(FActorTests, GetComponentsReturnsAllMatchingInstances) {
-    FActor* actor = FActor::CreateActor("MultiComponentHost");
+    auto actor = FActor::CreateActor("MultiComponentHost");
     ASSERT_NE(actor, nullptr);
 
     DummyComponent* first = actor->AddComponent<DummyComponent>(1);
@@ -92,6 +84,4 @@ TEST(FActorTests, GetComponentsReturnsAllMatchingInstances) {
     EXPECT_EQ(allDummy[0], first);
     EXPECT_EQ(allDummy[1], second);
     EXPECT_EQ(actor->GetComponent<AnotherDummyComponent>(), other);
-
-    delete actor;
 }

@@ -6,10 +6,10 @@ FActor::FActor() = default;
 
 FActor::~FActor() = default;
 
-FActor* FActor::CreateActor(const std::string& name) {
-    const auto NewActor = new FActor();
+std::unique_ptr<FActor> FActor::CreateActor(const std::string& name) {
+    auto NewActor = std::make_unique<FActor>();
     NewActor->Name = name;
-    NewActor->Transform.SetOwner(NewActor);
+    NewActor->Transform.SetOwner(NewActor.get());
     return NewActor;
 }
 

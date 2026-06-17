@@ -15,7 +15,7 @@ public:
     virtual ~Component();
 
     void SetOwner(FActor* InOwner);
-    virtual FActor* GetOwner();
+    [[nodiscard]] virtual FActor* GetOwner();
 
     virtual void OnDrawUI() {}
     virtual void Update(float DeltaTime);

@@ -2,8 +2,14 @@
 
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
+
+// 前置声明，避免头文件暴露 nlohmann/json
+namespace nlohmann {
+class json;
+}
 
 namespace Tumbler {
 
@@ -31,7 +37,7 @@ public:
     };
 
     SceneSerializer() = default;
-    ~SceneSerializer() = default;
+    ~SceneSerializer();
 
     // 读取 Scene JSON 文件
     bool LoadScene(const std::string& sceneJsonPath);
@@ -53,9 +59,7 @@ public:
 
 private:
     std::string m_SceneName;
-    // 内部保存的 JSON 对象，用于遍历 objects / lights 等
-    // nlohmann::json 在 .cpp 中使用
-    void* m_JsonDoc = nullptr; // opaque pointer，避免头文件暴露 nlohmann/json
+    std::unique_ptr<nlohmann::json> m_JsonDoc;
 
     // 按类型分组: m_AssetMap["meshes"]["path"] = AssetMapEntry
     std::map<std::string, std::map<std::string, AssetMapEntry>> m_AssetMap;

@@ -6,12 +6,11 @@
 #include "Core/Math/Vector4.h"
 
 #include <cmath>
-#include <type_traits>
+#include <concepts>
 
 namespace Tumbler::Math {
 
-template <typename T> struct TMatrix4 {
-    static_assert(std::is_floating_point_v<T>, "TMatrix4 requires a floating point type.");
+template <typename T> requires std::floating_point<T> struct TMatrix4 {
 
     T M[4][4]{};
 

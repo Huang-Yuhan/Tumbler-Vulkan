@@ -10,6 +10,8 @@ using json = nlohmann::json;
 
 namespace Tumbler {
 
+SceneSerializer::~SceneSerializer() = default;
+
 // ============================================================================
 // 辅助：计算文件路径的简单 hash（用于增量构建检测）
 // ============================================================================
@@ -46,12 +48,9 @@ bool SceneSerializer::LoadScene(const std::string& sceneJsonPath) {
     try {
         json doc = json::parse(file);
         // 保存 JSON document
-        if (m_JsonDoc) {
-            delete static_cast<json*>(m_JsonDoc);
-        }
-        m_JsonDoc = new json(std::move(doc));
+        m_JsonDoc = std::make_unique<json>(std::move(doc));
 
-        m_SceneName = (*static_cast<json*>(m_JsonDoc)).value("name", "Untitled");
+        m_SceneName = m_JsonDoc->value("name", "Untitled");
         std::cout << "[SceneSerializer] Loaded scene '" << m_SceneName << "'" << std::endl;
         return true;
     } catch (const json::exception& e) {
@@ -65,7 +64,7 @@ std::vector<SceneSerializer::Dependency> SceneSerializer::CollectDependencies() 
     if (!m_JsonDoc)
         return deps;
 
-    const json& doc = *static_cast<const json*>(m_JsonDoc);
+    const json& doc = *m_JsonDoc;
 
     if (!doc.contains("objects") || !doc["objects"].is_array()) {
         return deps;
@@ -94,7 +93,7 @@ std::vector<SceneSerializer::Dependency> SceneSerializer::CollectDependencies() 
                         for (const char* key : {"albedo", "normal", "metallicRoughness"}) {
                             if (matDoc.contains(key) && matDoc[key].is_string()) {
                                 std::string texPath = matDoc[key].get<std::string>();
-                                if (!texPath.empty() && texPath.rfind("cooked/", 0) != 0) {
+                                if (!texPath.empty() && !texPath.starts_with("cooked/")) {
                                     deps.push_back({"texture", texPath});
                                 }
                             }

@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstring>
 #include <fstream>
+#include <vector>
 #include <iostream>
 #include <stb_image.h>
 #include <stb_image_resize2.h>
@@ -12,8 +13,8 @@ namespace Tumbler {
 
 bool TextureImporter::Load(const std::string& imagePath, ImportResult& outResult) {
     int width, height, channels;
-    unsigned char* data = stbi_load(imagePath.c_str(), &width, &height, &channels, 0);
-    if (!data) {
+    unsigned char* stbData = stbi_load(imagePath.c_str(), &width, &height, &channels, 0);
+    if (!stbData) {
         std::cerr << "[TextureImporter] Failed to load image: " << imagePath << " ("
                   << (stbi_failure_reason() ? stbi_failure_reason() : "unknown") << ")" << std::endl;
         return false;
@@ -29,16 +30,6 @@ bool TextureImporter::Load(const std::string& imagePath, ImportResult& outResult
     } else if (channels == 3) {
         // stb 不支持 3 通道 mipmap resize，转换为 4 通道
         outResult.Format = static_cast<uint32_t>(ETextureFormat::R8G8B8A8_SRGB);
-        std::vector<uint8_t> rgbaData(width * height * 4);
-        for (int i = 0; i < width * height; i++) {
-            rgbaData[i * 4 + 0] = data[i * 3 + 0];
-            rgbaData[i * 4 + 1] = data[i * 3 + 1];
-            rgbaData[i * 4 + 2] = data[i * 3 + 2];
-            rgbaData[i * 4 + 3] = 255;
-        }
-        stbi_image_free(data);
-        data = new uint8_t[width * height * 4];
-        std::memcpy(data, rgbaData.data(), rgbaData.size());
         channels = 4;
     } else if (channels == 2) {
         outResult.Format = static_cast<uint32_t>(ETextureFormat::R8G8_UNORM);
@@ -46,7 +37,24 @@ bool TextureImporter::Load(const std::string& imagePath, ImportResult& outResult
         outResult.Format = static_cast<uint32_t>(ETextureFormat::R8_UNORM);
     }
 
-    uint32_t bpp = BytesPerPixel(static_cast<ETextureFormat>(outResult.Format));
+    // 将 stb 数据拷贝到 vector 中，统一所有权
+    const size_t srcSize = static_cast<size_t>(width) * static_cast<size_t>(height) * static_cast<size_t>(channels);
+    std::vector<uint8_t> baseData(srcSize);
+    if (channels == 3) {
+        // 3 通道 → 4 通道转换
+        baseData.resize(static_cast<size_t>(width) * static_cast<size_t>(height) * 4);
+        for (int i = 0; i < width * height; i++) {
+            baseData[i * 4 + 0] = stbData[i * 3 + 0];
+            baseData[i * 4 + 1] = stbData[i * 3 + 1];
+            baseData[i * 4 + 2] = stbData[i * 3 + 2];
+            baseData[i * 4 + 3] = 255;
+        }
+    } else {
+        std::memcpy(baseData.data(), stbData, srcSize);
+    }
+    stbi_image_free(stbData);
+
+    const uint32_t bpp = BytesPerPixel(static_cast<ETextureFormat>(outResult.Format));
 
     // 计算 mip 级别数
     uint32_t maxDim = std::max(outResult.Width, outResult.Height);
@@ -57,7 +65,7 @@ bool TextureImporter::Load(const std::string& imagePath, ImportResult& outResult
     // 逐级生成 mipmap
     uint32_t curWidth = outResult.Width;
     uint32_t curHeight = outResult.Height;
-    unsigned char* curData = data;
+    std::vector<uint8_t> curMipData = std::move(baseData);
 
     for (uint32_t mip = 0; mip < outResult.MipLevels; mip++) {
         uint32_t mipSize = curWidth * curHeight * bpp;
@@ -65,38 +73,25 @@ bool TextureImporter::Load(const std::string& imagePath, ImportResult& outResult
         // 将当前 mip 数据追加到输出 buffer
         size_t offset = outResult.MipData.size();
         outResult.MipData.resize(offset + mipSize);
-        std::memcpy(outResult.MipData.data() + offset, curData, mipSize);
+        std::memcpy(outResult.MipData.data() + offset, curMipData.data(), mipSize);
 
         // 生成下一级 mip（如果还有）
         if (mip + 1 < outResult.MipLevels) {
             uint32_t nextWidth = std::max(1u, curWidth / 2);
             uint32_t nextHeight = std::max(1u, curHeight / 2);
             uint32_t nextSize = nextWidth * nextHeight * bpp;
-            unsigned char* nextData = new unsigned char[nextSize];
+            std::vector<uint8_t> nextMipData(nextSize);
 
             // 使用 stbir_resize_uint8_linear 做降采样
-            stbir_resize_uint8_linear(curData, static_cast<int>(curWidth), static_cast<int>(curHeight),
-                                      static_cast<int>(curWidth * bpp), nextData, static_cast<int>(nextWidth),
-                                      static_cast<int>(nextHeight), static_cast<int>(nextWidth * bpp),
+            stbir_resize_uint8_linear(curMipData.data(), static_cast<int>(curWidth), static_cast<int>(curHeight),
+                                      static_cast<int>(curWidth * bpp), nextMipData.data(),
+                                      static_cast<int>(nextWidth), static_cast<int>(nextHeight),
+                                      static_cast<int>(nextWidth * bpp),
                                       static_cast<stbir_pixel_layout>(channels - 1)); // STBIR_RGBA / STBIR_R / etc
 
-            if (mip == 0) {
-                // mip 0 的数据是 stb 分配的，释放它
-                stbi_image_free(curData);
-            } else {
-                delete[] curData;
-            }
-
-            curData = nextData;
+            curMipData = std::move(nextMipData);
             curWidth = nextWidth;
             curHeight = nextHeight;
-        } else {
-            // 最后一级
-            if (mip == 0) {
-                stbi_image_free(curData);
-            } else {
-                delete[] curData;
-            }
         }
     }
 

@@ -4,12 +4,11 @@
 #include "Core/Math/MathUtility.h"
 
 #include <cmath>
-#include <type_traits>
+#include <concepts>
 
 namespace Tumbler::Math {
 
-template <typename T> struct TVector3 {
-    static_assert(std::is_floating_point_v<T>, "TVector3 requires a floating point type.");
+template <typename T> requires std::floating_point<T> struct TVector3 {
 
     T X{};
     T Y{};
@@ -97,15 +96,18 @@ template <typename T> struct TVector3 {
     }
 };
 
-template <typename T> [[nodiscard]] constexpr TVector3<T> operator*(T scalar, const TVector3<T>& vector) {
+template <typename T> requires std::floating_point<T>
+[[nodiscard]] constexpr TVector3<T> operator*(T scalar, const TVector3<T>& vector) {
     return vector * scalar;
 }
 
-template <typename T> [[nodiscard]] constexpr T Dot(const TVector3<T>& a, const TVector3<T>& b) {
+template <typename T> requires std::floating_point<T>
+[[nodiscard]] constexpr T Dot(const TVector3<T>& a, const TVector3<T>& b) {
     return a.X * b.X + a.Y * b.Y + a.Z * b.Z;
 }
 
-template <typename T> [[nodiscard]] constexpr TVector3<T> Cross(const TVector3<T>& a, const TVector3<T>& b) {
+template <typename T> requires std::floating_point<T>
+[[nodiscard]] constexpr TVector3<T> Cross(const TVector3<T>& a, const TVector3<T>& b) {
     return TVector3<T>{a.Y * b.Z - a.Z * b.Y, a.Z * b.X - a.X * b.Z, a.X * b.Y - a.Y * b.X};
 }
 

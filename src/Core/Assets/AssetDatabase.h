@@ -44,25 +44,25 @@ public:
     bool LoadAssetMap(const std::string& assetMapPath);
 
     // 是否已加载
-    bool IsLoaded() const { return m_bLoaded; }
+    [[nodiscard]] bool IsLoaded() const noexcept { return m_bLoaded; }
 
     // ---- 查询 API ----
 
     // 按类型和源路径查询 cooked 路径，找不到返回空字符串
-    std::string GetCookedPath(const std::string& sourcePath, const std::string& type) const;
+    [[nodiscard]] std::string GetCookedPath(const std::string& sourcePath, const std::string& type) const;
 
     // 按类型获取所有条目的源路径列表（遍历用）
-    std::vector<std::string> GetAllSources(const std::string& type) const;
+    [[nodiscard]] std::vector<std::string> GetAllSources(const std::string& type) const;
 
     // 获取具体元数据
-    const MeshMeta* GetMeshMeta(const std::string& sourcePath) const;
-    const TextureMeta* GetTextureMeta(const std::string& sourcePath) const;
-    const MaterialMeta* GetMaterialMeta(const std::string& sourcePath) const;
+    [[nodiscard]] const MeshMeta* GetMeshMeta(const std::string& sourcePath) const;
+    [[nodiscard]] const TextureMeta* GetTextureMeta(const std::string& sourcePath) const;
+    [[nodiscard]] const MaterialMeta* GetMaterialMeta(const std::string& sourcePath) const;
 
     // 原始条目数
-    size_t GetMeshCount() const { return m_Meshes.size(); }
-    size_t GetTextureCount() const { return m_Textures.size(); }
-    size_t GetMaterialCount() const { return m_Materials.size(); }
+    [[nodiscard]] size_t GetMeshCount() const noexcept { return m_Meshes.size(); }
+    [[nodiscard]] size_t GetTextureCount() const noexcept { return m_Textures.size(); }
+    [[nodiscard]] size_t GetMaterialCount() const noexcept { return m_Materials.size(); }
 
 private:
     bool m_bLoaded = false;

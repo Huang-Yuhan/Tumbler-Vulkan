@@ -1,19 +1,21 @@
 #pragma once
 
+#include <concepts>
+
 namespace Tumbler::Math {
 
-// 前向声明
-template <typename T> struct TVector2;
+// 前向声明（requires 子句与定义一致）
+template <typename T> requires std::floating_point<T> struct TVector2;
 
-template <typename T> struct TVector3;
+template <typename T> requires std::floating_point<T> struct TVector3;
 
-template <typename T> struct TVector4;
+template <typename T> requires std::floating_point<T> struct TVector4;
 
-template <typename T> struct TMatrix4;
+template <typename T> requires std::floating_point<T> struct TMatrix4;
 
-template <typename T> struct TPlane;
+template <typename T> requires std::floating_point<T> struct TPlane;
 
-template <typename T> struct TQuaternion;
+template <typename T> requires std::floating_point<T> struct TQuaternion;
 
 struct Frustum;
 

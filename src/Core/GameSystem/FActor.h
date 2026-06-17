@@ -15,6 +15,8 @@ class FActor {
 private:
     // 构造函数私有化，强制使用 CreateActor
     FActor();
+    // 允许 make_unique 访问私有构造函数（避免 unique_ptr(new T) 的潜在性能损失）
+    friend std::unique_ptr<FActor> std::make_unique<FActor>();
 
 public:
     // 析构函数 (在 cpp 里实现)
@@ -27,7 +29,7 @@ public:
     std::vector<std::unique_ptr<Component>> Components;
     std::unordered_map<std::type_index, Component*> TypeMap;
 
-    static FActor* CreateActor(const std::string& name);
+    [[nodiscard]] static std::unique_ptr<FActor> CreateActor(const std::string& name);
 
     template <typename T, typename... Args> T* AddComponent(Args&&... args) {
         auto NewComp = std::make_unique<T>(std::forward<Args>(args)...);

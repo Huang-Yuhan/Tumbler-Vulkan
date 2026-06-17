@@ -27,19 +27,19 @@ public:
     // 2. 状态查询接口
     // ==========================================
     // 获取轴的值 (返回 1.0, -1.0 或 0.0)
-    float GetAxis(const std::string& name) const;
+    [[nodiscard]] float GetAxis(const std::string& name) const;
 
     // 动作是否一直被按住 (适合扫射机枪)
-    bool IsActionPressed(const std::string& name) const;
+    [[nodiscard]] bool IsActionPressed(const std::string& name) const;
 
-    bool GetKey(EKeyCode key) const;
-    bool WasKeyJustPressed(EKeyCode key) const;
+    [[nodiscard]] bool GetKey(EKeyCode key) const;
+    [[nodiscard]] bool WasKeyJustPressed(EKeyCode key) const;
 
     // 动作是否在当前帧【刚刚】被按下 (适合跳跃、打开菜单)
-    bool IsActionJustPressed(const std::string& name) const;
+    [[nodiscard]] bool IsActionJustPressed(const std::string& name) const;
 
     // 获取鼠标相对上一帧的位移 (用于转动视角)
-    glm::vec2 GetMouseDelta() const;
+    [[nodiscard]] glm::vec2 GetMouseDelta() const;
 
     void SetGameplayInputBlocked(bool blocked);
     [[nodiscard]] bool IsGameplayInputBlocked() const { return bGameplayInputBlocked; }
@@ -49,7 +49,7 @@ public:
     // ==========================================
     void SetUIFocused(bool focused) { bUIFocused = focused; }
     bool IsUIFocused() const { return bUIFocused; }
-    bool IsInputBlocked() const;
+    [[nodiscard]] bool IsInputBlocked() const;
 
 private:
     GLFWwindow* WindowHandle = nullptr;

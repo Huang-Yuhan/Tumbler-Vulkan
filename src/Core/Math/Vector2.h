@@ -4,12 +4,11 @@
 #include "Core/Math/MathUtility.h"
 
 #include <cmath>
-#include <type_traits>
+#include <concepts>
 
 namespace Tumbler::Math {
 
-template <typename T> struct TVector2 {
-    static_assert(std::is_floating_point_v<T>, "TVector2 requires a floating point type.");
+template <typename T> requires std::floating_point<T> struct TVector2 {
 
     T X{};
     T Y{};

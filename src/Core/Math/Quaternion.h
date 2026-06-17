@@ -7,12 +7,11 @@
 #include "Core/Math/Vector2.h"
 
 #include <cmath>
-#include <type_traits>
+#include <concepts>
 
 namespace Tumbler::Math {
 
-template <typename T> struct TQuaternion {
-    static_assert(std::is_floating_point_v<T>, "TQuaternion requires a floating point type.");
+template <typename T> requires std::floating_point<T> struct TQuaternion {
 
     T X{};
     T Y{};

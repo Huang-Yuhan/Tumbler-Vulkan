@@ -18,7 +18,7 @@ struct EngineConfig {
     std::string AssetMapPath = "cooked/asset_map.json"; // asset_map 路径
 
     // 从 JSON 文件加载配置
-    bool LoadFromFile(const std::string& configPath);
+    [[nodiscard]] bool LoadFromFile(const std::string& configPath);
 };
 
 } // namespace Tumbler

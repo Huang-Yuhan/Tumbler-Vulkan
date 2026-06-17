@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <memory>
 
 namespace Tumbler {
 
@@ -20,21 +21,18 @@ void FScene::Tick(float deltaTime) {
         }
     }
     for (FActor* actorToDelete : PendingKillActors) {
-        auto it = std::ranges::remove_if(Actors, [actorToDelete](const std::unique_ptr<FActor>& actorPtr) {
-                      return actorPtr.get() == actorToDelete;
-                  }).begin();
-        if (it != Actors.end()) {
-            Actors.erase(it, Actors.end());
-        }
+        std::erase_if(Actors, [actorToDelete](const std::unique_ptr<FActor>& actorPtr) {
+            return actorPtr.get() == actorToDelete;
+        });
     }
     PendingKillActors.clear();
 }
 
 FActor* FScene::CreateActor(const std::string& name) {
-    FActor* NewActor = FActor::CreateActor(name);
-    NewActor->Name = name;
-    Actors.push_back(std::unique_ptr<FActor>(NewActor));
-    return NewActor;
+    auto NewActor = FActor::CreateActor(name);
+    FActor* ptr = NewActor.get();
+    Actors.push_back(std::move(NewActor));
+    return ptr;
 }
 
 void FScene::DestroyActor(FActor* actor) {
