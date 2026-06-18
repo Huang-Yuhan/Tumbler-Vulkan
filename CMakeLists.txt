@@ -44,6 +44,23 @@ if(BUILD_TESTING)
     find_package(GTest CONFIG REQUIRED)
 endif()
 
+# 统一 vcpkg 路径，供测试子目录复用（避免重复的 _vcpkg_triplet 回退逻辑）
+if(DEFINED VCPKG_TARGET_TRIPLET)
+    set(TUMBLER_VCPKG_TRIPLET "${VCPKG_TARGET_TRIPLET}" CACHE STRING "vcpkg triplet for this build")
+elseif(WIN32)
+    set(TUMBLER_VCPKG_TRIPLET "x64-windows" CACHE STRING "vcpkg triplet for this build")
+elseif(APPLE)
+    set(TUMBLER_VCPKG_TRIPLET "arm64-osx" CACHE STRING "vcpkg triplet for this build")
+else()
+    set(TUMBLER_VCPKG_TRIPLET "x64-linux" CACHE STRING "vcpkg triplet for this build")
+endif()
+
+if(DEFINED VCPKG_INSTALLED_DIR)
+    set(TUMBLER_VCPKG_INSTALLED_DIR "${VCPKG_INSTALLED_DIR}" CACHE STRING "vcpkg installed packages root")
+else()
+    set(TUMBLER_VCPKG_INSTALLED_DIR "${CMAKE_BINARY_DIR}/vcpkg_installed" CACHE STRING "vcpkg installed packages root")
+endif()
+
 # 2. 编译 Shader (跟之前一样)
 add_subdirectory(assets/shaders)
 
@@ -63,7 +80,6 @@ add_library(TumblerCore STATIC ${CORE_SOURCES})
 # PUBLIC 关键字很重要：这意味着链接了这个库的程序（如 rectangle），
 # 也会自动获得这些 Include 路径，不需要再写一遍。
 target_include_directories(TumblerCore PUBLIC
-        "${CMAKE_CURRENT_SOURCE_DIR}/include"
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
         ${Stb_INCLUDE_DIR}
 )

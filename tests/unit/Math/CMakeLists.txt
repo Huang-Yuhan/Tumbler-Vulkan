@@ -21,16 +21,8 @@ set_tests_properties(${TumblerMathTests_TESTS}
         PROPERTIES LABELS "unit"
 )
 
-# Win32 平台：DLL 拷贝 + 环境变量
+# Win32 平台：DLL 拷贝 + 环境变量；Linux：LD_LIBRARY_PATH
 if(WIN32)
-    set(_vcpkg_triplet "${VCPKG_TARGET_TRIPLET}")
-    if(NOT _vcpkg_triplet)
-        set(_vcpkg_triplet "x64-windows")
-    endif()
-    if(_vcpkg_triplet MATCHES "^\\$env:")
-        set(_vcpkg_triplet "x64-windows")
-    endif()
-
     add_custom_command(TARGET TumblerMathTests POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
             $<TARGET_RUNTIME_DLLS:TumblerMathTests>
@@ -38,14 +30,19 @@ if(WIN32)
             COMMAND_EXPAND_LISTS
     )
 
-    set(_unit_test_env_mod_list
-            "PATH=path_list_prepend:${CMAKE_BINARY_DIR}/vcpkg_installed/${_vcpkg_triplet}/debug/bin"
-            "PATH=path_list_prepend:${CMAKE_BINARY_DIR}/vcpkg_installed/${_vcpkg_triplet}/bin"
+    set(_env_mod_list
+            "PATH=path_list_prepend:${TUMBLER_VCPKG_INSTALLED_DIR}/${TUMBLER_VCPKG_TRIPLET}/debug/bin"
+            "PATH=path_list_prepend:${TUMBLER_VCPKG_INSTALLED_DIR}/${TUMBLER_VCPKG_TRIPLET}/bin"
     )
-    list(JOIN _unit_test_env_mod_list ";" _unit_test_env_mod)
-
+    list(JOIN _env_mod_list ";" _env_mod)
     set_tests_properties(${TumblerMathTests_TESTS}
             PROPERTIES
-            ENVIRONMENT_MODIFICATION "${_unit_test_env_mod}"
+            ENVIRONMENT_MODIFICATION "${_env_mod}"
+    )
+elseif(UNIX AND NOT APPLE)
+    set_tests_properties(${TumblerMathTests_TESTS}
+            PROPERTIES
+            ENVIRONMENT_MODIFICATION
+                "LD_LIBRARY_PATH=path_list_prepend:${TUMBLER_VCPKG_INSTALLED_DIR}/${TUMBLER_VCPKG_TRIPLET}/lib"
     )
 endif()

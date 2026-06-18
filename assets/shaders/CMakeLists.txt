@@ -3,7 +3,13 @@
 # 1. 查找编译器 (修改为更灵活的查找方式)
 set(TUMBLER_SHADERS_COMPILED OFF CACHE INTERNAL "Whether shader sources were compiled with glslc")
 
-find_program(GLSLC_EXECUTABLE NAMES glslc HINTS "$ENV{VULKAN_SDK}/bin" "/usr/bin" "/usr/local/bin")
+if(WIN32)
+    find_program(GLSLC_EXECUTABLE NAMES glslc
+        HINTS "$ENV{VULKAN_SDK}/Bin" "$ENV{VULKAN_SDK}/bin")
+else()
+    find_program(GLSLC_EXECUTABLE NAMES glslc
+        HINTS "$ENV{VULKAN_SDK}/bin" "/usr/bin" "/usr/local/bin")
+endif()
 if(NOT GLSLC_EXECUTABLE)
     message(WARNING "Could not find glslc shader compiler! Shaders will not be compiled.")
     # Keep a no-op target so downstream add_dependencies(... Shaders) stays valid.
