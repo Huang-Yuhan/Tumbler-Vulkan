@@ -1,6 +1,10 @@
 #include "Engine.h"
 
 #include "Core/Assets/AssetDatabase.h"
+#include "Core/Engine/EngineConfig.h"
+#include "Core/GameSystem/Components/CStaticMesh.h"
+#include "Core/GameSystem/FActor.h"
+#include "Core/GameSystem/FScene.h"
 #include "Core/Graphics/CommandManager.h"
 #include "Core/Graphics/DescriptorManager.h"
 #include "Core/Graphics/RenderDevice.h"
@@ -8,6 +12,7 @@
 #include "Core/Graphics/VulkanContext.h"
 #include "Core/Graphics/VulkanSwapchain.h"
 #include "Core/Platform/AppWindow.h"
+#include "Core/Scene/SceneLoader.h"
 #include "Core/Utils/Log.h"
 
 namespace Tumbler {
@@ -15,7 +20,19 @@ namespace Tumbler {
 Engine::Engine() = default;
 Engine::~Engine() = default;
 
+bool Engine::Init(const std::string& configPath) {
+    EngineConfig config;
+    if (!config.LoadFromFile(configPath)) {
+        LOG_ERROR("Failed to load engine config: {}", configPath);
+        return false;
+    }
+
+    return Init(config);
+}
+
 bool Engine::Init(const EngineConfig& config) {
+    LogInit();
+
     m_Config = config;
 
     // ---- 1. AssetDatabase ----
@@ -87,6 +104,32 @@ bool Engine::Init(const EngineConfig& config) {
     return true;
 }
 
+bool Engine::LoadScene(const std::string& scenePath) {
+    m_Scene = std::make_unique<FScene>();
+
+    SceneLoader::Result result;
+    SceneLoader loader;
+    if (!loader.LoadFromFile(*m_Scene, scenePath, *m_AssetDatabase, result)) {
+        LOG_ERROR("Failed to load scene: {}", scenePath);
+        m_Scene.reset();
+        return false;
+    }
+
+    LOG_INFO("Scene loaded: {} mesh actors, {} light actors", result.MeshActors.size(), result.LightActors.size());
+
+#ifndef NDEBUG
+    for (auto* actor : result.MeshActors) {
+        auto* mesh = actor->GetComponent<CStaticMesh>();
+        if (mesh) {
+            LOG_INFO("  Mesh: '{}' source='{}' cooked='{}'", actor->Name, mesh->MeshSourcePath,
+                      mesh->CookedMeshPath);
+        }
+    }
+#endif
+
+    return true;
+}
+
 void Engine::Shutdown() {
     // 反向销毁：最后创建的先销毁
     m_ResourceManager.reset();
@@ -96,12 +139,14 @@ void Engine::Shutdown() {
     m_RenderDevice.reset();
     m_VulkanContext.reset();
     m_Window.reset();
+    m_Scene.reset();
     m_AssetDatabase.reset();
 
     m_bInitialized = false;
     m_bRunning = false;
 
     LOG_INFO("Shutdown complete.");
+    LogShutdown();
 }
 
 void Engine::Run() {

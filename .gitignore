@@ -1,5 +1,7 @@
 .idea/*
 cmake-build-debug/
+build-vs/
+build*/
 vcpkg_installed/
 /assets/shaders/**/*.spv
 build/*

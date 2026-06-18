@@ -3,11 +3,13 @@
 #include "Core/Engine/EngineConfig.h"
 
 #include <memory>
+#include <string>
 
 namespace Tumbler {
 
 class AppWindow;
 class AssetDatabase;
+class FScene;
 class VulkanContext;
 class RenderDevice;
 class CommandManager;
@@ -29,10 +31,16 @@ public:
     Engine(const Engine&) = delete;
     Engine& operator=(const Engine&) = delete;
 
-    // 初始化所有子系统
+    // 初始化所有子系统（内部处理 LogInit）
+    // 生产入口：从 JSON 文件加载配置
+    bool Init(const std::string& configPath);
+    // 编程入口：直接传入配置对象（测试/工具用）
     bool Init(const EngineConfig& config);
 
-    // 关闭所有子系统（反向销毁）
+    // 加载场景（内部创建 FScene + SceneLoader + 打印 Actor 信息）
+    bool LoadScene(const std::string& scenePath);
+
+    // 关闭所有子系统（反向销毁，内部处理 LogShutdown）
     void Shutdown();
 
     // 主循环（目前仅事件轮询 + clear + present）
@@ -42,6 +50,7 @@ public:
 
     AppWindow* GetWindow() const { return m_Window.get(); }
     AssetDatabase* GetAssetDatabase() const { return m_AssetDatabase.get(); }
+    const FScene* GetScene() const { return m_Scene.get(); }
     VulkanContext* GetVulkanContext() const { return m_VulkanContext.get(); }
     RenderDevice* GetRenderDevice() const { return m_RenderDevice.get(); }
     CommandManager* GetCommandManager() const { return m_CommandManager.get(); }
@@ -51,6 +60,9 @@ public:
 
 private:
     EngineConfig m_Config;
+
+    // 场景（ECS 数据，不直接持有 GPU 资源）
+    std::unique_ptr<FScene> m_Scene;
 
     // 子系统所有权（unique_ptr，按创建顺序声明）
     std::unique_ptr<AssetDatabase> m_AssetDatabase;
