@@ -1,3 +1,9 @@
+// EngineConfig.h — 引擎配置文件 (engine.json)
+//
+// 职责: 定义引擎配置结构体，支持从 JSON 文件加载窗口和渲染参数。
+// 依赖: nlohmann/json
+// 层级: 编排层 (Phase 2)
+
 #pragma once
 
 #include <string>

@@ -130,7 +130,7 @@ private:
 
 - **公开方法**: PascalCase — `Init()`、`Shutdown()`、`GetDevice()`
 - **私有方法**: PascalCase — `CreateInstance()`、`DestroySwapchainObjects()`
-- **简单 getter**: 内联在头文件，`const` 修饰 — `VkDevice GetDevice() const { return m_Device; }`
+- **简单 getter**: 内联在头文件，`const` 修饰，标记 `[[nodiscard]]` — `[[nodiscard]] VkDevice GetDevice() const { return m_Device; }`
 - **自由函数**: PascalCase — `BytesPerPixel()`、`ComputeSimpleFileHash()`
 
 ### 3.5 局部变量与参数

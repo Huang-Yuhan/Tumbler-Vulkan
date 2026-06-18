@@ -169,12 +169,13 @@ void Engine::Run() {
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
             // 窗口 resize → 重建交换链
-            int w, h;
-            m_Window->GetFramebufferSize(&w, &h);
-            if (w > 0 && h > 0) {
-                m_Swapchain->Recreate(w, h);
+            int fbWidth, fbHeight;
+            m_Window->GetFramebufferSize(&fbWidth, &fbHeight);
+            if (fbWidth > 0 && fbHeight > 0) {
+                m_Swapchain->Recreate(fbWidth, fbHeight);
             }
-        } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+            continue;
+        } else if (result != VK_SUCCESS) {
             break;
         }
 

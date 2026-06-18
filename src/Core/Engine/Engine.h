@@ -1,3 +1,9 @@
+// Engine.h — 生命周期编排 + 主循环驱动
+//
+// 职责: 按依赖顺序创建/销毁所有子系统，提供依赖注入，驱动主循环。
+// 依赖: 所有子系统头文件（AppWindow, VulkanContext, RenderDevice, ...）
+// 层级: 编排层 (Phase 2+)
+
 #pragma once
 
 #include "Core/Engine/EngineConfig.h"
@@ -48,15 +54,15 @@ public:
 
     // ---- 子系统访问器 (供后续扩展使用) ----
 
-    AppWindow* GetWindow() const { return m_Window.get(); }
-    AssetDatabase* GetAssetDatabase() const { return m_AssetDatabase.get(); }
-    const FScene* GetScene() const { return m_Scene.get(); }
-    VulkanContext* GetVulkanContext() const { return m_VulkanContext.get(); }
-    RenderDevice* GetRenderDevice() const { return m_RenderDevice.get(); }
-    CommandManager* GetCommandManager() const { return m_CommandManager.get(); }
-    VulkanSwapchain* GetSwapchain() const { return m_Swapchain.get(); }
-    DescriptorManager* GetDescriptorManager() const { return m_DescriptorManager.get(); }
-    ResourceManager* GetResourceManager() const { return m_ResourceManager.get(); }
+    [[nodiscard]] AppWindow* GetWindow() const { return m_Window.get(); }
+    [[nodiscard]] AssetDatabase* GetAssetDatabase() const { return m_AssetDatabase.get(); }
+    [[nodiscard]] const FScene* GetScene() const { return m_Scene.get(); }
+    [[nodiscard]] VulkanContext* GetVulkanContext() const { return m_VulkanContext.get(); }
+    [[nodiscard]] RenderDevice* GetRenderDevice() const { return m_RenderDevice.get(); }
+    [[nodiscard]] CommandManager* GetCommandManager() const { return m_CommandManager.get(); }
+    [[nodiscard]] VulkanSwapchain* GetSwapchain() const { return m_Swapchain.get(); }
+    [[nodiscard]] DescriptorManager* GetDescriptorManager() const { return m_DescriptorManager.get(); }
+    [[nodiscard]] ResourceManager* GetResourceManager() const { return m_ResourceManager.get(); }
 
 private:
     EngineConfig m_Config;
