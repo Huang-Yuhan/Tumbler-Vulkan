@@ -6,7 +6,16 @@
 
 不同机器的配置差异较大，参见 **`docs/machine-setups.md`**。当前机器配置摘要：
 
-**Linux**:
+**Linux (机器 Alpha — alpha)**:
+```bash
+export VCPKG_ROOT=$HOME/vcpkg
+export VULKAN_SDK=$HOME/.local/vulkan-sdk/1.4.350.1/x86_64
+export LD_LIBRARY_PATH=$VULKAN_SDK/lib/VulkanLoader/lib:$LD_LIBRARY_PATH
+export PATH=$VULKAN_SDK/bin:$PATH
+export VK_ADD_LAYER_PATH=$VULKAN_SDK/share/vulkan/explicit_layer.d
+```
+
+**Linux (原始开发机)**:
 ```bash
 export VCPKG_ROOT=/home/icecreamsarkaz/.vcpkg-clion/vcpkg
 export VULKAN_SDK=$HOME/.local/vulkan-sdk/1.4.350.1/x86_64
@@ -97,7 +106,7 @@ find src tests -name "*.h" -o -name "*.cpp" | xargs clang-format -i
 
 - **`src/Core/`** — 引擎库（编译为 `TumblerCore` 静态库），禁止依赖示例代码。
 - **`src/Tools/AssetImporter/`** — 资产导入 CLI 工具（独立可执行文件 `TumblerImporter`），不依赖 Vulkan/GLFW。
-- **`src/Examples/`** — 应用层（待重写）。
+- **`src/Examples/`** — 应用层。
 - **`tests/unit/`** — GoogleTest 单元测试。Vulkan 测试在 `tests/unit/Graphics/`。
 
 ### 子系统所有权
@@ -108,6 +117,8 @@ find src tests -name "*.h" -o -name "*.cpp" | xargs clang-format -i
 EngineConfig → AssetDatabase → AppWindow → VulkanContext → RenderDevice
   → CommandManager → VulkanSwapchain → DescriptorManager → ResourceManager
 ```
+
+**当前状态**：尚无 Renderer 管线。Engine::Run() 主循环仅做 Acquire + Present（无 draw call）。
 
 ### 目录速查
 
@@ -167,35 +178,38 @@ EngineConfig → AssetDatabase → AppWindow → VulkanContext → RenderDevice
 - 顶点格式：8×float32 交织（pos+normal+uv），资产不压缩，GPU 端自行量化
 - Rotation 序列化格式：Quaternion [x,y,z,w]（Unity 风格）
 
-### 渲染器子系统（当前状态）
+### Descriptor Set 绑定模型（已创建，渲染时启用）
 
-Engine 创建所有 Vulkan 子系统但**尚未有 Renderer 管线**（Phase 4 以后）。当前主循环仅做 Acquire + Present（无 draw call）。
-
-**Descriptor Set 绑定模型（已创建，渲染时启用）：**
 ```
 Set 0 (Global): binding 0 = SceneUBO, binding 1 = CombinedImageSampler (ShadowMap)
 Set 1 (Bindless): binding 0 = SampledImage[], binding 1 = MaterialData SSBO, binding 2 = ObjectData SSBO
 ```
 
-**Vulkan 1.4 必需特性：**
+### Vulkan 1.4 必需特性
+
 - `bufferDeviceAddress` — GPU-Driven 间接绘制
 - `descriptorIndexing` — Bindless 纹理数组
 - `drawIndirectCount` — GPU 端生成绘制命令
 
-### GPU-Driven 渲染管线（规划中）
+---
 
-目标：复现 UE5 Nanite 核心管线
+## GPU-Driven 渲染管线（开发中）
+
+当前分支 `nanite-integration` 的目标是复现 UE5 Nanite 核心管线：
+
 ```
 InstanceCull → NodeCull → ClusterCull → RasterBin → SW/HW Raster → VisBuffer → DepthExport → ShadeBinning → ShadeGBuffer → Lighting
 ```
 
-详见 `docs/gpu-driven-dev-plan.md`。
+**当前进度**：Phase 1-3 已完成（平台层、Vulkan 基础设施、资产管线、ECS、Engine 编排）。Phase 4（LOD 0 Cluster + VisBuffer + Deferred）是下一步。
+
+详见 `docs/gpu-driven-dev-plan.md` 和 `docs/guides/continuation.md`。
 
 ---
 
 ## 关键约定
 
-- **命名空间**：所有代码统一使用 `namespace Tumbler`（旧 ECS 类型 FActor/FScene/Component/CTransform 也已迁入）。
+- **命名空间**：所有代码统一使用 `namespace Tumbler`（包括 ECS 类型 FActor/FScene/Component/CTransform）。
 - **日志**：强制使用 `LOG_INFO`/`LOG_ERROR`/`LOG_WARN` 等宏（`Core/Utils/Log.h`），**禁止** `std::cout` / `std::cerr`。
 - **单例**：不使用单例模式。子系统由 Engine 持有 `std::unique_ptr`，通过引用注入。
 - **编码规范**：详见 `docs/standards/coding-style.md`。
@@ -217,12 +231,16 @@ InstanceCull → NodeCull → ClusterCull → RasterBin → SW/HW Raster → Vis
 - `docs/machine-setups.md` — 各开发机工具链路径与环境变量
 - `docs/gpu-driven-dev-plan.md` — Nanite 渲染器开发计划（Phase 4-9）
 - `docs/guides/continuation.md` — 后续开发指南（Phase 进度 + 待做任务）
+- `docs/guides/assets.md` — 资产管线详解
+- `docs/guides/input.md` — 输入系统
 - `docs/standards/coding-style.md` — 编码规范（命名、日志、架构约束）
-- `docs/architecture/overview.md` — 设计原则与数据流
+- `docs/architecture/ecs.md` — ECS 设计
 - `docs/architecture/decisions.md` — 关键设计决策
 - `docs/getting-started/setup.md` — 环境搭建
 - `docs/code-navigation.md` — 文件级速查表
 - `docs/troubleshooting.md` — 构建、运行时及 Linux/Wayland 问题
 - `docs/testing-and-ci.md` — 测试结构与 CI 流程
 - `docs/ue-research/INDEX.md` — UE5 Nanite 源码调研索引
-- `docs/ue-research/nanite-material-system.md` — Nanite 多材质系统分析
+- `docs/reference/pbr-theory.md` — PBR 理论参考
+- `docs/reference/ibl.md` — IBL 参考
+- `docs/reference/math.md` — 数学库文档

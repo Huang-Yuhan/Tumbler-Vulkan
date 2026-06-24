@@ -8,7 +8,21 @@ if(WIN32 AND NOT MSVC)
             "English: This project requires the MSVC compiler. In CLion, switch Toolchain to Visual Studio and reload CMake.")
 endif()
 
-set(CMAKE_CXX_STANDARD 20)
+# C++26 开关：Windows MSVC 若对 C++26 支持不佳可设 OFF 回退 C++20
+option(TUMBLER_USE_CPP26 "Use C++26 features (requires GCC 14+ / MSVC 17.12+)" ON)
+
+if(TUMBLER_USE_CPP26)
+    if(MSVC)
+        set(CMAKE_CXX_STANDARD 23)          # CMake 还不认识 26，MSVC 通过 c++latest 拿到
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++latest")
+    else()
+        set(CMAKE_CXX_STANDARD 26)
+    endif()
+    message(STATUS "C++ Standard: C++26 (MSVC: c++latest)")
+else()
+    set(CMAKE_CXX_STANDARD 20)
+    message(STATUS "C++ Standard: C++20 (C++26 disabled via TUMBLER_USE_CPP26=OFF)")
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(CTest)
 option(TUMBLER_ENABLE_RUNTIME_SMOKE_TESTS "Enable runtime smoke tests that launch App-Tumbler." OFF)
@@ -40,6 +54,7 @@ if(NOT Stb_INCLUDE_DIR)
 endif()
 find_package(imgui CONFIG REQUIRED)
 find_package(tinyobjloader CONFIG REQUIRED)
+find_package(slang CONFIG REQUIRED)
 if(BUILD_TESTING)
     find_package(GTest CONFIG REQUIRED)
 endif()
@@ -94,6 +109,7 @@ target_link_libraries(TumblerCore PUBLIC
         spdlog::spdlog
         imgui::imgui
         tinyobjloader::tinyobjloader
+        slang::slang
 )
 
 # 平台适配

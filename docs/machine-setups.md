@@ -109,6 +109,79 @@ cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
 
 ---
 
+## 机器 Alpha：alpha
+
+**角色**: Linux 开发机 + AI 辅助
+
+**OS**: Arch Linux (7.0.12-arch1-1)
+
+**GPU**: Intel(R) Graphics (RPL-P) — 集成显卡，Mesa 26.1.3
+
+**IDE**: VS Code (clangd + CMake Tools)
+
+**RAM**: 不详
+
+### 工具链路径
+
+| 工具 | 路径 |
+|------|------|
+| CMake | `/usr/sbin/cmake` (v4.3.4) |
+| GCC | `/usr/sbin/g++` (16.1.1) |
+| clangd | `/usr/sbin/clangd` (22.1.6) |
+| clang-format | `/usr/sbin/clang-format` (22.1.6) |
+| Ninja | `/usr/sbin/ninja` (1.13.2) |
+| vcpkg root | `~/vcpkg` |
+| vcpkg triplet | `x64-linux` |
+| Vulkan SDK | `~/.local/vulkan-sdk/1.4.350.1/x86_64` |
+| slangc | 由 vcpkg shader-slang 包提供，位于 `build-linux/vcpkg_installed/x64-linux/tools/shader-slang/slangc` (v2026.7.1) |
+
+### Vulkan 特性支持
+
+| 特性 | 支持 |
+|------|:----:|
+| Vulkan API 版本 | 1.4.348 |
+| `bufferDeviceAddress` | ✅ |
+| `descriptorIndexing` | ✅ |
+| `drawIndirectCount` | ✅ |
+| `shaderBufferInt64Atomics` | ✅ |
+| `shaderImageInt64Atomics` | ✅ |
+| `shaderSharedInt64Atomics` | ❌ (需 2-stage 32-bit fallback) |
+
+### 环境变量 (zsh)
+
+```bash
+export VCPKG_ROOT=$HOME/vcpkg
+export VULKAN_SDK=$HOME/.local/vulkan-sdk/1.4.350.1/x86_64
+export LD_LIBRARY_PATH=$VULKAN_SDK/lib/VulkanLoader/lib:$LD_LIBRARY_PATH
+export PATH=$VULKAN_SDK/bin:$PATH
+export VK_ADD_LAYER_PATH=$VULKAN_SDK/share/vulkan/explicit_layer.d
+```
+
+⚠️ **注意**: `VK_ADD_LAYER_PATH` 必须设置，否则 Vulkan validation layer 不可用。
+
+### CMake 配置命令
+
+```bash
+cmake -S . -B build-linux -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+  -DBUILD_TESTING=ON
+
+cmake --build build-linux
+```
+
+### 仓库
+
+路径: `/home/alpha/Tumbler-Vulkan`  
+Clone: `git clone git@github.com:Huang-Yuhan/Tumbler-Vulkan.git`
+
+### 参考引擎
+
+无 UE5 源码。
+
+---
+
 ## 模板
 
 新增机器时复制以下模板：

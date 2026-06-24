@@ -8,6 +8,7 @@ build/*
 build-linux/*
 build-phase3-*/
 .vscode/*
+.claude
 Testing/
 compile_commands.json
 .clangd/

@@ -7,7 +7,10 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 BUILD_DIR="build-linux"
-export VCPKG_ROOT="${VCPKG_ROOT:-$HOME/.vcpkg-clion/vcpkg}"
+export VCPKG_ROOT="${VCPKG_ROOT:-$HOME/vcpkg}"
+export VULKAN_SDK="${VULKAN_SDK:-$HOME/.local/vulkan-sdk/1.4.350.1/x86_64}"
+export LD_LIBRARY_PATH="$VULKAN_SDK/lib/VulkanLoader/lib:$LD_LIBRARY_PATH"
+export VK_ADD_LAYER_PATH="$VULKAN_SDK/share/vulkan/explicit_layer.d"
 
 echo -e "${GREEN}[pre-commit] Checking staged files...${NC}"
 

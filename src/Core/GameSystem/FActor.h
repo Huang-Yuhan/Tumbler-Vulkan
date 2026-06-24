@@ -16,7 +16,12 @@ private:
     // 构造函数私有化，强制使用 CreateActor
     FActor();
     // 允许 make_unique 访问私有构造函数（避免 unique_ptr(new T) 的潜在性能损失）
+    // C++26 中 std::make_unique 变成 constexpr，friend 声明必须匹配
+#if __cplusplus >= 202400L
+    friend constexpr std::unique_ptr<FActor> std::make_unique<FActor>();
+#else
     friend std::unique_ptr<FActor> std::make_unique<FActor>();
+#endif
 
 public:
     // 析构函数 (在 cpp 里实现)
