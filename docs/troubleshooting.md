@@ -305,7 +305,41 @@ cmake --build cmake-build-debug --target App-Tumbler
 - Linux 下额外显式声明了 `vulkan-loader[wayland,xcb,xlib]`
 - `AppWindow` 内部不是只调用一次 `glfwInit()` 就结束，而是按 Wayland → Any → X11 的顺序逐步尝试，并在失败时输出详细的 Vulkan WSI 扩展诊断
 
-### 2.7 Linux / Wayland：窗口没有标题栏或关闭按钮
+### 2.7 Linux：VS Code / IDE 中所有测试失败（找不到 .so）
+
+**现象：**
+- 终端 `ctest` 全部通过，但 VS Code Test Explorer 或 CLion 中测试一个都不过
+- 可能无任何输出，或报 `error while loading shared libraries`
+
+**原因：**
+部分 vcpkg 包（`shader-slang`、`vulkan-loader`）提供的是共享库（`.so`），不在系统默认库路径中。终端正常是因为 `~/.zshrc` 设了 `LD_LIBRARY_PATH`，但 IDE 启动的 shell 不加载 `.zshrc`。
+
+**确认：**
+```bash
+ldd build-linux/tests/TumblerUnitTests | grep -E "not found|slang|vulkan"
+```
+
+**解决方案：**
+
+VS Code — 在 `.vscode/settings.json` 添加：
+```json
+{
+  "cmake.testEnvironment": {
+    "VULKAN_SDK": "${env:VULKAN_SDK}",
+    "VK_ADD_LAYER_PATH": "${env:VULKAN_SDK}/share/vulkan/explicit_layer.d",
+    "LD_LIBRARY_PATH": "${env:VULKAN_SDK}/lib/VulkanLoader/lib:${buildDirectory}/vcpkg_installed/x64-linux/lib:${buildDirectory}/vcpkg_installed/x64-linux/debug/lib"
+  },
+  "cmake.buildEnvironment": {
+    "LD_LIBRARY_PATH": "${env:VULKAN_SDK}/lib/VulkanLoader/lib:${buildDirectory}/vcpkg_installed/x64-linux/lib:${buildDirectory}/vcpkg_installed/x64-linux/debug/lib"
+  }
+}
+```
+
+> `${buildDirectory}` 是 CMake Tools 内置变量，指向构建目录。
+
+CLion — 在 Run/Debug Configuration 或 CMake Profile 中设置同样的 `LD_LIBRARY_PATH`。
+
+### 2.8 Linux / Wayland：窗口没有标题栏或关闭按钮
 
 **典型日志：**
 ```text

@@ -159,6 +159,14 @@ export VK_ADD_LAYER_PATH=$VULKAN_SDK/share/vulkan/explicit_layer.d
 
 ⚠️ **注意**: `VK_ADD_LAYER_PATH` 必须设置，否则 Vulkan validation layer 不可用。
 
+**IDE 中运行测试额外要求：**
+
+部分 vcpkg 包提供的是 `.so`（如 `libslang-compiler.so`），IDE（VS Code/CLion）启动的 shell 不加载 `.zshrc`，需在 IDE 中配置 `LD_LIBRARY_PATH` 包含：
+- `$VULKAN_SDK/lib/VulkanLoader/lib` — libvulkan.so.1
+- `build-linux/vcpkg_installed/x64-linux/lib` + `debug/lib` — vcpkg 共享库
+
+详见 `docs/troubleshooting.md` 第 2.7 节。
+
 ### CMake 配置命令
 
 ```bash

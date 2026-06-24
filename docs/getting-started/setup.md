@@ -40,13 +40,30 @@ cmake --build build --config Debug --parallel
 
 ### Linux (Ninja)
 
+**前置要求：** 确保以下环境变量已设（建议写入 `~/.zshrc` 或 `~/.bashrc`）：
+
+```bash
+export VCPKG_ROOT=$HOME/vcpkg
+export VULKAN_SDK=$HOME/.local/vulkan-sdk/1.4.350.1/x86_64  # 按实际路径调整
+export LD_LIBRARY_PATH=$VULKAN_SDK/lib/VulkanLoader/lib:$LD_LIBRARY_PATH
+export PATH=$VULKAN_SDK/bin:$PATH
+export VK_ADD_LAYER_PATH=$VULKAN_SDK/share/vulkan/explicit_layer.d
+```
+
+> ⚠️ `VK_ADD_LAYER_PATH` 必须设置，否则 validation layer 不可用，Vulkan 测试全部失败。
+>
+> ⚠️ 部分 vcpkg 包提供的是共享库（如 `libslang-compiler.so`），IDE 中运行测试需额外配置 `LD_LIBRARY_PATH`（含 vcpkg installed lib 路径），详见 `docs/troubleshooting.md`。
+
+**构建：**
+
 ```bash
 cmake -S . -B build-linux -G Ninja \
   -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
   -DBUILD_TESTING=ON
 
-cmake --build build-linux --target App-Tumbler
+cmake --build build-linux
 ```
 
 ## 4. 运行
@@ -68,18 +85,23 @@ cmake --build build-linux --target App-Tumbler
 
 ```
 Tumbler-Vulkan/
-├── assets/              # 模型、着色器、纹理
+├── assets/              # 模型、场景、纹理
 │   ├── models/
-│   ├── shaders/engine/
+│   ├── scenes/
 │   └── textures/
 ├── docs/                # 文档
 ├── src/
 │   ├── Core/
-│   │   ├── Platform/    # 窗口 + Surface
-│   │   ├── Graphics/    # Vulkan 基础设施 + 渲染 Pass
-│   │   ├── Scene/       # 场景管理 + 相机
-│   │   ├── Editor/      # ImGui 调试面板
-│   │   └── Utils/       # 日志、Vulkan 工具、数学
+│   │   ├── Assets/      # 资产数据库 (AssetDatabase)
+│   │   ├── Engine/      # 引擎编排、生命周期
+│   │   ├── GameSystem/  # ECS (FActor, FScene, Components)
+│   │   ├── Graphics/    # Vulkan 基础设施
+│   │   ├── Math/        # 数学库
+│   │   ├── Platform/    # 窗口 + Surface (AppWindow)
+│   │   ├── Scene/       # 场景加载 (SceneLoader)
+│   │   └── Utils/       # 日志
+│   ├── Tools/
+│   │   └── AssetImporter/  # 资产导入 CLI
 │   └── Examples/
 │       └── Tumbler/     # 主示例
 ├── tests/               # 单元测试
@@ -89,6 +111,7 @@ Tumbler-Vulkan/
 
 ## 6. 下一步
 
-- [架构概览](../architecture/overview.md) — 理解 GPU-Driven 设计
-- [渲染架构](../architecture/rendering.md) — 理解帧循环和 GPU 数据流
+- [ECS 架构](../architecture/ecs.md) — 理解实体-组件系统
 - [设计决策](../architecture/decisions.md) — 理解关键取舍
+- [GPU-Driven 开发计划](../gpu-driven-dev-plan.md) — Nanite 管线开发进度
+- [编码规范](../standards/coding-style.md) — 命名、日志、架构约束
