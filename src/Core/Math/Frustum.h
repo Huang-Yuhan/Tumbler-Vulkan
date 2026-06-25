@@ -49,62 +49,46 @@ struct Frustum {
     }
 };
 
-namespace Detail {
-
-inline Planef MakePlaneFromRows(const Matrix4f& matrix, float row0Scale, float row1Scale, float row2Scale,
-                                float row3Scale) {
-    return Planef{
-        row0Scale * matrix[0][0] + row1Scale * matrix[1][0] + row2Scale * matrix[2][0] + row3Scale * matrix[3][0],
-        row0Scale * matrix[0][1] + row1Scale * matrix[1][1] + row2Scale * matrix[2][1] + row3Scale * matrix[3][1],
-        row0Scale * matrix[0][2] + row1Scale * matrix[1][2] + row2Scale * matrix[2][2] + row3Scale * matrix[3][2],
-        row0Scale * matrix[0][3] + row1Scale * matrix[1][3] + row2Scale * matrix[2][3] + row3Scale * matrix[3][3]};
-}
-
-inline bool NormalizeAndStore(Planef plane, FrustumPlane index, Frustum& outFrustum) {
-    if (!plane.Normalize()) {
-        return false;
-    }
-
-    outFrustum[index] = plane;
-    return true;
-}
-
-} // namespace Detail
-
+// 基于 Gribb/Hartmann 论文 "Fast Extraction of Viewing Frustum Planes from the World-View-Projection Matrix"
+// 从 ViewProj 矩阵的行线性组合提取 6 个平面 (Ax+By+Cz+D=0)，平面法线朝向视锥体内部。
 inline bool ExtractFrustumPlanes(const Matrix4f& viewProj, Frustum& outFrustum,
                                  DepthConvention convention = kDefaultDepthConvention) {
-    if (!Detail::NormalizeAndStore(Detail::MakePlaneFromRows(viewProj, 1.0f, 0.0f, 0.0f, 1.0f), FrustumPlane::Left,
-                                   outFrustum)) {
-        return false;
-    }
-    if (!Detail::NormalizeAndStore(Detail::MakePlaneFromRows(viewProj, -1.0f, 0.0f, 0.0f, 1.0f), FrustumPlane::Right,
-                                   outFrustum)) {
-        return false;
-    }
-    if (!Detail::NormalizeAndStore(Detail::MakePlaneFromRows(viewProj, 0.0f, 1.0f, 0.0f, 1.0f), FrustumPlane::Bottom,
-                                   outFrustum)) {
-        return false;
-    }
-    if (!Detail::NormalizeAndStore(Detail::MakePlaneFromRows(viewProj, 0.0f, -1.0f, 0.0f, 1.0f), FrustumPlane::Top,
-                                   outFrustum)) {
-        return false;
-    }
+    auto makePlane = [&](float r0, float r1, float r2, float r3) {
+        return Planef{r0 * viewProj[0][0] + r1 * viewProj[1][0] + r2 * viewProj[2][0] + r3 * viewProj[3][0],
+                      r0 * viewProj[0][1] + r1 * viewProj[1][1] + r2 * viewProj[2][1] + r3 * viewProj[3][1],
+                      r0 * viewProj[0][2] + r1 * viewProj[1][2] + r2 * viewProj[2][2] + r3 * viewProj[3][2],
+                      r0 * viewProj[0][3] + r1 * viewProj[1][3] + r2 * viewProj[2][3] + r3 * viewProj[3][3]};
+    };
 
-    if (convention == DepthConvention::ReverseZZeroToOne) {
-        if (!Detail::NormalizeAndStore(Detail::MakePlaneFromRows(viewProj, 0.0f, 0.0f, -1.0f, 1.0f), FrustumPlane::Near,
-                                       outFrustum)) {
+    auto normalizeAndStore = [&](const Planef& plane, FrustumPlane index) {
+        Planef normalized = plane;
+        if (!normalized.Normalize()) {
             return false;
         }
-        return Detail::NormalizeAndStore(Detail::MakePlaneFromRows(viewProj, 0.0f, 0.0f, 1.0f, 0.0f), FrustumPlane::Far,
-                                         outFrustum);
+        outFrustum[index] = normalized;
+        return true;
+    };
+
+    // 左/右/底/顶: ±Row3 ± Row[0-2]
+    if (!normalizeAndStore(makePlane(1.0f, 0.0f, 0.0f, 1.0f), FrustumPlane::Left))
+        return false;
+    if (!normalizeAndStore(makePlane(-1.0f, 0.0f, 0.0f, 1.0f), FrustumPlane::Right))
+        return false;
+    if (!normalizeAndStore(makePlane(0.0f, 1.0f, 0.0f, 1.0f), FrustumPlane::Bottom))
+        return false;
+    if (!normalizeAndStore(makePlane(0.0f, -1.0f, 0.0f, 1.0f), FrustumPlane::Top))
+        return false;
+
+    // 近/远: 根据深度约定调整
+    if (convention == DepthConvention::ReverseZZeroToOne) {
+        if (!normalizeAndStore(makePlane(0.0f, 0.0f, -1.0f, 1.0f), FrustumPlane::Near))
+            return false;
+        return normalizeAndStore(makePlane(0.0f, 0.0f, 1.0f, 0.0f), FrustumPlane::Far);
     }
 
-    if (!Detail::NormalizeAndStore(Detail::MakePlaneFromRows(viewProj, 0.0f, 0.0f, 1.0f, 0.0f), FrustumPlane::Near,
-                                   outFrustum)) {
+    if (!normalizeAndStore(makePlane(0.0f, 0.0f, 1.0f, 0.0f), FrustumPlane::Near))
         return false;
-    }
-    return Detail::NormalizeAndStore(Detail::MakePlaneFromRows(viewProj, 0.0f, 0.0f, -1.0f, 1.0f), FrustumPlane::Far,
-                                     outFrustum);
+    return normalizeAndStore(makePlane(0.0f, 0.0f, -1.0f, 1.0f), FrustumPlane::Far);
 }
 
 } // namespace Tumbler::Math

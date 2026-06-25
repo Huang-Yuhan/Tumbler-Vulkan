@@ -4,14 +4,19 @@
 #include "Core/Math/MathUtility.h"
 #include "Core/Math/Matrix.h"
 #include "Core/Math/Vector.h"
-#include "Core/Math/Vector2.h"
 
 #include <cmath>
 #include <concepts>
 
 namespace Tumbler::Math {
 
-template <typename T> requires std::floating_point<T> struct TQuaternion {
+// 单位四元数表示旋转, 存储顺序 [X, Y, Z, W] (Unity/UE 风格, 非 GLM 的 [W,X,Y,Z])
+// 旋转公式: v' = q * v * q⁻¹, 用 RotateVector() 一步完成 (等价于 q * v)
+// 乘法 (operator*): 四元数合成, q1 * q2 表示先应用 q2 再 q1
+// Slerp: 球面线性插值, 沿 4D 单位球大圆弧匀速过渡
+template <typename T>
+    requires std::floating_point<T>
+struct TQuaternion {
 
     T X{};
     T Y{};
@@ -58,20 +63,21 @@ template <typename T> requires std::floating_point<T> struct TQuaternion {
     [[nodiscard]] T LengthSquared() const { return X * X + Y * Y + Z * Z + W * W; }
     [[nodiscard]] T Length() const { return std::sqrt(LengthSquared()); }
 
-    void Normalize(T tolerance = static_cast<T>(SmallNumber)) {
+    bool Normalize(T tolerance = static_cast<T>(SmallNumber)) {
         const T lenSq = LengthSquared();
         if (lenSq <= tolerance * tolerance) {
             X = T(0);
             Y = T(0);
             Z = T(0);
             W = T(1);
-            return;
+            return false;
         }
         const T invLength = T(1) / std::sqrt(lenSq);
         X *= invLength;
         Y *= invLength;
         Z *= invLength;
         W *= invLength;
+        return true;
     }
 
     [[nodiscard]] TQuaternion GetNormalized(T tolerance = static_cast<T>(SmallNumber)) const {

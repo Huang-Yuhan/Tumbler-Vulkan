@@ -10,7 +10,13 @@
 
 namespace Tumbler::Math {
 
-template <typename T> requires std::floating_point<T> struct TMatrix4 {
+// 4x4 矩阵 — 以行主序存储 (M[row][col]), 但变换向量时按列向量惯例 (M * v)
+// 矩阵元素按 16 参构造函数顺序: M00..M03 (row0), M10..M13 (row1), M20..M23 (row2), M30..M33 (row3)
+// TransformPosition: v 视为 (x,y,z,1) 应用完整仿射变换 (含平移)
+// TransformVector:   v 视为 (x,y,z,0) 仅应用旋转/缩放 (忽略平移分量)
+template <typename T>
+    requires std::floating_point<T>
+struct TMatrix4 {
 
     T M[4][4]{};
 
@@ -54,88 +60,90 @@ template <typename T> requires std::floating_point<T> struct TMatrix4 {
     }
 };
 
-inline Matrix4f MakeLookAt(const Vector3f& eye, const Vector3f& target, const Vector3f& up) {
-    const Vector3f forward = (target - eye).GetNormalized();
-    const Vector3f right = Cross(forward, up).GetNormalized();
-    const Vector3f cameraUp = Cross(right, forward);
+template <typename T> TMatrix4<T> MakeLookAt(const TVector3<T>& eye, const TVector3<T>& target, const TVector3<T>& up) {
+    const TVector3<T> forward = (target - eye).GetNormalized();
+    const TVector3<T> right = Cross(forward, up).GetNormalized();
+    const TVector3<T> cameraUp = Cross(right, forward);
 
-    return Matrix4f{
+    return TMatrix4<T>{
         right.X,    right.Y,    right.Z,    -Dot(right, eye),  cameraUp.X, cameraUp.Y, cameraUp.Z, -Dot(cameraUp, eye),
-        -forward.X, -forward.Y, -forward.Z, Dot(forward, eye), 0.0f,       0.0f,       0.0f,       1.0f};
+        -forward.X, -forward.Y, -forward.Z, Dot(forward, eye), T(0),       T(0),       T(0),       T(1)};
 }
 
-inline Matrix4f MakePerspective(float verticalFovRadians, float aspectRatio, float nearZ, float farZ,
-                                DepthConvention convention = kDefaultDepthConvention) {
-    const float tanHalfFov = std::tan(verticalFovRadians * 0.5f);
-    const float yScale = 1.0f / tanHalfFov;
-    const float xScale = yScale / aspectRatio;
+template <typename T>
+TMatrix4<T> MakePerspective(T verticalFovRadians, T aspectRatio, T nearZ, T farZ,
+                            DepthConvention convention = kDefaultDepthConvention) {
+    const T tanHalfFov = std::tan(verticalFovRadians * T(0.5));
+    const T yScale = T(1) / tanHalfFov;
+    const T xScale = yScale / aspectRatio;
 
     if (convention == DepthConvention::ReverseZZeroToOne) {
-        const float zScale = nearZ / (farZ - nearZ);
-        const float zOffset = (farZ * nearZ) / (farZ - nearZ);
-        return Matrix4f{xScale, 0.0f, 0.0f,   0.0f,    0.0f, yScale, 0.0f,  0.0f,
-                        0.0f,   0.0f, zScale, zOffset, 0.0f, 0.0f,   -1.0f, 0.0f};
+        const T zScale = nearZ / (farZ - nearZ);
+        const T zOffset = (farZ * nearZ) / (farZ - nearZ);
+        return TMatrix4<T>{xScale, T(0), T(0),   T(0),    T(0), yScale, T(0),  T(0),
+                           T(0),   T(0), zScale, zOffset, T(0), T(0),   -T(1), T(0)};
     }
 
-    const float zScale = farZ / (nearZ - farZ);
-    const float zOffset = (farZ * nearZ) / (nearZ - farZ);
-    return Matrix4f{xScale, 0.0f, 0.0f,   0.0f,    0.0f, yScale, 0.0f,  0.0f,
-                    0.0f,   0.0f, zScale, zOffset, 0.0f, 0.0f,   -1.0f, 0.0f};
+    const T zScale = farZ / (nearZ - farZ);
+    const T zOffset = (farZ * nearZ) / (nearZ - farZ);
+    return TMatrix4<T>{xScale, T(0), T(0),   T(0),    T(0), yScale, T(0),  T(0),
+                       T(0),   T(0), zScale, zOffset, T(0), T(0),   -T(1), T(0)};
 }
 
-inline Matrix4f MakeTranslation(const Vector3f& translation) {
-    return Matrix4f{1.0f, 0.0f, 0.0f, translation.X, 0.0f, 1.0f, 0.0f, translation.Y,
-                    0.0f, 0.0f, 1.0f, translation.Z, 0.0f, 0.0f, 0.0f, 1.0f};
+template <typename T> TMatrix4<T> MakeTranslation(const TVector3<T>& translation) {
+    return TMatrix4<T>{T(1), T(0), T(0), translation.X, T(0), T(1), T(0), translation.Y,
+                       T(0), T(0), T(1), translation.Z, T(0), T(0), T(0), T(1)};
 }
 
-inline Matrix4f MakeScale(const Vector3f& scale) {
-    return Matrix4f{scale.X, 0.0f, 0.0f,    0.0f, 0.0f, scale.Y, 0.0f, 0.0f,
-                    0.0f,    0.0f, scale.Z, 0.0f, 0.0f, 0.0f,    0.0f, 1.0f};
+template <typename T> TMatrix4<T> MakeScale(const TVector3<T>& scale) {
+    return TMatrix4<T>{scale.X, T(0), T(0),    T(0), T(0), scale.Y, T(0), T(0),
+                       T(0),    T(0), scale.Z, T(0), T(0), T(0),    T(0), T(1)};
 }
 
-inline Matrix4f MakeOrtho(float left, float right, float bottom, float top, float nearZ, float farZ,
-                          DepthConvention convention = kDefaultDepthConvention) {
-    const float rl = 1.0f / (right - left);
-    const float tb = 1.0f / (top - bottom);
+template <typename T>
+TMatrix4<T> MakeOrtho(T left, T right, T bottom, T top, T nearZ, T farZ,
+                      DepthConvention convention = kDefaultDepthConvention) {
+    const T rl = T(1) / (right - left);
+    const T tb = T(1) / (top - bottom);
 
     if (convention == DepthConvention::ReverseZZeroToOne) {
-        const float fn = 1.0f / (nearZ - farZ);
-        return Matrix4f{2.0f * rl, 0.0f, 0.0f, -(right + left) * rl, 0.0f, 2.0f * tb, 0.0f, -(top + bottom) * tb,
-                        0.0f,      0.0f, fn,   nearZ * fn,           0.0f, 0.0f,      0.0f, 1.0f};
+        const T fn = T(1) / (nearZ - farZ);
+        return TMatrix4<T>{T(2) * rl, T(0), T(0), -(right + left) * rl, T(0), T(2) * tb, T(0), -(top + bottom) * tb,
+                           T(0),      T(0), fn,   nearZ * fn,           T(0), T(0),      T(0), T(1)};
     }
 
-    const float fn = 1.0f / (farZ - nearZ);
-    return Matrix4f{2.0f * rl, 0.0f, 0.0f, -(right + left) * rl, 0.0f, 2.0f * tb, 0.0f, -(top + bottom) * tb,
-                    0.0f,      0.0f, -fn,  -nearZ * fn,          0.0f, 0.0f,      0.0f, 1.0f};
+    const T fn = T(1) / (farZ - nearZ);
+    return TMatrix4<T>{T(2) * rl, T(0), T(0), -(right + left) * rl, T(0), T(2) * tb, T(0), -(top + bottom) * tb,
+                       T(0),      T(0), -fn,  -nearZ * fn,          T(0), T(0),      T(0), T(1)};
 }
 
-inline Matrix4f Inverse(const Matrix4f& m) {
-    const float m00 = m[0][0], m01 = m[0][1], m02 = m[0][2], m03 = m[0][3];
-    const float m10 = m[1][0], m11 = m[1][1], m12 = m[1][2], m13 = m[1][3];
-    const float m20 = m[2][0], m21 = m[2][1], m22 = m[2][2], m23 = m[2][3];
-    const float m30 = m[3][0], m31 = m[3][1], m32 = m[3][2], m33 = m[3][3];
+template <typename T> TMatrix4<T> Inverse(const TMatrix4<T>& m) {
+    const T m00 = m[0][0], m01 = m[0][1], m02 = m[0][2], m03 = m[0][3];
+    const T m10 = m[1][0], m11 = m[1][1], m12 = m[1][2], m13 = m[1][3];
+    const T m20 = m[2][0], m21 = m[2][1], m22 = m[2][2], m23 = m[2][3];
+    const T m30 = m[3][0], m31 = m[3][1], m32 = m[3][2], m33 = m[3][3];
 
-    const float s0 = m00 * m11 - m10 * m01;
-    const float s1 = m00 * m12 - m10 * m02;
-    const float s2 = m00 * m13 - m10 * m03;
-    const float s3 = m01 * m12 - m11 * m02;
-    const float s4 = m01 * m13 - m11 * m03;
-    const float s5 = m02 * m13 - m12 * m03;
+    const T s0 = m00 * m11 - m10 * m01;
+    const T s1 = m00 * m12 - m10 * m02;
+    const T s2 = m00 * m13 - m10 * m03;
+    const T s3 = m01 * m12 - m11 * m02;
+    const T s4 = m01 * m13 - m11 * m03;
+    const T s5 = m02 * m13 - m12 * m03;
 
-    const float c0 = m20 * m31 - m30 * m21;
-    const float c1 = m20 * m32 - m30 * m22;
-    const float c2 = m20 * m33 - m30 * m23;
-    const float c3 = m21 * m32 - m31 * m22;
-    const float c4 = m21 * m33 - m31 * m23;
-    const float c5 = m22 * m33 - m32 * m23;
+    const T c0 = m20 * m31 - m30 * m21;
+    const T c1 = m20 * m32 - m30 * m22;
+    const T c2 = m20 * m33 - m30 * m23;
+    const T c3 = m21 * m32 - m31 * m22;
+    const T c4 = m21 * m33 - m31 * m23;
+    const T c5 = m22 * m33 - m32 * m23;
 
-    const float det = s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0;
+    const T det = s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0;
     if (IsNearlyZero(det)) {
-        return Matrix4f::Identity();
+        return TMatrix4<T>::Identity();
     }
 
-    const float invDet = 1.0f / det;
-    return Matrix4f{
+    const T invDet = T(1) / det;
+    return TMatrix4<T>{
         (m11 * c5 - m12 * c4 + m13 * c3) * invDet,  (-m01 * c5 + m02 * c4 - m03 * c3) * invDet,
         (m31 * s5 - m32 * s4 + m33 * s3) * invDet,  (-m21 * s5 + m22 * s4 - m23 * s3) * invDet,
 

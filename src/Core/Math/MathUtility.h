@@ -7,6 +7,11 @@
 
 namespace Tumbler::Math {
 
+// 数值工具函数
+// Clamp: 将 value 钳制在 [minValue, maxValue] 范围内
+// Lerp: 线性插值 a + (b-a)*t, t∈[0,1] 时在 ab 之间, 超出范围时为外推
+// IsNearlyZero/IsNearlyEqual: 浮点容差比较, 默认容差 SmallNumber=1e-8
+
 template <typename T> constexpr T Clamp(T value, T minValue, T maxValue) noexcept {
     return value < minValue ? minValue : (value > maxValue ? maxValue : value);
 }

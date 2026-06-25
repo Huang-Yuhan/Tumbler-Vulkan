@@ -8,7 +8,12 @@
 
 namespace Tumbler::Math {
 
-template <typename T> requires std::floating_point<T> struct TPlane {
+// 平面方程: Ax + By + Cz + D = 0
+// (X,Y,Z) 是法线方向, D = -Normal · PointOnPlane（即法线点乘平面上任一点再取负）
+// SignedDistance: 正值 = 点在法线朝向侧, 负值 = 背侧, 零 = 在平面上
+template <typename T>
+    requires std::floating_point<T>
+struct TPlane {
 
     T X{};
     T Y{};
