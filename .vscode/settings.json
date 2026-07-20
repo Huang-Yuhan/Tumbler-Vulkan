@@ -1,0 +1,32 @@
+{
+    "cmake.configureArgs": [
+        "-DCMAKE_TOOLCHAIN_FILE=/home/alpha/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "-DCMAKE_C_COMPILER=/usr/sbin/gcc",
+        "-DCMAKE_CXX_COMPILER=/usr/sbin/g++"
+    ],
+    "cmake.configureEnvironment": {
+        "VCPKG_ROOT": "/home/alpha/vcpkg",
+        "VULKAN_SDK": "/home/alpha/.local/vulkan-sdk/1.4.350.1/x86_64"
+    },
+    "cSpell.words": [
+        "GLFW",
+        "GLFWwindow",
+        "Tumbler",
+        "Vulkan",
+        "VkSurface",
+        "VkInstance",
+        "ImGui",
+        "Nanite",
+        "Bindless",
+        "spirv",
+        "vkcmd",
+        "vkcreate",
+        "vkdestroy",
+        "vkqueue",
+        "vkfence",
+        "vksemaphore",
+        "Gpu",
+        "Vis",
+        "spdlog"
+    ]
+}

@@ -1,0 +1,13 @@
+build/
+build-*/
+*.spv
+*.spv.meta
+cooked/
+.vs/
+.idea/
+cmake-build-*/
+out/
+compile_commands.json
+.clangd/
+.claude/
+imgui.ini

@@ -1,0 +1,44 @@
+{
+  "name": "tumbler",
+  "version-string": "0.2.0",
+  "builtin-baseline": "930ecc42b512b564571d767f70775d284a6fa307",
+  "dependencies": [
+    {
+      "name": "glfw3",
+      "features": [
+        {
+          "name": "wayland",
+          "platform": "linux"
+        }
+      ]
+    },
+    "glm",
+    "gtest",
+    {
+      "name": "imgui",
+      "features": [
+        "glfw-binding",
+        "vulkan-binding"
+      ]
+    },
+    "spdlog",
+    "stb",
+    "tinyobjloader",
+    "nlohmann-json",
+    "shader-slang",
+    {
+      "name": "vulkan",
+      "platform": "windows | linux"
+    },
+    {
+      "name": "vulkan-loader",
+      "features": [
+        "wayland",
+        "xcb",
+        "xlib"
+      ],
+      "platform": "linux"
+    },
+    "vulkan-memory-allocator"
+  ]
+}
