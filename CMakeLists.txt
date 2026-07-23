@@ -38,6 +38,7 @@ find_package(imgui CONFIG REQUIRED)
 find_package(tinyobjloader CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(slang CONFIG REQUIRED)
+find_package(metis CONFIG REQUIRED)
 if(BUILD_TESTING)
     find_package(GTest CONFIG REQUIRED)
 endif()
@@ -81,6 +82,7 @@ target_link_libraries(Tumbler PRIVATE
     tinyobjloader::tinyobjloader
     nlohmann_json::nlohmann_json
     slang::slang
+    metis
 )
 
 add_dependencies(Tumbler Shaders)

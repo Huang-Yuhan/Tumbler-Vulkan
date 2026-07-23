@@ -39,6 +39,7 @@
       ],
       "platform": "linux"
     },
-    "vulkan-memory-allocator"
+    "vulkan-memory-allocator",
+    "metis"
   ]
 }
