@@ -4,13 +4,14 @@
 #include <expected>
 #include <string>
 #include <vector>
+#include <glm/glm.hpp>
 
 namespace Tumbler {
 
 struct Vertex {
-    float px, py, pz;
-    float nx, ny, nz;
-    float u, v;
+    glm::vec3 pos;
+    glm::vec3 normal;
+    glm::vec2 uv;
 };
 static_assert(sizeof(Vertex) == 8 * sizeof(float));
 

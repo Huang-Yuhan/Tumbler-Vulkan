@@ -37,7 +37,7 @@ concept PositionProvider = requires(T&& f, uint32_t i) {
 // 两个半边共享同一条边，方向相反。
 template <typename T>
 concept EdgeCallback = requires(T&& f, uint32_t a, uint32_t b) {
-	f(a, b);
+	{ f(a, b) } -> std::same_as<void>;
 };
 
 class HalfEdgeHashTable {
