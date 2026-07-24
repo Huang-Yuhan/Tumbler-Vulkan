@@ -1,6 +1,7 @@
 #include "ClusterDag.h"
 #include "HalfEdge.h"
 #include "NaniteHelper.h"
+#include "GraphPartitioner.h"
 
 namespace Tumbler::Nanite {
 
