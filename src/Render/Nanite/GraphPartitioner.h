@@ -1,38 +1,39 @@
 #pragma once
 
-#include <metis.h>
-#include <vector>
-
+#include "MetisGraphWrapper.h"
 #include "Core/Utils/Range.h"
+
+#include <cstdint>
+#include <expected>
+#include <vector>
 
 namespace Tumbler::Nanite {
 
-	using Range = Tumbler::Utils::Range;
+using Range = Tumbler::Utils::Range;
 
+enum class PartitionError {
+    InvalidInput,   // METIS_ERROR_INPUT
+    OutOfMemory,    // METIS_ERROR_MEMORY
+    InternalError,  // METIS_ERROR
+};
+
+// Partitions a mesh triangle graph into clusters using METIS.
+//
+// Partition() calls METIS_PartGraphRecursive to recursively
+// bisect the graph into roughly equal-sized parts (~128 triangles each).
+// Triangles within each cluster are sorted contiguous for GPU upload.
 class GraphPartitioner {
-	// Fields to be filled by you
 public:
-	struct GraphData
-	{
-        uint32_t Offset;
-        uint32_t Num;
+    struct Result {
+        std::vector<int32_t> part;       // part[triIdx] = cluster id
+        std::vector<Range>   clusters;    // clusters[c] = contiguous triangle range
+        std::vector<int32_t> sortedTo;    // sortedTo[triIdx] = new position after sort
+    };
 
-		std::vector<idx_t> Adjacency;
-        std::vector<idx_t> AdjacencyCost;
-		std::vector<idx_t> AdjacencyOffset;
-	};
-
-	// 这里没有一个GraphData的字段，是因为后续做图划分的时候会有多个Graph，每个GraphData对应一个图划分的子图，并不只有一个图
-
-	std::vector<Range> Ranges; // 每个Range对应一个子图的顶点范围
-        std::vector<uint32_t> Indexes;
-        std::vector<uint32_t> SortedTo;
-
-	GraphPartitioner(uint32_t numVertices, uint32_t MinPartitionSize, uint32_t MaxPartitionSize);
-
-	GraphData* NewGraph(uint32_t NumAdjacency);
-        void AddAdjacency(GraphData* graph, uint32_t AdjIndex, idx_t Cost);
-        void AddLocalityLinks(GraphData* graph, uint32_t AdjIndex, idx_t Cost);
+    // numClusters = ceil(numTriangles / kClusterTriangleCount)
+    std::expected<Result, PartitionError> Partition(
+        const MetisGraphWrapper::Result& graph,
+        int32_t numClusters);
 };
 
 } // namespace Tumbler::Nanite
