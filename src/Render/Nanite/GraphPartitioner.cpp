@@ -1,5 +1,6 @@
 #include "GraphPartitioner.h"
 
+#include <cassert>
 #include <metis.h>
 #include <numeric>
 
@@ -81,6 +82,11 @@ GraphPartitioner::Bisect(const MetisGraphWrapper::Result& graph,
     }
 
     int32_t leftN = l - first;
+
+    // Single mesh: METIS should always produce a valid bisection
+    assert(leftN > 0 && leftN < N);
+    // TODO: support sub-mesh / disconnected components (guard against
+    //       degenerate bisection where all vertices land on one side)
 
     // Rebuild sortedTo from the rearranged sortedTriangles
     for (int32_t pos = first; pos < first + N; ++pos) {
