@@ -52,12 +52,60 @@ endif()
 file(GLOB_RECURSE SHADER_SOURCES "${CMAKE_SOURCE_DIR}/shaders/*.slang")
 set(SHADER_OUTPUT_DIR "${CMAKE_BINARY_DIR}/shaders")
 
+# Locate slangc (vcpkg puts it in tools/shader-slang, fallback to PATH)
+find_program(SLANGC_EXECUTABLE slangc
+    PATHS "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-linux/tools/shader-slang"
+    NO_DEFAULT_PATH
+)
+if(NOT SLANGC_EXECUTABLE)
+    find_program(SLANGC_EXECUTABLE slangc)
+endif()
+message(STATUS "slangc: ${SLANGC_EXECUTABLE}")
+
+# ---- nanite_debug.slang (multi-entry-point: vert_main + frag_main) ----
+set(NANITE_VERT "${SHADER_OUTPUT_DIR}/nanite_debug_vert.spv")
+set(NANITE_FRAG "${SHADER_OUTPUT_DIR}/nanite_debug_frag.spv")
+
+add_custom_command(
+    OUTPUT ${NANITE_VERT}
+    COMMAND ${SLANGC_EXECUTABLE} ${CMAKE_SOURCE_DIR}/shaders/nanite_debug.slang
+            -entry vert_main -stage vertex -o ${NANITE_VERT} -target spirv
+    DEPENDS ${CMAKE_SOURCE_DIR}/shaders/nanite_debug.slang
+    COMMENT "Compiling nanite_debug.slang (vert) → SPIR-V"
+)
+add_custom_command(
+    OUTPUT ${NANITE_FRAG}
+    COMMAND ${SLANGC_EXECUTABLE} ${CMAKE_SOURCE_DIR}/shaders/nanite_debug.slang
+            -entry frag_main -stage fragment -o ${NANITE_FRAG} -target spirv
+    DEPENDS ${CMAKE_SOURCE_DIR}/shaders/nanite_debug.slang
+    COMMENT "Compiling nanite_debug.slang (frag) → SPIR-V"
+)
+list(APPEND SPV_OUTPUTS ${NANITE_VERT} ${NANITE_FRAG})
+
+# ---- Generic shader compilation (single entry point "main") ----
 foreach(shader ${SHADER_SOURCES})
     get_filename_component(shader_name ${shader} NAME_WE)
     set(spv_output "${SHADER_OUTPUT_DIR}/${shader_name}.spv")
+
+    # Detect stage from suffix: name_vert → vertex, name_frag → fragment
+    if(shader_name MATCHES "_vert$")
+        set(stage_flag -stage vertex)
+    elseif(shader_name MATCHES "_frag$")
+        set(stage_flag -stage fragment)
+    elseif(shader_name MATCHES "_comp$")
+        set(stage_flag -stage compute)
+    else()
+        set(stage_flag "")
+    endif()
+
+    # Skip nanite_debug.slang (already handled above)
+    if(shader_name STREQUAL "nanite_debug")
+        continue()
+    endif()
+
     add_custom_command(
         OUTPUT ${spv_output}
-        COMMAND slangc ${shader} -o ${spv_output} -target spirv
+        COMMAND ${SLANGC_EXECUTABLE} ${shader} -o ${spv_output} -target spirv ${stage_flag}
         DEPENDS ${shader}
         COMMENT "Compiling ${shader_name}.slang → SPIR-V"
     )
@@ -89,6 +137,7 @@ add_dependencies(Tumbler Shaders)
 
 target_compile_definitions(Tumbler PRIVATE
     SHADER_DIR="${SHADER_OUTPUT_DIR}"
+    ASSET_DIR="${CMAKE_SOURCE_DIR}/assets"
 )
 
 if(WIN32)

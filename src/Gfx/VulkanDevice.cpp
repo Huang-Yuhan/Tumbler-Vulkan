@@ -200,9 +200,16 @@ std::expected<void, DeviceError> VulkanDevice::CreateLogicalDevice() {
         });
     }
 
+    // Vulkan 1.1 features
+    VkPhysicalDeviceVulkan11Features features11{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+        .shaderDrawParameters = VK_TRUE,
+    };
+
     // Vulkan 1.3 features
     VkPhysicalDeviceVulkan13Features features13{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+        .pNext = &features11,
         .dynamicRendering = VK_TRUE,
     };
 
