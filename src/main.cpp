@@ -99,6 +99,13 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    // ---- Acquire Fence (minimal sync for validation, reused each frame) ----
+    VkFenceCreateInfo fenceInfo{
+        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+    };
+    VkFence acquireFence = VK_NULL_HANDLE;
+    vkCreateFence(device.GetDevice(), &fenceInfo, nullptr, &acquireFence);
+
     // ---- Main Loop ----
     LOG_INFO("Entering main loop");
     while (!window.ShouldClose()) {
@@ -116,13 +123,17 @@ int main(int argc, char** argv) {
 
         // Acquire swapchain image
         uint32_t imageIndex = 0;
-        VkResult acquireResult = swapchain.AcquireNextImage(&imageIndex, VK_NULL_HANDLE, VK_NULL_HANDLE);
+        VkResult acquireResult = swapchain.AcquireNextImage(&imageIndex, VK_NULL_HANDLE, acquireFence);
         if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR || acquireResult == VK_SUBOPTIMAL_KHR) {
             continue;
         }
         if (acquireResult != VK_SUCCESS && acquireResult != VK_SUBOPTIMAL_KHR) {
             break;
         }
+
+        // Wait for the image to be available before using it
+        vkWaitForFences(device.GetDevice(), 1, &acquireFence, VK_TRUE, UINT64_MAX);
+        vkResetFences(device.GetDevice(), 1, &acquireFence);
 
         // Record work
         VkCommandBuffer cmd = cmdManager.Allocate();
@@ -214,6 +225,7 @@ int main(int argc, char** argv) {
     // ---- Shutdown ----
     vkDeviceWaitIdle(device.GetDevice());
 
+    vkDestroyFence(device.GetDevice(), acquireFence, nullptr);
     deletionQueue.Shutdown();
     descriptorHeap.Shutdown();
     cmdManager.Shutdown();

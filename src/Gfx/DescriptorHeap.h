@@ -19,9 +19,9 @@ namespace Bindings {
     constexpr uint32_t ShadowMap  = 1;
 
     // Set 1 — Bindless (init once, rarely updated)
-    constexpr uint32_t Textures       = 0;  // SampledImage[]
-    constexpr uint32_t MaterialData   = 1;  // SSBO
-    constexpr uint32_t ClusterPageData = 2;  // ByteAddressBuffer
+    constexpr uint32_t MaterialData   = 0;  // SSBO
+    constexpr uint32_t ClusterPageData = 1;  // ByteAddressBuffer
+    constexpr uint32_t Textures       = 2;  // SampledImage[]  (variable-count, must be highest)
     constexpr uint32_t ObjectData     = 3;  // SSBO (future: per-instance transforms)
 }
 

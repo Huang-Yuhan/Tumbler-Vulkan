@@ -53,22 +53,20 @@ std::expected<void, DescriptorError> DescriptorHeap::Init(VkDevice device, uint3
     VkDescriptorBindingFlags bindlessFlags =
         VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
         VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
-    VkDescriptorBindingFlags arrayFlags =
-        bindlessFlags | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
+
+    std::array<VkDescriptorBindingFlags, 3> set1BindingFlags = {{
+        bindlessFlags,   // binding 0: MaterialData
+        bindlessFlags,   // binding 1: ClusterPageData
+        bindlessFlags | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT,  // binding 2: Textures (must be highest)
+    }};
 
     VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo{
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
-        .bindingCount = 1,
-        .pBindingFlags = &arrayFlags,
+        .bindingCount = static_cast<uint32_t>(set1BindingFlags.size()),
+        .pBindingFlags = set1BindingFlags.data(),
     };
 
     std::array<VkDescriptorSetLayoutBinding, 3> set1Bindings{{
-        {
-            .binding = Bindings::Textures,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = maxBindlessTextures,
-            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-        },
         {
             .binding = Bindings::MaterialData,
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
@@ -80,6 +78,12 @@ std::expected<void, DescriptorError> DescriptorHeap::Init(VkDevice device, uint3
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             .descriptorCount = 1,
             .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        },
+        {
+            .binding = Bindings::Textures,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = maxBindlessTextures,
+            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         },
     }};
 
