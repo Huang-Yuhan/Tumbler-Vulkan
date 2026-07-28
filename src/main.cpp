@@ -1,3 +1,4 @@
+#include "Assets/MeshLoader.h"
 #include "Core/Platform/AppWindow.h"
 #include "Core/Utils/Log.h"
 #include "Gfx/CommandManager.h"
@@ -5,13 +6,37 @@
 #include "Gfx/DescriptorHeap.h"
 #include "Gfx/Swapchain.h"
 #include "Gfx/VulkanDevice.h"
+#include "Render/Nanite/NaniteBuilder.h"
 
 int main(int argc, char** argv) {
     using namespace Tumbler;
 
     Log::Init();
 
-    const char* scenePath = (argc > 1) ? argv[1] : "assets/scenes/demo.tscene";
+    // ---- Nanite test: load mesh + partition ----
+    const char* meshPath = (argc > 1) ? argv[1] : "assets/models/Sting-Sword-lowpoly.obj";
+    auto mesh = LoadObj(meshPath);
+    if (mesh) {
+        LOG_INFO("Mesh loaded: {} vertices, {} triangles",
+                 mesh->vertices.size(), mesh->indices.size() / 3);
+
+        auto naniteData = Nanite::NaniteBuilder().Build(*mesh);
+        if (naniteData) {
+            auto& clusters = naniteData->clusterDag.GetClusters();
+            LOG_INFO("=== Nanite Partition Result ===");
+            LOG_INFO("Total clusters: {}", clusters.size());
+            for (size_t c = 0; c < clusters.size(); ++c) {
+                LOG_INFO("  Cluster[{}]: {} vertices, {} triangles",
+                         c, clusters[c].NumVertices, clusters[c].NumTriangles);
+            }
+        } else {
+            LOG_ERROR("Nanite build failed");
+        }
+    } else {
+        LOG_WARN("Mesh load failed: {}", meshPath);
+    }
+
+    const char* scenePath = "assets/scenes/demo.tscene";
     LOG_INFO("Scene: {}", scenePath);
 
     // ---- Window ----
