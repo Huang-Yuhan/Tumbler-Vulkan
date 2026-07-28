@@ -19,7 +19,7 @@ class MetisGraphWrapper {
 public:
     // Immutable METIS CSR data, produced by Build().
     struct Result {
-        int32_t                numVertices;
+        int32_t                numVertices = 0;
         std::vector<int32_t>   xadj;    // CSR offset array
         std::vector<int32_t>   adjncy;  // CSR adjacency list
         std::vector<int32_t>   adjwgt;  // CSR edge weights

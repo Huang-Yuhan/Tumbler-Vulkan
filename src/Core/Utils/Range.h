@@ -5,10 +5,10 @@
 namespace Tumbler::Utils {
 
 	struct Range {
-	uint32_t start;
-	uint32_t end;
-	Range(uint32_t s, uint32_t e) : start(s), end(e) {}
-	uint32_t size() const { return end - start; }
+	int32_t start;
+	int32_t end;
+	Range(int32_t s, int32_t e) : start(s), end(e) {}
+	int32_t size() const { return end - start; }
 	bool operator<(const Range& other) const { return start < other.start; }
 	};
 

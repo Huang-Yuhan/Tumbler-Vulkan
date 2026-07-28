@@ -12,7 +12,6 @@ MetisGraphWrapper::MetisGraphWrapper(int32_t numTriangles)
 void MetisGraphWrapper::AddEdge(int32_t u, int32_t v, int32_t cost) {
     assert(u >= 0 && u < m_NumVertices);
     assert(v >= 0 && v < m_NumVertices);
-
     m_Neighbors[u].emplace_back(v, cost);
     m_Neighbors[v].emplace_back(u, cost);
 }
