@@ -9,24 +9,25 @@
         "VULKAN_SDK": "/home/alpha/.local/vulkan-sdk/1.4.350.1/x86_64"
     },
     "cSpell.words": [
+        "Bindless",
         "GLFW",
         "GLFWwindow",
-        "Tumbler",
-        "Vulkan",
-        "VkSurface",
-        "VkInstance",
+        "Gpu",
         "ImGui",
         "Nanite",
-        "Bindless",
+        "Partitioner",
+        "spdlog",
         "spirv",
+        "Tumbler",
+        "Vis",
         "vkcmd",
         "vkcreate",
         "vkdestroy",
-        "vkqueue",
         "vkfence",
+        "VkInstance",
+        "vkqueue",
         "vksemaphore",
-        "Gpu",
-        "Vis",
-        "spdlog"
+        "VkSurface",
+        "Vulkan"
     ]
 }

@@ -101,11 +101,44 @@ vkCmdDraw(cmd, 3, 1, 0, 0);  // 3 verts, 1 instance, firstVertex=0, firstInstanc
 - Dynamic rendering (Vulkan 1.3)
 - Pipeline layout: 1 descriptor set (3 SSBO bindings, unused), 1 push constant (mat4, unused)
 
+## Root Cause (2026-07-28)
+
+**Depth test rejection — all fragments discarded.**
+
+The debug vertex shader outputs `z = 0.0` in clip space. With reversed-Z:
+
+| Value | Meaning |
+|---|---|
+| `depthClearValue = 0.0` | Far plane (reversed-Z) |
+| `depthCompareOp = GREATER` | Nearer fragments win |
+| shader `z = 0.0` → depth buffer `0.0` | Exact match with cleared far plane |
+
+Depth test: `0.0 > 0.0` → **FALSE** on every pixel.
+
+### Trace
+
+```
+Clip space z=0.0 → (w=1.0) → NDC z=0.0
+→ Viewport [minDepth=0, maxDepth=1]: depth = 0.0
+→ Compare: 0.0 > clear(0.0) = false → fragment killed
+```
+
+### Fix
+
+Change shader z from `0.0` → `0.5` (mid-depth in reversed-Z):
+```hlsl
+o.position = float4(x, y, 0.5, 1.0);  // was 0.0
+```
+
+### Why it wasn't caught earlier
+
+The "Ruled Out" table focused on SSBO stride mismatches and Vulkan feature flags — all valid concerns, but the depth test was overlooked. The bug report's own next-step #2 ("Try without depth attachment/testing") would have caught this immediately.
+
 ## Next Steps to Investigate
 
-1. Try `VK_POLYGON_MODE_LINE` to rule out rasterizer issues
-2. Try without depth attachment/testing
+1. ~~Try `VK_POLYGON_MODE_LINE` to rule out rasterizer issues~~
+2. ~~Try without depth attachment/testing~~ — **would have caught this**
 3. Try a compute shader fill instead of graphics pipeline
 4. Run under RenderDoc to capture frame state
-5. Verify `gl_Position.w` is not being clipped by `VK_KHR_maintenance1`
+5. ~~Verify `gl_Position.w` is not being clipped by `VK_KHR_maintenance1`~~
 6. Check if GLFW Wayland backend has any incompatibility

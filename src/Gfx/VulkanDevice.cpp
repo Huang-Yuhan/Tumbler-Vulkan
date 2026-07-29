@@ -229,6 +229,15 @@ std::expected<void, DeviceError> VulkanDevice::CreateLogicalDevice() {
         .bufferDeviceAddress = VK_TRUE,
     };
 
+    // Base features (Vulkan 1.0)
+    VkPhysicalDeviceFeatures2 features2{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+        .pNext = &features12,
+        .features = {
+            .fillModeNonSolid = VK_TRUE,  // VK_POLYGON_MODE_LINE
+        },
+    };
+
     // Swapchain extension is still needed even in Vulkan 1.4
     const std::vector<const char*> deviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
@@ -236,7 +245,7 @@ std::expected<void, DeviceError> VulkanDevice::CreateLogicalDevice() {
 
     VkDeviceCreateInfo deviceInfo{
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .pNext = &features12,
+        .pNext = &features2,
         .queueCreateInfoCount = static_cast<uint32_t>(queueInfos.size()),
         .pQueueCreateInfos = queueInfos.data(),
         .enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size()),

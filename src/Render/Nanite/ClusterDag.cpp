@@ -51,6 +51,10 @@ void ClusterDag::AddMesh(const MeshData& data) {
         return;
     }
 
+    // Store partition for visualization
+    m_Part         = partResult->part;
+    m_NumTriangles = numTriangles;
+
     // ---- 4. Build sortedTriangles (inverse of sortedTo) ----
     std::vector<int32_t> sortedTriangles(numTriangles);
     for (int32_t t = 0; t < numTriangles; ++t) {

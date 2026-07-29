@@ -94,9 +94,13 @@ std::expected<VkPipeline, PipelineError> GraphicsPipelineBuilder::Build(VkDevice
         },
     };
 
-    // No vertex input — GPU-driven reads vertices from storage buffers
+    // Vertex input: use builder's bindings/attributes, or empty for GPU-driven
     VkPipelineVertexInputStateCreateInfo vertexInput{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+        .vertexBindingDescriptionCount   = static_cast<uint32_t>(vertexBindings.size()),
+        .pVertexBindingDescriptions      = vertexBindings.data(),
+        .vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexAttribs.size()),
+        .pVertexAttributeDescriptions    = vertexAttribs.data(),
     };
 
     VkPipelineInputAssemblyStateCreateInfo inputAssembly{
@@ -112,9 +116,12 @@ std::expected<VkPipeline, PipelineError> GraphicsPipelineBuilder::Build(VkDevice
 
     VkPipelineRasterizationStateCreateInfo raster{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-        .polygonMode = VK_POLYGON_MODE_FILL,
+        .polygonMode = polygonMode,
         .cullMode = cullMode,
         .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+        .depthBiasEnable = depthBiasEnable,
+        .depthBiasConstantFactor = depthBiasConstant,
+        .depthBiasSlopeFactor = depthBiasSlope,
         .lineWidth = 1.0f,
     };
 

@@ -36,7 +36,15 @@ struct GraphicsPipelineBuilder {
     std::span<VkFormat> colorFormats;  // empty = no color attachments
     VkFormat           depthFormat = VK_FORMAT_UNDEFINED;
     VkCullModeFlags    cullMode    = VK_CULL_MODE_BACK_BIT;
+    VkPolygonMode      polygonMode = VK_POLYGON_MODE_FILL;
     VkCompareOp        depthOp     = VK_COMPARE_OP_GREATER;  // reversed-Z
+    VkBool32           depthBiasEnable    = VK_FALSE;
+    float              depthBiasConstant  = 0.0f;
+    float              depthBiasSlope     = 0.0f;
+
+    // Vertex input (empty = no vertex attributes, for GPU-driven rendering)
+    std::span<VkVertexInputBindingDescription>   vertexBindings;
+    std::span<VkVertexInputAttributeDescription> vertexAttribs;
 
     std::expected<VkPipeline, PipelineError> Build(VkDevice device);
 };
