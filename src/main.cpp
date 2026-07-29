@@ -40,14 +40,40 @@ struct MeshGpuState {
     uint32_t         indexCount    = 0;
 };
 
-// Generate a distinct color from cluster ID
+// Push constant: viewProj + wireframe flag (matches cluster_vis.slang)
+struct PushData {
+    glm::mat4 viewProj;
+    uint32_t  wireframe;
+};
+static_assert(sizeof(PushData) >= sizeof(glm::mat4) + sizeof(uint32_t));
+
+// Generate a maximally distinct color from cluster ID.
+// Uses golden-ratio conjugate to scatter hues so adjacent cluster IDs
+// are never close in color, plus varies saturation and value.
 glm::vec3 ClusterColor(int32_t clusterId, int32_t numClusters) {
-    float hue = float(clusterId) / float(numClusters);
-    // HSV→RGB: simple rainbow mapping
-    float r = glm::abs(hue * 6.0f - 3.0f) - 1.0f;
-    float g = 2.0f - glm::abs(hue * 6.0f - 2.0f);
-    float b = 2.0f - glm::abs(hue * 6.0f - 4.0f);
-    return glm::clamp(glm::vec3(r, g, b), 0.0f, 1.0f);
+    if (numClusters <= 0) return glm::vec3(0.5f);
+
+    constexpr float kGoldenRatioConjugate = 0.618033988749895f;
+    float hue = std::fmod(float(clusterId) * kGoldenRatioConjugate, 1.0f);
+
+    // Vary saturation and value by cluster parity to add contrast
+    float saturation = (clusterId & 1) ? 0.85f : 0.65f;
+    float value      = (clusterId & 2) ? 0.90f : 0.70f;
+
+    // HSV→RGB
+    float c = value * saturation;
+    float x = c * (1.0f - std::abs(std::fmod(hue * 6.0f, 2.0f) - 1.0f));
+    float m = value - c;
+
+    float r, g, b;
+    if      (hue < 1.0f / 6.0f) { r = c; g = x; b = 0; }
+    else if (hue < 2.0f / 6.0f) { r = x; g = c; b = 0; }
+    else if (hue < 3.0f / 6.0f) { r = 0; g = c; b = x; }
+    else if (hue < 4.0f / 6.0f) { r = 0; g = x; b = c; }
+    else if (hue < 5.0f / 6.0f) { r = x; g = 0; b = c; }
+    else                         { r = c; g = 0; b = x; }
+
+    return glm::vec3(r + m, g + m, b + m);
 }
 
 bool UploadMeshForClusterVis(VkDevice device, VmaAllocator allocator,
@@ -133,11 +159,11 @@ bool UploadMeshForClusterVis(VkDevice device, VmaAllocator allocator,
                  state.indexBuffer, state.idxAlloc);
     state.indexCount = static_cast<uint32_t>(mesh.indices.size());
 
-    // ---- Pipeline layout: push constant MVP only ----
+    // ---- Pipeline layout: push constant (mat4 + uint for wireframe flag) ----
     VkPushConstantRange pushRange{
-        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         .offset     = 0,
-        .size       = sizeof(glm::mat4),
+        .size       = sizeof(PushData),
     };
     VkPipelineLayoutCreateInfo pipeLayoutInfo{
         .sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -170,7 +196,7 @@ bool UploadMeshForClusterVis(VkDevice device, VmaAllocator allocator,
         .fragPath       = SHADER_DIR "/cluster_vis_frag.spv",
         .colorFormats   = colorSpan,
         .depthFormat    = VK_FORMAT_D32_SFLOAT,
-        .cullMode       = VK_CULL_MODE_NONE,
+        .cullMode       = VK_CULL_MODE_BACK_BIT,
         .vertexBindings = bindSpan,
         .vertexAttribs  = attrSpan,
     };
@@ -214,12 +240,14 @@ int main(int argc, char** argv) {
     Log::Init();
 
     // ---- Load mesh ----
-    const char* meshPath = (argc > 1) ? argv[1] : ASSET_DIR "/models/Sting-Sword-lowpoly.obj";
+    const char* meshPath = (argc > 1) ? argv[1] : ASSET_DIR "/models/bunny.obj";
     auto mesh = LoadObj(meshPath);
     if (!mesh) {
         LOG_ERROR("Failed to load mesh: {}", meshPath);
         return 1;
     }
+    // Bunny is ~0.2 units wide - scale up for visibility
+    for (auto& v : mesh->vertices) v.pos *= 10.0f;
     LOG_INFO("Mesh loaded: {} vertices, {} triangles",
              mesh->vertices.size(), mesh->indices.size() / 3);
 
@@ -276,8 +304,8 @@ int main(int argc, char** argv) {
     Camera camera;
     camera.SetPerspective(glm::radians(60.0f), 0.1f, 1000.0f);
     camera.SetTarget(glm::vec3(0.0f));
-    camera.SetDistance(20.0f);
-    camera.Orbit(0.0f, std::asin(5.0f / 20.0f));  // match original camY=5 @ dist=20
+    camera.SetDistance(5.0f);
+    camera.Orbit(0.0f, glm::radians(20.0f));  // look slightly down
 
     // ---- ImGui ----
     ImGuiLayer imgui;
@@ -431,11 +459,12 @@ int main(int argc, char** argv) {
         vkCmdBeginRendering(cmd, &renderInfo);
 
         // ---- Draw mesh ----
-        auto DrawMesh = [&](VkPipeline pipeline) {
+        auto DrawMesh = [&](VkPipeline pipeline, bool wireframe) {
+            PushData pushData{ viewProj, wireframe ? 1u : 0u };
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
             vkCmdPushConstants(cmd, meshGpu.pipeLayout,
-                               VK_SHADER_STAGE_VERTEX_BIT, 0,
-                               sizeof(glm::mat4), &viewProj);
+                               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                               sizeof(PushData), &pushData);
 
             VkViewport viewport{
                 .x        = 0.0f,
@@ -457,14 +486,14 @@ int main(int argc, char** argv) {
 
         switch (renderMode) {
         case RenderMode::Shaded:
-            DrawMesh(meshGpu.pipelineFill);
+            DrawMesh(meshGpu.pipelineFill, false);
             break;
         case RenderMode::Wireframe:
-            DrawMesh(meshGpu.pipelineLine);
+            DrawMesh(meshGpu.pipelineLine, true);
             break;
         case RenderMode::ShadedWireframe:
-            DrawMesh(meshGpu.pipelineFill);
-            DrawMesh(meshGpu.pipelineLine);
+            DrawMesh(meshGpu.pipelineFill, false);
+            DrawMesh(meshGpu.pipelineLine, true);
             break;
         }
 

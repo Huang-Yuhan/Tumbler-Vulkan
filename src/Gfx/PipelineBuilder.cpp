@@ -132,9 +132,9 @@ std::expected<VkPipeline, PipelineError> GraphicsPipelineBuilder::Build(VkDevice
 
     VkPipelineDepthStencilStateCreateInfo depthStencil{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-        .depthTestEnable = depthFormat != VK_FORMAT_UNDEFINED ? VK_TRUE : VK_FALSE,
-        .depthWriteEnable = depthFormat != VK_FORMAT_UNDEFINED ? VK_TRUE : VK_FALSE,
-        .depthCompareOp = depthOp,
+        .depthTestEnable  = depthTestEnable,
+        .depthWriteEnable = depthWriteEnable,
+        .depthCompareOp   = depthOp,
     };
 
     VkPipelineColorBlendAttachmentState blendAttachment{

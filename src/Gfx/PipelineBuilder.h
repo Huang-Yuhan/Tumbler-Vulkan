@@ -38,6 +38,8 @@ struct GraphicsPipelineBuilder {
     VkCullModeFlags    cullMode    = VK_CULL_MODE_BACK_BIT;
     VkPolygonMode      polygonMode = VK_POLYGON_MODE_FILL;
     VkCompareOp        depthOp     = VK_COMPARE_OP_GREATER;  // reversed-Z
+    VkBool32           depthTestEnable = VK_TRUE;
+    VkBool32           depthWriteEnable = VK_TRUE;
     VkBool32           depthBiasEnable    = VK_FALSE;
     float              depthBiasConstant  = 0.0f;
     float              depthBiasSlope     = 0.0f;

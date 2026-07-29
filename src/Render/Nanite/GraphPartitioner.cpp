@@ -1,168 +1,162 @@
 #include "GraphPartitioner.h"
 
 #include <cassert>
-#include <metis.h>
-#include <numeric>
+#include <algorithm>
 
 namespace Tumbler::Nanite {
 
-// ---- Private ----
+void GraphPartitioner::BisectGraph(FGraphData* graph, FGraphData* childGraphs[2]) {
+    childGraphs[0] = nullptr;
+    childGraphs[1] = nullptr;
 
-std::expected<void, PartitionError>
-GraphPartitioner::Bisect(const MetisGraphWrapper::Result& graph,
-                         int32_t first,
-                         const PartitionSettings& settings,
-                         std::vector<int32_t>& sortedTo,
-                         std::vector<int32_t>& sortedTriangles,
-                         std::vector<int32_t>& part,
-                         std::vector<Range>& clusters) {
-    const int32_t N = graph.numVertices;
+    auto AddPartition = [this](int32_t offset, int32_t num) {
+        Range& range = Ranges[m_NumPartitions++];
+        range.start  = offset;
+        range.end    = offset + num;
+    };
 
-    // ---- 1. Leaf: this subgraph is already a cluster ----
-    if (N <= settings.maxClusterSize) {
-        int32_t clusterId = static_cast<int32_t>(clusters.size());
-        for (int32_t i = 0; i < N; ++i) {
-            int32_t globalIdx = sortedTriangles[first + i];
-            part[globalIdx] = clusterId;
-        }
-        clusters.push_back(Range{first, first + N});
-        return {};
+    if (graph->Num <= m_MaxPartitionSize) {
+        AddPartition(graph->Offset, graph->Num);
+        return;
     }
 
-    // ---- 2. Bisect with METIS_PartGraphRecursive(nparts=2) ----
-    idx_t ncon = 1;
+    const int32_t targetPartitionSize = (m_MinPartitionSize + m_MaxPartitionSize) / 2;
+    const int32_t targetNumPartitions = std::max(2, (graph->Num + targetPartitionSize - 1) / targetPartitionSize);
+
+    assert(graph->AdjacencyOffset.size() == static_cast<size_t>(graph->Num + 1));
+
+    idx_t ncon  = 1;
     idx_t nparts = 2;
     idx_t edgecut = 0;
-    std::vector<idx_t> localPart(N);
+
+    real_t partitionWeights[] = {
+        static_cast<float>(targetNumPartitions / 2) / targetNumPartitions,
+        1.0f - static_cast<float>(targetNumPartitions / 2) / targetNumPartitions
+    };
 
     idx_t options[METIS_NOPTIONS];
     METIS_SetDefaultOptions(options);
-    // TODO: tune these for triangle mesh quality
-    //   options[METIS_OPTION_CTYPE]  = METIS_CTYPE_SHEM;
-    //   options[METIS_OPTION_IPTYPE] = METIS_IPTYPE_EDGE;
-    //   options[METIS_OPTION_RTYPE]  = METIS_RTYPE_SEP2SIDED;
-    //   options[METIS_OPTION_MINCONN] = 1;
-    //   options[METIS_OPTION_CONTIG]  = 1;
 
-    int ret = METIS_PartGraphRecursive(
-        const_cast<idx_t*>(&N),      // nvtxs
-        &ncon,                         // ncon
-        const_cast<idx_t*>(graph.xadj.data()),     // xadj
-        const_cast<idx_t*>(graph.adjncy.data()),   // adjncy
-        nullptr,                                   // vwgt
-        nullptr,                                   // vsize
-        const_cast<idx_t*>(graph.adjwgt.data()),   // adjwgt
-        &nparts,                                   // nparts
-        nullptr,                                   // tpwgts (equal weight)
-        nullptr,                                   // ubvec (default unbalance)
-        options,                                   // options
-        &edgecut,                                  // edgecut
-        localPart.data());                         // part
+    // Allow looser imbalance tolerance at higher levels
+    bool bLoose = targetNumPartitions >= 128 || m_MaxPartitionSize / m_MinPartitionSize > 1;
+    options[METIS_OPTION_UFACTOR] = bLoose ? 200 : 1;
 
-    if (ret != METIS_OK) {
-        switch (ret) {
-        case METIS_ERROR_INPUT:  return std::unexpected(PartitionError::InvalidInput);
-        case METIS_ERROR_MEMORY: return std::unexpected(PartitionError::OutOfMemory);
-        default:                 return std::unexpected(PartitionError::InternalError);
-        }
-    }
+    int r = METIS_PartGraphRecursive(
+        &graph->Num,
+        &ncon,
+        graph->AdjacencyOffset.data(),
+        graph->Adjacency.data(),
+        nullptr,                         // vwgt
+        nullptr,                         // vsize
+        graph->AdjacencyCost.data(),     // adjwgt
+        &nparts,
+        partitionWeights,                // tpwgts (imbalanced split)
+        nullptr,                         // ubvec
+        options,
+        &edgecut,
+        m_PartitionIDs.data() + graph->Offset
+    );
 
-    // ---- 3. Two-pointer partition: part=0 to the left, part=1 to the right ----
-    int32_t l = first;
-    int32_t r = first + N - 1;
+    assert(r == METIS_OK);
 
-    while (l <= r) {
-        while (l <= r && localPart[sortedTo[sortedTriangles[l]] - first] == 0) ++l;
-        while (l <= r && localPart[sortedTo[sortedTriangles[r]] - first] == 1) --r;
-        if (l < r) {
-            std::swap(sortedTriangles[l], sortedTriangles[r]);
-            ++l;
-            --r;
-        }
-    }
-
-    int32_t leftN = l - first;
-
-    // Single mesh: METIS should always produce a valid bisection
-    assert(leftN > 0 && leftN < N);
-    // TODO: support sub-mesh / disconnected components (guard against
-    //       degenerate bisection where all vertices land on one side)
-
-    // Rebuild sortedTo from the rearranged sortedTriangles
-    for (int32_t pos = first; pos < first + N; ++pos) {
-        sortedTo[sortedTriangles[pos]] = pos;
-    }
-
-    // ---- 4. Build left + right subgraphs ----
-    auto BuildSubgraph = [&](int32_t side) -> MetisGraphWrapper::Result {
-        // oldToNew: old local index → new local index 0..sideN-1
-        std::vector<int32_t> oldToNew(N, -1);
-        int32_t sideN = 0;
-        for (int32_t v = 0; v < N; ++v) {
-            if (localPart[v] == side) {
-                oldToNew[v] = sideN++;
+    // ---- In-place two-pointer partition ----
+    {
+        int32_t front = graph->Offset;
+        int32_t back  = graph->Offset + graph->Num - 1;
+        while (front <= back) {
+            while (front <= back && m_PartitionIDs[front] == 0) {
+                m_SwappedWith[front] = front;
+                ++front;
+            }
+            while (front <= back && m_PartitionIDs[back] == 1) {
+                m_SwappedWith[back] = back;
+                --back;
+            }
+            if (front < back) {
+                std::swap(Indexes[front], Indexes[back]);
+                m_SwappedWith[front] = back;
+                m_SwappedWith[back]  = front;
+                ++front;
+                --back;
             }
         }
 
-        MetisGraphWrapper builder(sideN);
-        for (int32_t v = 0; v < N; ++v) {
-            if (localPart[v] != side) continue;
-            int32_t newV = oldToNew[v];
-            for (idx_t e = graph.xadj[v]; e < graph.xadj[v + 1]; ++e) {
-                int32_t neighbor = graph.adjncy[e];
-                if (localPart[neighbor] == side) {
-                    builder.AddEdge(newV, oldToNew[neighbor], graph.adjwgt[e]);
+        int32_t split = front;
+        int32_t num[2];
+        num[0] = split - graph->Offset;
+        num[1] = graph->Offset + graph->Num - split;
+
+        assert(num[0] > 0);
+        assert(num[1] > 0);
+
+        if (num[0] <= m_MaxPartitionSize && num[1] <= m_MaxPartitionSize) {
+            AddPartition(graph->Offset, num[0]);
+            AddPartition(split,          num[1]);
+        } else {
+            for (int32_t i = 0; i < 2; ++i) {
+                childGraphs[i]            = new FGraphData;
+                childGraphs[i]->Adjacency.reserve(graph->Adjacency.size() >> 1);
+                childGraphs[i]->AdjacencyCost.reserve(graph->Adjacency.size() >> 1);
+                childGraphs[i]->AdjacencyOffset.reserve(num[i] + 1);
+                childGraphs[i]->Num = num[i];
+            }
+            childGraphs[0]->Offset = graph->Offset;
+            childGraphs[1]->Offset = split;
+
+            for (int32_t i = 0; i < graph->Num; ++i) {
+                FGraphData* child = childGraphs[i >= childGraphs[0]->Num ? 1 : 0];
+                child->AdjacencyOffset.push_back(static_cast<idx_t>(child->Adjacency.size()));
+
+                int32_t orgIndex = m_SwappedWith[graph->Offset + i] - graph->Offset;
+                for (idx_t adjIdx = graph->AdjacencyOffset[orgIndex];
+                     adjIdx < graph->AdjacencyOffset[orgIndex + 1]; ++adjIdx) {
+                    idx_t adj     = graph->Adjacency[adjIdx];
+                    idx_t adjCost = graph->AdjacencyCost[adjIdx];
+
+                    adj = m_SwappedWith[graph->Offset + adj] - child->Offset;
+                    if (0 <= adj && adj < child->Num) {
+                        child->Adjacency.push_back(adj);
+                        child->AdjacencyCost.push_back(adjCost);
+                    }
                 }
             }
+            childGraphs[0]->AdjacencyOffset.push_back(
+                static_cast<idx_t>(childGraphs[0]->Adjacency.size()));
+            childGraphs[1]->AdjacencyOffset.push_back(
+                static_cast<idx_t>(childGraphs[1]->Adjacency.size()));
         }
-        return builder.Build();
-    };
-
-    MetisGraphWrapper::Result leftSubgraph  = BuildSubgraph(0);
-    MetisGraphWrapper::Result rightSubgraph = BuildSubgraph(1);
-
-    // ---- 5. Recurse ----
-    auto leftResult = Bisect(leftSubgraph, first, settings,
-                             sortedTo, sortedTriangles, part, clusters);
-    if (!leftResult) return std::unexpected(leftResult.error());
-
-    auto rightResult = Bisect(rightSubgraph, first + leftN, settings,
-                              sortedTo, sortedTriangles, part, clusters);
-    if (!rightResult) return std::unexpected(rightResult.error());
-    return {};
+    }
 }
 
-// ---- Public ----
+void GraphPartitioner::RecursiveBisectGraph(FGraphData* graph) {
+    FGraphData* childGraphs[2];
+    BisectGraph(graph, childGraphs);
+    delete graph;
 
-std::expected<GraphPartitioner::Result, PartitionError>
-GraphPartitioner::Partition(const MetisGraphWrapper::Result& graph,
-                            const PartitionSettings& settings) {
-    // ---- 1. Validate ----
-    if (settings.minClusterSize > settings.maxClusterSize ||
-        settings.maxClusterSize <= 0 ||
-        graph.numVertices <= 0) {
-        return std::unexpected(PartitionError::InvalidInput);
+    if (childGraphs[0] && childGraphs[1]) {
+        RecursiveBisectGraph(childGraphs[0]);
+        RecursiveBisectGraph(childGraphs[1]);
     }
+}
 
-    // ---- 2. Init identity mappings ----
-    std::vector<int32_t> sortedTo(graph.numVertices);       // sortedTo[oldIdx] = newPos
-    std::vector<int32_t> sortedTriangles(graph.numVertices); // sortedTriangles[pos] = oldIdx
-    std::iota(sortedTo.begin(), sortedTo.end(), 0);
-    std::iota(sortedTriangles.begin(), sortedTriangles.end(), 0);
+void GraphPartitioner::PartitionStrict(FGraphData* graph, bool /*bThreaded*/) {
+    m_PartitionIDs.resize(m_NumElements);
+    m_SwappedWith.resize(m_NumElements);
 
-    std::vector<int32_t> part(graph.numVertices);
-    std::vector<Range> clusters;
+    int32_t numPartitionsExpected = (graph->Num + m_MinPartitionSize - 1) / m_MinPartitionSize;
+    Ranges.resize(numPartitionsExpected * 2);
+    m_NumPartitions = 0;
 
-    // ---- 3. Recursive bisection ----
-    auto BisectRes = Bisect(graph, 0, settings, sortedTo, sortedTriangles, part, clusters);
-    if (!BisectRes) return std::unexpected(BisectRes.error());
+    RecursiveBisectGraph(graph);
 
-    // ---- 4. Return ----
-    Result result;
-    result.part      = std::move(part);
-    result.clusters  = std::move(clusters);
-    result.sortedTo  = std::move(sortedTo);
-    return result;
+    Ranges.resize(m_NumPartitions);
+    std::sort(Ranges.begin(), Ranges.end());
+
+    m_PartitionIDs.clear();
+    m_SwappedWith.clear();
+
+    for (uint32_t i = 0; i < m_NumElements; ++i)
+        SortedTo[Indexes[i]] = i;
 }
 
 } // namespace Tumbler::Nanite

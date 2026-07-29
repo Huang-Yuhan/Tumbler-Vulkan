@@ -82,10 +82,52 @@ public:
 
 		auto [begin, end] = map.equal_range(Key);
 		for (auto it = begin; it != end; it++) {
-                    auto otherIndex = it->second;
-                    if (p2 == GetPos(otherIndex) && p1 == GetPos(cycle3(otherIndex))) {
-                        Func(idx, otherIndex);
+			auto otherIndex = it->second;
+			if (p2 == GetPos(otherIndex) && p1 == GetPos(cycle3(otherIndex))) {
+				Func(idx, otherIndex);
 			}
+		}
+	}
+
+	// ---- Direct adjacency array builder ----
+	// After all AddEdge calls, builds a compact Direct[] array where
+	// Direct[edgeIndex] = pairedEdgeIndex (-1 = no match, -2 = >2 matches).
+	template <PositionProvider GetPosition>
+	void BuildDirectAdjacency(std::vector<int32_t>& outDirect, uint32_t numEdges,
+	                          GetPosition&& GetPos) const {
+		outDirect.assign(numEdges, -1);
+
+		for (uint32_t edgeIndex = 0; edgeIndex < numEdges; ++edgeIndex) {
+			int32_t adjCount = 0;
+			int32_t adjIndex = -1;
+			ForAllMatching(edgeIndex, GetPos,
+				[&](uint32_t /*a*/, uint32_t b) {
+					adjIndex = static_cast<int32_t>(b);
+					++adjCount;
+				});
+			outDirect[edgeIndex] = (adjCount == 1) ? adjIndex : (adjCount > 1 ? -2 : -1);
+		}
+	}
+
+	// Iterate all unique matched pairs where first < second
+	template <typename EdgePairCallback>
+	static void ForAllPairs(const std::vector<int32_t>& direct, uint32_t numEdges,
+	                        EdgePairCallback&& callback) {
+		for (uint32_t e = 0; e < numEdges; ++e) {
+			int32_t adj = direct[e];
+			if (adj >= 0 && static_cast<uint32_t>(adj) > e) {
+				callback(e, static_cast<uint32_t>(adj));
+			}
+		}
+	}
+
+	// Callback for a specific edge: func(edgeIndex, adjEdgeIndex) if matched
+	template <typename EdgePairCallback>
+	static void ForEachAdjacency(const std::vector<int32_t>& direct, uint32_t edgeIndex,
+	                             EdgePairCallback&& callback) {
+		int32_t adj = direct[edgeIndex];
+		if (adj >= 0) {
+			callback(edgeIndex, static_cast<uint32_t>(adj));
 		}
 	}
 };
