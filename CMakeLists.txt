@@ -102,6 +102,26 @@ add_custom_command(
 )
 list(APPEND SPV_OUTPUTS ${CLUSTER_VIS_VERT} ${CLUSTER_VIS_FRAG})
 
+# ---- cluster_draw.slang (multi-entry-point: vert_main + frag_main) ----
+set(CLUSTER_DRAW_VERT "${SHADER_OUTPUT_DIR}/cluster_draw_vert.spv")
+set(CLUSTER_DRAW_FRAG "${SHADER_OUTPUT_DIR}/cluster_draw_frag.spv")
+
+add_custom_command(
+    OUTPUT ${CLUSTER_DRAW_VERT}
+    COMMAND ${SLANGC_EXECUTABLE} ${CMAKE_SOURCE_DIR}/shaders/cluster_draw.slang
+            -entry vert_main -stage vertex -o ${CLUSTER_DRAW_VERT} -target spirv
+    DEPENDS ${CMAKE_SOURCE_DIR}/shaders/cluster_draw.slang
+    COMMENT "Compiling cluster_draw.slang (vert) → SPIR-V"
+)
+add_custom_command(
+    OUTPUT ${CLUSTER_DRAW_FRAG}
+    COMMAND ${SLANGC_EXECUTABLE} ${CMAKE_SOURCE_DIR}/shaders/cluster_draw.slang
+            -entry frag_main -stage fragment -o ${CLUSTER_DRAW_FRAG} -target spirv
+    DEPENDS ${CMAKE_SOURCE_DIR}/shaders/cluster_draw.slang
+    COMMENT "Compiling cluster_draw.slang (frag) → SPIR-V"
+)
+list(APPEND SPV_OUTPUTS ${CLUSTER_DRAW_VERT} ${CLUSTER_DRAW_FRAG})
+
 # ---- Generic shader compilation (single entry point "main") ----
 foreach(shader ${SHADER_SOURCES})
     get_filename_component(shader_name ${shader} NAME_WE)
@@ -119,7 +139,7 @@ foreach(shader ${SHADER_SOURCES})
     endif()
 
     # Skip multi-entry-point shaders (already handled above)
-    if(shader_name STREQUAL "nanite_debug" OR shader_name STREQUAL "cluster_vis")
+    if(shader_name STREQUAL "nanite_debug" OR shader_name STREQUAL "cluster_vis" OR shader_name STREQUAL "cluster_draw")
         continue()
     endif()
 

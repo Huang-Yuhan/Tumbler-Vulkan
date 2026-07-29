@@ -21,95 +21,72 @@
 
 namespace {
 
+using namespace Tumbler;
+using namespace Tumbler::Nanite;
+
 enum class RenderMode {
     Shaded,
     Wireframe,
     ShadedWireframe,
 };
 
-struct MeshGpuState {
-    VkBuffer vertexBuffer = VK_NULL_HANDLE;
-    VkBuffer indexBuffer  = VK_NULL_HANDLE;
-    VkBuffer colorBuffer  = VK_NULL_HANDLE;
-    VmaAllocation vertAlloc = VK_NULL_HANDLE;
-    VmaAllocation idxAlloc  = VK_NULL_HANDLE;
-    VmaAllocation colAlloc  = VK_NULL_HANDLE;
-    VkPipelineLayout pipeLayout    = VK_NULL_HANDLE;
-    VkPipeline       pipelineFill  = VK_NULL_HANDLE;
-    VkPipeline       pipelineLine  = VK_NULL_HANDLE;
-    uint32_t         indexCount    = 0;
+struct ClusterGpuState {
+    VkBuffer         clusterMeta     = VK_NULL_HANDLE;  // StructuredBuffer<ClusterInfo>
+    VkBuffer         indexBuffer     = VK_NULL_HANDLE;  // StructuredBuffer<uint>
+    VkBuffer         positionBuffer  = VK_NULL_HANDLE;  // StructuredBuffer<float> (xyz per vertex)
+    VmaAllocation    metaAlloc       = VK_NULL_HANDLE;
+    VmaAllocation    idxAlloc        = VK_NULL_HANDLE;
+    VmaAllocation    posAlloc        = VK_NULL_HANDLE;
+    VkDescriptorSetLayout setLayout  = VK_NULL_HANDLE;
+    VkDescriptorPool      descPool   = VK_NULL_HANDLE;
+    VkDescriptorSet       descSet    = VK_NULL_HANDLE;
+    VkPipelineLayout      pipeLayout = VK_NULL_HANDLE;
+    VkPipeline            pipelineFill = VK_NULL_HANDLE;
+    VkPipeline            pipelineLine = VK_NULL_HANDLE;
+    uint32_t              vertexCount  = 0;  // per-cluster (= kClusterTriangleCount * 3)
+    uint32_t              numClusters  = 0;
 };
 
-// Push constant: viewProj + wireframe flag (matches cluster_vis.slang)
+// Push constant: matches cluster_draw.slang
 struct PushData {
     glm::mat4 viewProj;
     uint32_t  wireframe;
 };
 static_assert(sizeof(PushData) >= sizeof(glm::mat4) + sizeof(uint32_t));
 
-// Generate a maximally distinct color from cluster ID.
-// Uses golden-ratio conjugate to scatter hues so adjacent cluster IDs
-// are never close in color, plus varies saturation and value.
-glm::vec3 ClusterColor(int32_t clusterId, int32_t numClusters) {
-    if (numClusters <= 0) return glm::vec3(0.5f);
+// Precompute a maximally distinct color palette for N clusters
+std::vector<glm::vec4> BuildClusterColors(int32_t numClusters) {
+    std::vector<glm::vec4> colors(numClusters);
+    constexpr float kGolden = 0.618033988749895f;
+    for (int32_t i = 0; i < numClusters; ++i) {
+        float hue = std::fmod(float(i) * kGolden, 1.0f);
+        float sat = (i & 1) ? 0.85f : 0.65f;
+        float val = (i & 2) ? 0.90f : 0.70f;
 
-    constexpr float kGoldenRatioConjugate = 0.618033988749895f;
-    float hue = std::fmod(float(clusterId) * kGoldenRatioConjugate, 1.0f);
-
-    // Vary saturation and value by cluster parity to add contrast
-    float saturation = (clusterId & 1) ? 0.85f : 0.65f;
-    float value      = (clusterId & 2) ? 0.90f : 0.70f;
-
-    // HSV→RGB
-    float c = value * saturation;
-    float x = c * (1.0f - std::abs(std::fmod(hue * 6.0f, 2.0f) - 1.0f));
-    float m = value - c;
-
-    float r, g, b;
-    if      (hue < 1.0f / 6.0f) { r = c; g = x; b = 0; }
-    else if (hue < 2.0f / 6.0f) { r = x; g = c; b = 0; }
-    else if (hue < 3.0f / 6.0f) { r = 0; g = c; b = x; }
-    else if (hue < 4.0f / 6.0f) { r = 0; g = x; b = c; }
-    else if (hue < 5.0f / 6.0f) { r = x; g = 0; b = c; }
-    else                         { r = c; g = 0; b = x; }
-
-    return glm::vec3(r + m, g + m, b + m);
+        float c = val * sat;
+        float x = c * (1.0f - std::abs(std::fmod(hue * 6.0f, 2.0f) - 1.0f));
+        float m = val - c;
+        float r, g, b;
+        if      (hue < 1.0f/6.0f) { r=c; g=x; b=0; }
+        else if (hue < 2.0f/6.0f) { r=x; g=c; b=0; }
+        else if (hue < 3.0f/6.0f) { r=0; g=c; b=x; }
+        else if (hue < 4.0f/6.0f) { r=0; g=x; b=c; }
+        else if (hue < 5.0f/6.0f) { r=x; g=0; b=c; }
+        else                       { r=c; g=0; b=x; }
+        colors[i] = glm::vec4(r + m, g + m, b + m, 1.0f);
+    }
+    return colors;
 }
 
-bool UploadMeshForClusterVis(VkDevice device, VmaAllocator allocator,
-                              Tumbler::CommandManager& cmdManager,
-                              Tumbler::DeletionQueue& dq,
-                              const Tumbler::MeshData& mesh,
-                              const std::vector<int32_t>& part,
-                              int32_t numClusters,
-                              VkFormat colorFormat,
-                              MeshGpuState& state) {
-    if (mesh.vertices.empty() || mesh.indices.empty()) return false;
+bool UploadClusterData(VkDevice device, VmaAllocator allocator,
+                       CommandManager& cmdManager, DeletionQueue& dq,
+                       const std::vector<Cluster>& clusters,
+                       VkFormat colorFormat,
+                       ClusterGpuState& state) {
+    if (clusters.empty()) return false;
 
-    // ---- Build per-vertex cluster colors ----
-    std::vector<glm::vec3> colors(mesh.vertices.size(), glm::vec3(0.0f));
-    int32_t numTriangles = static_cast<int32_t>(mesh.indices.size() / 3);
-    for (int32_t t = 0; t < numTriangles; ++t) {
-        int32_t cid = (t < static_cast<int32_t>(part.size())) ? part[t] : 0;
-        glm::vec3 color = ClusterColor(cid, numClusters);
-        for (int32_t k = 0; k < 3; ++k) {
-            uint32_t vi = mesh.indices[t * 3 + k];
-            if (vi < colors.size()) colors[vi] = color;
-        }
-    }
-
-    // ---- Build interleaved vertex buffer: position(12B) + color(12B) = 24B ----
-    struct VertexPC {
-        float px, py, pz;
-        float cr, cg, cb;
-    };
-    std::vector<VertexPC> vertData(mesh.vertices.size());
-    for (size_t i = 0; i < mesh.vertices.size(); ++i) {
-        vertData[i] = {
-            mesh.vertices[i].pos.x, mesh.vertices[i].pos.y, mesh.vertices[i].pos.z,
-            colors[i].x, colors[i].y, colors[i].z,
-        };
-    }
+    state.numClusters = static_cast<uint32_t>(clusters.size());
+    state.vertexCount = kClusterTriangleCount * 3;  // 384
 
     auto UploadBuffer = [&](const void* data, VkDeviceSize size,
                             VkBufferUsageFlags usage,
@@ -133,8 +110,7 @@ bool UploadMeshForClusterVis(VkDevice device, VmaAllocator allocator,
             .flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
             .usage = VMA_MEMORY_USAGE_AUTO,
         };
-        vmaCreateBuffer(allocator, &stageInfo, &stageAllocInfo,
-                        &staging, &stagingAlloc, nullptr);
+        vmaCreateBuffer(allocator, &stageInfo, &stageAllocInfo, &staging, &stagingAlloc, nullptr);
 
         void* mapped;
         vmaMapMemory(allocator, stagingAlloc, &mapped);
@@ -145,21 +121,125 @@ bool UploadMeshForClusterVis(VkDevice device, VmaAllocator allocator,
             VkBufferCopy region{ .size = size };
             vkCmdCopyBuffer(cmd, staging, buffer, 1, &region);
         });
-
         dq.Enqueue([allocator, staging, stagingAlloc]() {
             vmaDestroyBuffer(allocator, staging, stagingAlloc);
         });
     };
 
-    UploadBuffer(vertData.data(), vertData.size() * sizeof(VertexPC),
-                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                 state.vertexBuffer, state.vertAlloc);
-    UploadBuffer(mesh.indices.data(), mesh.indices.size() * sizeof(uint32_t),
-                 VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                 state.indexBuffer, state.idxAlloc);
-    state.indexCount = static_cast<uint32_t>(mesh.indices.size());
+    // ---- 1. Build flat position buffer: xyz per unique vertex ----
+    // Iterate clusters, extract positions from VertexData, dedup by offset tracking
+    std::vector<float> allPositions;      // xyz per vertex
+    std::vector<uint32_t> allIndices;     // packed local indices
+    std::vector<glm::vec4> clusterColors = BuildClusterColors(state.numClusters);
 
-    // ---- Pipeline layout: push constant (mat4 + uint for wireframe flag) ----
+    // Cluster metadata struct (matches shader's ClusterInfo)
+    struct CpuClusterInfo {
+        uint32_t indexOffset;
+        uint32_t vertexOffset;
+        uint32_t indexCount;
+        uint32_t pad;
+        float    color[4];
+    };
+    std::vector<CpuClusterInfo> meta(state.numClusters);
+
+    uint32_t curIndexOffset  = 0;
+    uint32_t curVertexOffset = 0;
+
+    for (uint32_t c = 0; c < state.numClusters; ++c) {
+        const auto& cluster = clusters[c];
+        uint32_t numVerts = cluster.NumVertices;
+        uint32_t numIdx   = static_cast<uint32_t>(cluster.indices.size());
+
+        // Store positions: VertexData[i] is 32 bytes (Vertex struct), pos is first 12 bytes
+        for (uint32_t v = 0; v < numVerts; ++v) {
+            const float* src = reinterpret_cast<const float*>(cluster.VertexData.data() + v * sizeof(Vertex));
+            allPositions.push_back(src[0]);  // pos.x
+            allPositions.push_back(src[1]);  // pos.y
+            allPositions.push_back(src[2]);  // pos.z
+        }
+
+        // Store indices (local indices already remapped to local vertex range)
+        allIndices.insert(allIndices.end(), cluster.indices.begin(), cluster.indices.end());
+
+        meta[c] = {
+            curIndexOffset,
+            curVertexOffset,
+            numIdx,
+            0,
+            { clusterColors[c].x, clusterColors[c].y, clusterColors[c].z, clusterColors[c].w }
+        };
+
+        curIndexOffset  += numIdx;
+        curVertexOffset += numVerts;
+    }
+
+    // ---- 2. Upload buffers ----
+    UploadBuffer(meta.data(), meta.size() * sizeof(CpuClusterInfo),
+                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                 state.clusterMeta, state.metaAlloc);
+    UploadBuffer(allIndices.data(), allIndices.size() * sizeof(uint32_t),
+                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                 state.indexBuffer, state.idxAlloc);
+    UploadBuffer(allPositions.data(), allPositions.size() * sizeof(float),
+                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                 state.positionBuffer, state.posAlloc);
+
+    // ---- 3. Descriptor set layout ----
+    VkDescriptorSetLayoutBinding bindings[3] = {
+        { .binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 1,
+          .stageFlags = VK_SHADER_STAGE_VERTEX_BIT },
+        { .binding = 1, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 1,
+          .stageFlags = VK_SHADER_STAGE_VERTEX_BIT },
+        { .binding = 2, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 1,
+          .stageFlags = VK_SHADER_STAGE_VERTEX_BIT },
+    };
+    VkDescriptorSetLayoutCreateInfo setLayoutInfo{
+        .sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .bindingCount = 3,
+        .pBindings    = bindings,
+    };
+    vkCreateDescriptorSetLayout(device, &setLayoutInfo, nullptr, &state.setLayout);
+
+    // ---- 4. Descriptor pool + set ----
+    VkDescriptorPoolSize poolSize{
+        .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 3,
+    };
+    VkDescriptorPoolCreateInfo poolInfo{
+        .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .maxSets       = 1,
+        .poolSizeCount = 1,
+        .pPoolSizes    = &poolSize,
+    };
+    vkCreateDescriptorPool(device, &poolInfo, nullptr, &state.descPool);
+
+    VkDescriptorSetAllocateInfo setAlloc{
+        .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .descriptorPool     = state.descPool,
+        .descriptorSetCount = 1,
+        .pSetLayouts        = &state.setLayout,
+    };
+    vkAllocateDescriptorSets(device, &setAlloc, &state.descSet);
+
+    // ---- 5. Write descriptor set ----
+    VkDescriptorBufferInfo bufInfos[3] = {
+        { .buffer = state.clusterMeta,    .offset = 0, .range = VK_WHOLE_SIZE },
+        { .buffer = state.indexBuffer,    .offset = 0, .range = VK_WHOLE_SIZE },
+        { .buffer = state.positionBuffer, .offset = 0, .range = VK_WHOLE_SIZE },
+    };
+    VkWriteDescriptorSet writes[3];
+    for (int i = 0; i < 3; ++i) {
+        writes[i] = {
+            .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet          = state.descSet,
+            .dstBinding      = static_cast<uint32_t>(i),
+            .descriptorCount = 1,
+            .descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .pBufferInfo     = &bufInfos[i],
+        };
+    }
+    vkUpdateDescriptorSets(device, 3, writes, 0, nullptr);
+
+    // ---- 6. Pipeline layout ----
     VkPushConstantRange pushRange{
         .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         .offset     = 0,
@@ -167,46 +247,34 @@ bool UploadMeshForClusterVis(VkDevice device, VmaAllocator allocator,
     };
     VkPipelineLayoutCreateInfo pipeLayoutInfo{
         .sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount         = 0,
-        .pSetLayouts            = nullptr,
+        .setLayoutCount         = 1,
+        .pSetLayouts            = &state.setLayout,
         .pushConstantRangeCount = 1,
         .pPushConstantRanges    = &pushRange,
     };
     vkCreatePipelineLayout(device, &pipeLayoutInfo, nullptr, &state.pipeLayout);
 
-    // ---- Graphics pipeline with vertex attributes ----
-    // Interleaved: position(12B) + color(12B) = 24B stride
-    VkVertexInputBindingDescription bindDesc{
-        .binding   = 0,
-        .stride    = 24,  // float3 pos + float3 color
-        .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
-    };
-    VkVertexInputAttributeDescription attribDescs[2] = {
-        { .location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0  },
-        { .location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 12 },
-    };
-    std::span<VkVertexInputBindingDescription> bindSpan(&bindDesc, 1);
-    std::span<VkVertexInputAttributeDescription> attrSpan(attribDescs, 2);
-
+    // ---- 7. Graphics pipeline (no vertex input bindings — GPU-driven) ----
     std::vector<VkFormat> formats = { colorFormat };
     std::span<VkFormat> colorSpan(formats);
-    Tumbler::GraphicsPipelineBuilder pipeBuilder{
+    std::span<VkVertexInputBindingDescription> emptyBindings;
+    std::span<VkVertexInputAttributeDescription> emptyAttribs;
+
+    GraphicsPipelineBuilder pipeBuilder{
         .layout         = state.pipeLayout,
-        .vertPath       = SHADER_DIR "/cluster_vis_vert.spv",
-        .fragPath       = SHADER_DIR "/cluster_vis_frag.spv",
+        .vertPath       = SHADER_DIR "/cluster_draw_vert.spv",
+        .fragPath       = SHADER_DIR "/cluster_draw_frag.spv",
         .colorFormats   = colorSpan,
         .depthFormat    = VK_FORMAT_D32_SFLOAT,
         .cullMode       = VK_CULL_MODE_BACK_BIT,
-        .vertexBindings = bindSpan,
-        .vertexAttribs  = attrSpan,
+        .vertexBindings = emptyBindings,
+        .vertexAttribs  = emptyAttribs,
     };
 
-    // Fill pipeline
     auto fillPipe = pipeBuilder.Build(device);
     if (!fillPipe) return false;
     state.pipelineFill = *fillPipe;
 
-    // Line (wireframe) pipeline
     pipeBuilder.polygonMode       = VK_POLYGON_MODE_LINE;
     pipeBuilder.depthBiasEnable   = VK_TRUE;
     pipeBuilder.depthBiasConstant = -1.0f;
@@ -215,21 +283,21 @@ bool UploadMeshForClusterVis(VkDevice device, VmaAllocator allocator,
     if (!linePipe) return false;
     state.pipelineLine = *linePipe;
 
-    LOG_INFO("Mesh upload: {} vertices, {} triangles, {} clusters",
-             mesh.vertices.size(), numTriangles, numClusters);
+    LOG_INFO("Cluster upload: {} clusters, {} verts, {} indices",
+             state.numClusters, allPositions.size() / 3, allIndices.size());
     return true;
 }
 
-void DestroyMeshGpuState(VkDevice device, VmaAllocator allocator,
-                          Tumbler::DeletionQueue& dq,
-                          MeshGpuState& state) {
-    if (state.pipelineFill) dq.Enqueue([device, p = state.pipelineFill]() { vkDestroyPipeline(device, p, nullptr); });
-    if (state.pipelineLine) dq.Enqueue([device, p = state.pipelineLine]() { vkDestroyPipeline(device, p, nullptr); });
-    if (state.pipeLayout)  dq.Enqueue([device, l = state.pipeLayout]() { vkDestroyPipelineLayout(device, l, nullptr); });
-    if (state.vertexBuffer) dq.Enqueue([allocator, b = state.vertexBuffer, a = state.vertAlloc]()
-        { vmaDestroyBuffer(allocator, b, a); });
-    if (state.indexBuffer) dq.Enqueue([allocator, b = state.indexBuffer, a = state.idxAlloc]()
-        { vmaDestroyBuffer(allocator, b, a); });
+void DestroyClusterGpuState(VkDevice device, VmaAllocator allocator,
+                            DeletionQueue& dq, ClusterGpuState& state) {
+    if (state.pipelineFill) dq.Enqueue([d = device, p = state.pipelineFill]() { vkDestroyPipeline(d, p, nullptr); });
+    if (state.pipelineLine) dq.Enqueue([d = device, p = state.pipelineLine]() { vkDestroyPipeline(d, p, nullptr); });
+    if (state.pipeLayout)   dq.Enqueue([d = device, l = state.pipeLayout]()  { vkDestroyPipelineLayout(d, l, nullptr); });
+    if (state.descPool)     dq.Enqueue([d = device, p = state.descPool]()    { vkDestroyDescriptorPool(d, p, nullptr); });
+    if (state.setLayout)    dq.Enqueue([d = device, l = state.setLayout]()   { vkDestroyDescriptorSetLayout(d, l, nullptr); });
+    if (state.clusterMeta)  dq.Enqueue([a = allocator, b = state.clusterMeta,  al = state.metaAlloc]() { vmaDestroyBuffer(a, b, al); });
+    if (state.indexBuffer)  dq.Enqueue([a = allocator, b = state.indexBuffer, al = state.idxAlloc]()  { vmaDestroyBuffer(a, b, al); });
+    if (state.positionBuffer) dq.Enqueue([a = allocator, b = state.positionBuffer, al = state.posAlloc](){ vmaDestroyBuffer(a, b, al); });
 }
 
 } // anonymous namespace
@@ -246,7 +314,6 @@ int main(int argc, char** argv) {
         LOG_ERROR("Failed to load mesh: {}", meshPath);
         return 1;
     }
-    // Bunny is ~0.2 units wide - scale up for visibility
     for (auto& v : mesh->vertices) v.pos *= 10.0f;
     LOG_INFO("Mesh loaded: {} vertices, {} triangles",
              mesh->vertices.size(), mesh->indices.size() / 3);
@@ -258,7 +325,6 @@ int main(int argc, char** argv) {
         return 1;
     }
     auto& clusters = naniteData->clusterDag.GetClusters();
-    const auto& part = naniteData->clusterDag.GetPart();
     int32_t numClusters = static_cast<int32_t>(clusters.size());
     LOG_INFO("Nanite partition: {} clusters", numClusters);
 
@@ -305,7 +371,7 @@ int main(int argc, char** argv) {
     camera.SetPerspective(glm::radians(60.0f), 0.1f, 1000.0f);
     camera.SetTarget(glm::vec3(0.0f));
     camera.SetDistance(5.0f);
-    camera.Orbit(0.0f, glm::radians(20.0f));  // look slightly down
+    camera.Orbit(0.0f, glm::radians(20.0f));
 
     // ---- ImGui ----
     ImGuiLayer imgui;
@@ -327,13 +393,12 @@ int main(int argc, char** argv) {
         }
     }
 
-    // ---- Upload mesh with cluster colors ----
-    MeshGpuState meshGpu;
-    if (!UploadMeshForClusterVis(device.GetDevice(), vmaAllocator,
-                                  cmdManager, deletionQueue, *mesh,
-                                  part, numClusters,
-                                  swapchain.GetFormat(), meshGpu)) {
-        LOG_ERROR("Mesh GPU upload failed");
+    // ---- Upload cluster data ----
+    ClusterGpuState clusterGpu;
+    if (!UploadClusterData(device.GetDevice(), vmaAllocator,
+                           cmdManager, deletionQueue, clusters,
+                           swapchain.GetFormat(), clusterGpu)) {
+        LOG_ERROR("Cluster GPU upload failed");
         return 1;
     }
 
@@ -347,14 +412,12 @@ int main(int argc, char** argv) {
     while (!window.ShouldClose()) {
         window.PollEvents();
 
-        // Handle pending resize (from Present or previous Acquire)
         if (swapchain.NeedsRecreate()) {
             window.GetFramebufferSize(&fbW, &fbH);
             if (fbW > 0 && fbH > 0) {
                 swapchain.Recreate(fbW, fbH);
                 imgui.OnSwapchainRecreate(swapchain.GetImageCount());
             }
-            // Skip this frame — no valid swapchain to render to
             continue;
         }
 
@@ -363,7 +426,6 @@ int main(int argc, char** argv) {
         uint32_t imageIndex = 0;
         VkResult acquireResult = swapchain.AcquireNextImage(&imageIndex, VK_NULL_HANDLE, acquireFence);
         if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR || acquireResult == VK_SUBOPTIMAL_KHR) {
-            // Swapchain out of date — recreate immediately, don't defer
             window.GetFramebufferSize(&fbW, &fbH);
             if (fbW > 0 && fbH > 0) {
                 swapchain.Recreate(fbW, fbH);
@@ -376,16 +438,15 @@ int main(int argc, char** argv) {
         vkWaitForFences(device.GetDevice(), 1, &acquireFence, VK_TRUE, UINT64_MAX);
         vkResetFences(device.GetDevice(), 1, &acquireFence);
 
-        // ---- ImGui begin (must be before any ImGui::GetIO usage) ----
+        // ---- ImGui begin ----
         imgui.BeginFrame();
 
-        // ---- Camera (uses ImGui::GetIO().DeltaTime) ----
+        // ---- Camera ----
         float aspect = static_cast<float>(swapchain.GetExtent().width) /
                        static_cast<float>(swapchain.GetExtent().height);
         camera.SetAspectRatio(aspect);
-        camera.Orbit(ImGui::GetIO().DeltaTime * 0.3f, 0.0f);  // auto-rotate
+        camera.Orbit(ImGui::GetIO().DeltaTime * 0.3f, 0.0f);
 
-        // Mouse wheel zoom (when not hovering ImGui windows)
         float wheel = ImGui::GetIO().MouseWheel;
         if (wheel != 0.0f && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow)) {
             camera.Zoom(wheel * 2.0f);
@@ -458,42 +519,41 @@ int main(int argc, char** argv) {
         };
         vkCmdBeginRendering(cmd, &renderInfo);
 
-        // ---- Draw mesh ----
-        auto DrawMesh = [&](VkPipeline pipeline, bool wireframe) {
+        // ---- Draw clusters (instanced) ----
+        auto DrawClusters = [&](VkPipeline pipeline, bool wireframe) {
             PushData pushData{ viewProj, wireframe ? 1u : 0u };
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-            vkCmdPushConstants(cmd, meshGpu.pipeLayout,
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                    clusterGpu.pipeLayout, 0, 1,
+                                    &clusterGpu.descSet, 0, nullptr);
+            vkCmdPushConstants(cmd, clusterGpu.pipeLayout,
                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                                sizeof(PushData), &pushData);
 
             VkViewport viewport{
-                .x        = 0.0f,
-                .y        = 0.0f,
+                .x        = 0.0f, .y = 0.0f,
                 .width    = static_cast<float>(swapchain.GetExtent().width),
                 .height   = static_cast<float>(swapchain.GetExtent().height),
-                .minDepth = 0.0f,
-                .maxDepth = 1.0f,
+                .minDepth = 0.0f, .maxDepth = 1.0f,
             };
             VkRect2D scissor{ .offset = { 0, 0 }, .extent = swapchain.GetExtent() };
             vkCmdSetViewport(cmd, 0, 1, &viewport);
             vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-            VkDeviceSize vtxOffset = 0;
-            vkCmdBindVertexBuffers(cmd, 0, 1, &meshGpu.vertexBuffer, &vtxOffset);
-            vkCmdBindIndexBuffer(cmd, meshGpu.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-            vkCmdDrawIndexed(cmd, meshGpu.indexCount, 1, 0, 0, 0);
+            // 384 vertices per instance (= 128 triangles * 3), N instances
+            vkCmdDraw(cmd, clusterGpu.vertexCount, clusterGpu.numClusters, 0, 0);
         };
 
         switch (renderMode) {
         case RenderMode::Shaded:
-            DrawMesh(meshGpu.pipelineFill, false);
+            DrawClusters(clusterGpu.pipelineFill, false);
             break;
         case RenderMode::Wireframe:
-            DrawMesh(meshGpu.pipelineLine, true);
+            DrawClusters(clusterGpu.pipelineLine, true);
             break;
         case RenderMode::ShadedWireframe:
-            DrawMesh(meshGpu.pipelineFill, false);
-            DrawMesh(meshGpu.pipelineLine, true);
+            DrawClusters(clusterGpu.pipelineFill, false);
+            DrawClusters(clusterGpu.pipelineLine, true);
             break;
         }
 
@@ -536,7 +596,7 @@ int main(int argc, char** argv) {
     imgui.Shutdown();
     vkDeviceWaitIdle(device.GetDevice());
     vkDestroyFence(device.GetDevice(), acquireFence, nullptr);
-    DestroyMeshGpuState(device.GetDevice(), vmaAllocator, deletionQueue, meshGpu);
+    DestroyClusterGpuState(device.GetDevice(), vmaAllocator, deletionQueue, clusterGpu);
     deletionQueue.Shutdown();
     cmdManager.Shutdown();
     swapchain.Shutdown();
