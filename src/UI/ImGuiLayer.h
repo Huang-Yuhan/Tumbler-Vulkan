@@ -6,8 +6,9 @@ struct GLFWwindow;
 
 namespace Tumbler {
 
-// Thin RAII wrapper around ImGui's GLFW+Vulkan backend.
-// Designed for Dynamic Rendering (no render pass).
+// RAII wrapper around ImGui's GLFW+Vulkan backend.
+// Enables Docking branch + Unity-style dark theme.
+// Designed for Dynamic Rendering (Vulkan 1.4).
 class ImGuiLayer {
 public:
     ImGuiLayer() = default;
@@ -23,7 +24,7 @@ public:
         VkDevice         device;
         uint32_t         queueFamily;
         VkQueue          queue;
-        uint32_t         minImageCount;   // typically 2 or 3
+        uint32_t         minImageCount;
         VkFormat         colorFormat;
         VkFormat         depthFormat;
     };
@@ -31,18 +32,19 @@ public:
     bool Init(const Config& config);
     void Shutdown();
 
-    // Call each frame before building ImGui widgets
+    // Call each frame before building any ImGui widgets.
     void BeginFrame();
 
-    // Call INSIDE a dynamic rendering pass to record ImGui draw commands
+    // Call INSIDE a dynamic rendering pass to record ImGui draw commands.
     void EndFrame(VkCommandBuffer cmd);
 
-    // Called after swapchain recreation with the same format
+    // Called after swapchain recreation.
     void OnSwapchainRecreate(uint32_t minImageCount);
 
 private:
-    VkDevice m_Device      = VK_NULL_HANDLE;
-    bool     m_Initialized  = false;
+    void ApplyUnityTheme();
+    VkDevice    m_Device      = VK_NULL_HANDLE;
+    bool        m_Initialized  = false;
 };
 
 } // namespace Tumbler
